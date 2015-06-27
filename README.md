@@ -10,7 +10,7 @@ Not (yet) supported: appending to existing files (using unlimited dimensions), u
 
 ## Building
 
-rust-netcdf depends on libnetcdf. You also need libclang installed because netcdf-sys uses [rust-bindgen](https://github.com/crabtw/rust-bindgen) to generate netcdf function signatures.
+rust-netcdf depends on libnetcdf.
 
 ## Read Example
 

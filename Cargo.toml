@@ -11,5 +11,5 @@ keywords = ["netcdf", "hdf", "hdf4", "hdf5", "cdm", "libnetcdf", "netcdf4"]
 [dependencies.netcdf-sys]
 path = "netcdf-sys"
 
-[dependencies.lazy_static]
-git = "https://github.com/Kimundi/lazy-static.rs"
+[dependencies]
+lazy_static = "0.1.11"

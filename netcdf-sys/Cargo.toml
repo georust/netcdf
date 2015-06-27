@@ -14,11 +14,6 @@ build = "build.rs"
 [build-dependencies]
 gcc = "0.3.8"
 
-[build-dependencies.bindgen]
-git = "https://github.com/crabtw/rust-bindgen.git"
-
-[dependencies.lazy_static]
-git = "https://github.com/Kimundi/lazy-static.rs"
-
 [dependencies]
 libc = "0.1.8"
+lazy_static = "0.1.11"

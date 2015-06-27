@@ -7,7 +7,7 @@ extern crate lazy_static;
 extern crate libc;
 use std::sync::Mutex;
 
-include!(concat!(env!("OUT_DIR"), "/netcdf_bindings.rs"));
+include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/netcdf_bindings.rs"));
 
 extern "C" {
     pub static nc_nat: ::libc::c_int;
