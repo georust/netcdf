@@ -4,8 +4,8 @@ rust:
   - beta
   - nightly
 install:
-  - wget http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8.14/src/hdf5-1.8.14.tar.bz2
-  - tar -xzvf hdf5-1.8.14.tar.bz2
+  - wget https://www.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8.14/src/hdf5-1.8.14.tar.gz
+  - tar -xzvf hdf5-1.8.14.tar.gz
   - cd hdf5-1.8.14 && ./configure --prefix=/usr && make && sudo make install
   - wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.3.3.1.tar.gz
   - tar -xzvf netcdf-4.3.3.1.tar.gz
