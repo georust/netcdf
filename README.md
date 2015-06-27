@@ -53,4 +53,4 @@ file.root.add_variable(
 
 ## Documentation
 
-I intend to improve documentation soon. For now, check out tests/lib.rs for quite a few usage examples.
+I intend to improve documentation soon. For now, check out [tests/lib.rs](https://github.com/mhiley/rust-netcdf/blob/master/tests/lib.rs) for quite a few usage examples.
