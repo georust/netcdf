@@ -6,7 +6,7 @@ license = "GPL-3.0"
 description = "High-level NetCDF bindings for Rust"
 repository = "https://github.com/mhiley/rust-netcdf"
 documentation = "https://github.com/mhiley/rust-netcdf"
-keywords = ["netcdf", "hdf", "hdf4", "hdf5", "cdm", "libnetcdf", "netcdf4"]
+keywords = ["netcdf", "hdf", "hdf5", "libnetcdf", "netcdf4"]
 
 [dependencies]
 lazy_static = "0.1.11"
