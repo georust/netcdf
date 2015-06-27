@@ -4,8 +4,6 @@ rust:
     - beta
     - nightly
 os:
-    - linux
     - osx
 before_install:
-    - (test $TRAVIS_OS_NAME == "osx" && (brew update && brew install netcdf))
-    - (test $TRAVIS_OS_NAME == "linux" && (sudo apt-get update -qq && sudo apt-get install -y libnetcdf-dev))
+    - brew update && brew install netcdf
