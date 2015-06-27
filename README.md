@@ -10,7 +10,7 @@ Not (yet) supported: appending to existing files (using unlimited dimensions), u
 
 ## Building
 
-rust-netcdf depends on libnetcdf.
+rust-netcdf depends on libnetcdf v4.3.3.1
 
 ## Read Example
 

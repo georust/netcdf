@@ -1,8 +1,12 @@
 language: rust
 rust:
-    - 1.0.0
-    - beta
-    - nightly
-before_install:
-    - sudo apt-get update -qq
-    - sudo apt-get install -qq libnetcdf-dev
+  - 1.0.0
+  - beta
+  - nightly
+install:
+  - wget http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8.14/src/hdf5-1.8.14.tar.bz2
+  - tar -xzvf hdf5-1.8.14.tar.bz2
+  - cd hdf5-1.8.14 && ./configure --prefix=/usr && make && sudo make install
+  - wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.3.3.1.tar.gz
+  - tar -xzvf netcdf-4.3.3.1.tar.gz
+  - cd netcdf-4.3.3.1.tar.gz && ./configure --prefix=/usr && make && sudo make install
