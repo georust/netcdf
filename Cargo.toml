@@ -1,0 +1,15 @@
+[package]
+name = "netcdf"
+version = "0.1.0"
+authors = ["Michael Hiley <mike.hiley@ssec.wisc.edu>"]
+license = "GPL-3.0"
+description = "High-level NetCDF bindings for Rust"
+repository = "https://github.com/mhiley/rust-netcdf"
+documentation = "https://github.com/mhiley/rust-netcdf"
+keywords = ["netcdf", "hdf", "hdf4", "hdf5", "cdm", "libnetcdf", "netcdf4"]
+
+[dependencies.netcdf-sys]
+path = "netcdf-sys"
+
+[dependencies.lazy_static]
+git = "https://github.com/Kimundi/lazy-static.rs"
