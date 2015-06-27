@@ -9,4 +9,4 @@ install:
   - cd hdf5-1.8.14 && ./configure --prefix=/usr && make && sudo make install
   - wget ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.3.3.1.tar.gz
   - tar -xzvf netcdf-4.3.3.1.tar.gz
-  - cd netcdf-4.3.3.1.tar.gz && ./configure --prefix=/usr && make && sudo make install
+  - cd netcdf-4.3.3.1 && ./configure --prefix=/usr && make && sudo make install
