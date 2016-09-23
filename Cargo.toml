@@ -10,6 +10,4 @@ keywords = ["netcdf", "hdf", "hdf5", "libnetcdf", "netcdf4"]
 
 [dependencies]
 lazy_static = "0.1.11"
-
-[dependencies.netcdf-sys]
-path = "netcdf-sys"
+netcdf-sys = { path = "netcdf-sys" }
