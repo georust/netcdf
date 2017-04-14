@@ -1,5 +1,4 @@
 use std::ffi;
-use std::fmt;
 use std::collections::HashMap;
 use netcdf_sys::*;
 use string_from_c_str;
@@ -51,35 +50,8 @@ pub struct Attribute {
 
 impl Attribute {
     pub fn get_char(&self, cast: bool) -> Result<String, String> {
-        if self.attrtype != nc_char {
-            if !cast {
-                return Err("Types are not equivalent and cast==false".to_string());
-            } else {
-                // format each possible type into a String
-                let att_as_str;
-                if self.attrtype == nc_short {
-                    att_as_str = format!("{}", self.get_short(false).unwrap());
-                } else if self.attrtype == nc_byte {
-                    att_as_str = format!("{}", self.get_byte(false).unwrap());
-                } else if self.attrtype == nc_int {
-                    att_as_str = format!("{}", self.get_int(false).unwrap());
-                } else if self.attrtype == nc_float {
-                    att_as_str = format!("{}", self.get_float(false).unwrap());
-                } else if self.attrtype == nc_double {
-                    att_as_str = format!("{}", self.get_double(false).unwrap());
-                } else if self.attrtype == nc_ushort {
-                    att_as_str = format!("{}", self.get_ushort(false).unwrap());
-                } else if self.attrtype == nc_uint {
-                    att_as_str = format!("{}", self.get_uint(false).unwrap());
-                } else if self.attrtype == nc_int64 {
-                    att_as_str = format!("{}", self.get_int64(false).unwrap());
-                } else if self.attrtype == nc_uint64 {
-                    att_as_str = format!("{}", self.get_uint64(false).unwrap());
-                } else {
-                    return Err("unknown attribute type".to_string());
-                }
-                return Ok(att_as_str);
-            }
+        if (!cast) && (self.attrtype != nc_char) {
+            return Err("Types are not equivalent and cast==false".to_string());
         }
         let attr_char_str;
         let name_copy: ffi::CString = 
@@ -147,15 +119,6 @@ impl Attribute {
 
     pub fn get_double(&self, cast: bool) -> Result<f64, String> {
         get_attr_as_type!(self, nc_double, f64, nc_get_att_double, cast)
-    }
-}
-
-impl fmt::Display for Attribute {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.get_char(true) {
-            Ok(chars) => write!(f, "{}", chars),
-            Err(e) => write!(f, "{}", e)
-        }
     }
 }
 
