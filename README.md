@@ -6,7 +6,15 @@ High-level [NetCDF](http://www.unidata.ucar.edu/software/netcdf/) bindings for R
 
 ## Status
 
-Not (yet) supported: appending to existing files (using unlimited dimensions), user defined types, string variables, multi-valued attributes, strided/subsetted reads. All variable data is read into a 1-dimensional Vec with the last variable dimension varying fastest.
+Not (yet) supported:
+
+* appending to existing files (using unlimited dimensions),
+* user defined types,
+* string variables,
+* multi-valued attributes,
+* strided/subsetted reads. 
+
+All variable data is read into a 1-dimensional Vec with the last variable dimension varying fastest.
 
 ## Building
 
@@ -24,6 +32,10 @@ let var = file.root.variables.get("data").unwrap();
 // Read variable as any NC_TYPE, optionally failing if doing so would
 // force a cast:
 let data : Vec<i32> = var.get_int(false).unwrap();
+
+// You can also use values() to read the variable, data will be implicitly casted
+// if needed
+let data : Vec<i32> = var.values().unwrap();
 
 // All variable data is read into 1-dimensional Vec.
 for x in 0..(6*12) {

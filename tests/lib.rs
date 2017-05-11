@@ -75,7 +75,7 @@ fn getter() {
     assert_eq!(f, file.name);
 
     let var = file.root.variables.get("data").unwrap();
-    let data : Vec<i32> = var.get().unwrap();
+    let data : Vec<i32> = var.values().unwrap();
 
     assert_eq!(data.len(), 6*12);
     for x in 0..(6*12) {
@@ -83,7 +83,7 @@ fn getter() {
     }
 
     // do the same thing but cast to float
-    let data : Vec<f32> = var.get().unwrap();
+    let data : Vec<f32> = var.values().unwrap();
 
     assert_eq!(data.len(), 6*12);
     for x in 0..(6*12) {

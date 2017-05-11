@@ -16,8 +16,9 @@
 //! // force a cast:
 //! let data : Vec<i32> = var.get_int(false).unwrap();
 //!
-//! // You can use get() to read the variable, with an implicit if needed
-//! let data : Vec<i32> = var.get().unwrap();
+//! // You can also use values() to read the variable, data will be implicitly casted
+//! // if needed
+//! let data : Vec<i32> = var.values().unwrap();
 //!
 //! // All variable data is read into 1-dimensional Vec.
 //! for x in 0..(6*12) {

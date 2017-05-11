@@ -113,7 +113,7 @@ impl Variable {
         Ok(())
     }
 
-    pub fn get<T: Getter>(&self) -> Result<Vec<T>, String> {
+    pub fn values<T: Getter>(&self) -> Result<Vec<T>, String> {
         T::get_variable(self)
     }
 }
