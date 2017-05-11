@@ -67,6 +67,31 @@ fn var_cast() {
 }
 
 #[test]
+/// Tests implicit casts
+fn getter() {
+    let f = test_file("simple_xy.nc");
+
+    let file = netcdf::open(&f).unwrap();
+    assert_eq!(f, file.name);
+
+    let var = file.root.variables.get("data").unwrap();
+    let data : Vec<i32> = var.get().unwrap();
+
+    assert_eq!(data.len(), 6*12);
+    for x in 0..(6*12) {
+        assert_eq!(data[x], x as i32);
+    }
+
+    // do the same thing but cast to float
+    let data : Vec<f32> = var.get().unwrap();
+
+    assert_eq!(data.len(), 6*12);
+    for x in 0..(6*12) {
+        assert_eq!(data[x], x as f32);
+    }
+}
+
+#[test]
 #[should_panic(expected = "Types are not equivalent and cast==false")]
 fn var_cast_fail() {
     let f = test_file("simple_xy.nc");

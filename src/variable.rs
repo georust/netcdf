@@ -1,3 +1,4 @@
+use std::marker::Sized;
 use std::ffi;
 use std::collections::HashMap;
 use netcdf_sys::*;
@@ -28,6 +29,31 @@ macro_rules! get_var_as_type {
     }};
 }
 
+pub trait Getter {
+    fn get_variable(variable: &Variable) -> Result<Vec<Self>, String>
+        where Self: Sized;
+}
+macro_rules! impl_getter {
+    ($sized_type: ty, $nc_type: ident, $nc_fn: ident ) => {
+        impl Getter for $sized_type {
+            fn get_variable(variable: &Variable) -> Result<Vec<$sized_type>, String> {
+                let cast = variable.vartype != $nc_type;
+                get_var_as_type!(variable, $nc_type, $sized_type, $nc_fn, cast)
+            }
+        }
+    }
+}
+impl_getter!(u8, nc_char, nc_get_var_uchar);
+impl_getter!(i8, nc_byte, nc_get_var_schar);
+impl_getter!(i16, nc_short, nc_get_var_short);
+impl_getter!(u16, nc_ushort, nc_get_var_ushort);
+impl_getter!(i32, nc_int, nc_get_var_int);
+impl_getter!(u32, nc_uint, nc_get_var_uint);
+impl_getter!(i64, nc_int64, nc_get_var_longlong);
+impl_getter!(u64, nc_uint64, nc_get_var_ulonglong);
+impl_getter!(f32, nc_float, nc_get_var_float);
+impl_getter!(f64, nc_double, nc_get_var_double);
+
 pub struct Variable {
     pub name : String,
     pub attributes : HashMap<String, Attribute>,
@@ -37,6 +63,7 @@ pub struct Variable {
     pub len: u64, // total length; the product of all dim lengths
     pub file_id: i32,
 }
+
 
 impl Variable {
     pub fn get_char(&self, cast: bool) -> Result<Vec<u8>, String> {
@@ -84,6 +111,10 @@ impl Variable {
                 }
             );
         Ok(())
+    }
+
+    pub fn get<T: Getter>(&self) -> Result<Vec<T>, String> {
+        T::get_variable(self)
     }
 }
 
