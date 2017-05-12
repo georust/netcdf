@@ -15,5 +15,5 @@ build = "build.rs"
 gcc = "0.3.8"
 
 [dependencies]
-libc = "0.1.8"
-lazy_static = "0.1.11"
+libc = "0.2"
+lazy_static = "0.2.8"
