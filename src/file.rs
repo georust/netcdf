@@ -46,7 +46,7 @@ pub fn create(file: &str) -> Result<File, String> {
     let err : i32;
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
-        err = nc_create(f.as_ptr(), nc_write|nc_netcdf4, &mut ncid);
+        err = nc_create(f.as_ptr(), nc_netcdf4, &mut ncid);
     }
     if err != nc_noerr {
         return Err(NC_ERRORS.get(&err).unwrap().clone());
