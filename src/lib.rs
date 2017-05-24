@@ -47,6 +47,7 @@
 //! ```
 
 extern crate netcdf_sys;
+extern crate ndarray;
 
 #[macro_use]
 extern crate lazy_static;

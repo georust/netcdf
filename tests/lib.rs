@@ -1,5 +1,7 @@
 extern crate netcdf;
 
+extern crate ndarray;
+use ndarray::{ArrayD,IxDyn};
 use netcdf::{test_file, test_file_new};
 
 // Failure tests
@@ -68,7 +70,7 @@ fn var_cast() {
 
 #[test]
 /// Tests implicit casts
-fn getter() {
+fn implicit_cast() {
     let f = test_file("simple_xy.nc");
 
     let file = netcdf::open(&f).unwrap();
@@ -509,4 +511,16 @@ fn all_attr_types() {
           file.root.attributes.get("attr_double").unwrap().get_double(false).unwrap());
 
     }
+}
+
+#[test]
+/// Tests the shape of a variable
+/// when fetched using "Variable::as_array()"
+fn fetch_ndarray() {
+    let f = test_file("pres_temp_4D.nc");
+    let file = netcdf::open(&f).unwrap();
+    assert_eq!(f, file.name);
+    let pres = file.root.variables.get("pressure").unwrap();
+    let values_array: ArrayD<f64>  = pres.as_array().unwrap();
+    assert_eq!(values_array.shape(),  &[2, 2, 6, 12]);
 }

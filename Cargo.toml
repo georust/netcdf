@@ -10,6 +10,7 @@ keywords = ["netcdf", "hdf", "hdf5", "libnetcdf", "netcdf4"]
 
 [dependencies]
 lazy_static = "0.1.11"
+ndarray = "0.9.1"
 
 [dependencies.netcdf-sys]
 path = "netcdf-sys"

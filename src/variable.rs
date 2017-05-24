@@ -7,6 +7,8 @@ use group::PutAttr;
 use attribute::{init_attributes, Attribute};
 use string_from_c_str;
 use NC_ERRORS;
+use std::error::Error;
+use ndarray::{Array1,ArrayD,IxDyn};
 
 macro_rules! get_var_as_type {
     ( $me:ident, $nc_type:ident, $vec_type:ty, $nc_fn:ident , $cast:ident ) 
@@ -29,14 +31,21 @@ macro_rules! get_var_as_type {
     }};
 }
 
-pub trait Getter {
-    fn get_variable(variable: &Variable) -> Result<Vec<Self>, String>
+/// This trait allow an implicit cast when fetching 
+/// a netCDF variable
+pub trait FromVariable {
+
+    fn from_variable(variable: &Variable) -> Result<Vec<Self>, String>
         where Self: Sized;
 }
+// This macro implements the trait FromVariable for the type "sized_type"
+// if "sized_type" is equivalent to "nc_type" (the constant from the libnetcdf)
+// the function "nc_fn" will be called with caste set to false, set to true otherwise.
+// "nc_fn" should had been generated using "get_var_as_type"
 macro_rules! impl_getter {
-    ($sized_type: ty, $nc_type: ident, $nc_fn: ident ) => {
-        impl Getter for $sized_type {
-            fn get_variable(variable: &Variable) -> Result<Vec<$sized_type>, String> {
+    ($sized_type: ty, $nc_type: ident, $nc_fn: ident) => {
+        impl FromVariable for $sized_type {
+            fn from_variable(variable: &Variable) -> Result<Vec<$sized_type>, String> {
                 let cast = variable.vartype != $nc_type;
                 get_var_as_type!(variable, $nc_type, $sized_type, $nc_fn, cast)
             }
@@ -63,7 +72,6 @@ pub struct Variable {
     pub len: u64, // total length; the product of all dim lengths
     pub file_id: i32,
 }
-
 
 impl Variable {
     pub fn get_char(&self, cast: bool) -> Result<Vec<u8>, String> {
@@ -113,9 +121,30 @@ impl Variable {
         Ok(())
     }
 
-    pub fn values<T: Getter>(&self) -> Result<Vec<T>, String> {
-        T::get_variable(self)
+    /// Fetchs variable values.
+    /// ```
+    /// // Each values will be implicitly casted to a f64 if needed
+    /// let values: Vec<64> = some_variable.values().unwrap();
+    /// ```
+    pub fn values<T: FromVariable>(&self) -> Result<Vec<T>, String> {
+        T::from_variable(self)
     }
+
+    /// Fetchs variable values as a ndarray.
+    /// ```
+    /// // Each values will be implicitly casted to a f64 if needed
+    /// let values: ArrayD<64> = some_variable.as_array().unwrap();
+    /// ```
+    pub fn as_array<T: FromVariable>(&self) -> Result<ArrayD<T>, Box<Error>> {
+        let mut dims: Vec<usize> = Vec::new();
+        for dim in &self.dimensions {
+            dims.push(dim.len as usize);
+        }
+        let values = self.values()?;
+        let array = Array1::<T>::from_vec(values);
+        Ok(array.into_shape(dims)?)
+    }
+
 }
 
 pub fn init_variables(vars: &mut HashMap<String, Variable>, grp_id: i32,
