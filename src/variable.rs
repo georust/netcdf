@@ -63,13 +63,17 @@ impl_getter!(u64, nc_uint64, nc_get_var_ulonglong);
 impl_getter!(f32, nc_float, nc_get_var_float);
 impl_getter!(f64, nc_double, nc_get_var_double);
 
+/// This struct defines a netCDF variable.
 pub struct Variable {
+    /// The variable name
     pub name : String,
     pub attributes : HashMap<String, Attribute>,
     pub dimensions : Vec<Dimension>,
+    /// the netcdf variable type identifier (from netcdf-sys)
     pub vartype : i32,
     pub id: i32,
-    pub len: u64, // total length; the product of all dim lengths
+    /// total length; the product of all dim lengths
+    pub len: u64, 
     pub file_id: i32,
 }
 
@@ -122,19 +126,23 @@ impl Variable {
     }
 
     /// Fetchs variable values.
+    ///
     /// ```
     /// // Each values will be implicitly casted to a f64 if needed
     /// let values: Vec<64> = some_variable.values().unwrap();
     /// ```
+    ///
     pub fn values<T: FromVariable>(&self) -> Result<Vec<T>, String> {
         T::from_variable(self)
     }
 
     /// Fetchs variable values as a ndarray.
+    ///
     /// ```
     /// // Each values will be implicitly casted to a f64 if needed
     /// let values: ArrayD<64> = some_variable.as_array().unwrap();
     /// ```
+    ///
     pub fn as_array<T: FromVariable>(&self) -> Result<ArrayD<T>, Box<Error>> {
         let mut dims: Vec<usize> = Vec::new();
         for dim in &self.dimensions {
@@ -144,7 +152,6 @@ impl Variable {
         let array = Array1::<T>::from_vec(values);
         Ok(array.into_shape(dims)?)
     }
-
 }
 
 pub fn init_variables(vars: &mut HashMap<String, Variable>, grp_id: i32,
