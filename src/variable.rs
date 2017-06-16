@@ -38,7 +38,7 @@ pub trait Numeric {
 
     fn from_variable(variable: &Variable) -> Result<Vec<Self>, String>
         where Self: Sized;
-    fn new() -> Self
+    fn zeros() -> Self
         where Self: Sized;
 }
 // This macro implements the trait Numeric for the type "sized_type"
@@ -52,7 +52,7 @@ macro_rules! impl_getter {
                 let cast = variable.vartype != $nc_type;
                 get_var_as_type!(variable, $nc_type, $sized_type, $nc_fn, cast)
             }
-            fn new() -> $sized_type {
+            fn zeros() -> $sized_type {
                 0 as $sized_type
             }
         }
@@ -135,20 +135,34 @@ impl Variable {
     ///
     /// ```
     /// // Each values will be implicitly casted to a f64 if needed
-    /// let values: Vec<f64> = some_variable.values().unwrap();
+    /// // let values: Vec<f64> = some_variable.values().unwrap();
     /// ```
     ///
     pub fn values<T: Numeric>(&self) -> Result<Vec<T>, String> {
         T::from_variable(self)
     }
     
-    /// Fetchs a specificvalue at a specific index.
-    pub fn value_at<T: Numeric>(&self, index: &[usize]) -> Result<T, String> {
-        let mut buff: T = T::new();
+    /// Fetchs one specific value at specific indices
+    ///  indices must has the same length as self.dimensions.
+    pub fn value_at<T: Numeric>(&self, indices: &[usize]) -> Result<T, String> {
+        // Check the length of `indices`
+        if indices.len() != self.dimensions.len() {
+            return Err("`indices` must has the same length as the variable dimensions".into());
+        }
+        for i in 0..indices.len() {
+            if (indices[i] as u64) >= self.dimensions[i].len {
+                return Err("requested index is bigger than the dimension length".into());
+            }
+        }
+
+        // initialize `buff` to 0
+        let mut buff: T = T::zeros();
+        // create a c_void pointer from `buff`
         let buff_ptr = &mut buff as *mut _ as *mut libc::c_void;
         let err: i32;
 
-        let indices: Vec<size_t> = index.iter().map(|i| *i as size_t).collect();
+        // Get a pointer to an array [size_t]
+        let indices: Vec<size_t> = indices.iter().map(|i| *i as size_t).collect();
         let indices_ptr = indices.as_slice().as_ptr();
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
@@ -165,7 +179,7 @@ impl Variable {
     ///
     /// ```
     /// // Each values will be implicitly casted to a f64 if needed
-    /// let values: ArrayD<f64> = some_variable.as_array().unwrap();
+    /// // let values: ArrayD<f64> = some_variable.as_array().unwrap();
     /// ```
     ///
     pub fn as_array<T: Numeric>(&self) -> Result<ArrayD<T>, Box<Error>> {
