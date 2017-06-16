@@ -69,6 +69,20 @@ fn var_cast() {
 }
 
 #[test]
+fn test_index_fetch() {
+    let f = test_file("simple_xy.nc");
+
+    let file = netcdf::open(&f).unwrap();
+
+    let var = file.root.variables.get("data").unwrap();
+    let first_val: i32 = var.value_at(&[0usize, 0usize]).unwrap();
+    let other_val: i32 = var.value_at(&[5usize, 3usize]).unwrap();
+
+    assert_eq!(first_val, 0 as i32);
+    assert_eq!(other_val, 63 as i32 );
+}
+
+#[test]
 /// Tests implicit casts
 fn implicit_cast() {
     let f = test_file("simple_xy.nc");

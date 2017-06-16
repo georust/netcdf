@@ -34,20 +34,20 @@ macro_rules! get_var_as_type {
 
 /// This trait allow an implicit cast when fetching 
 /// a netCDF variable
-pub trait FromVariable {
+pub trait Numeric {
 
     fn from_variable(variable: &Variable) -> Result<Vec<Self>, String>
         where Self: Sized;
     fn new() -> Self
         where Self: Sized;
 }
-// This macro implements the trait FromVariable for the type "sized_type"
+// This macro implements the trait Numeric for the type "sized_type"
 // if "sized_type" is equivalent to "nc_type" (the constant from the libnetcdf)
 // the function "nc_fn" will be called with caste set to false, set to true otherwise.
 // "nc_fn" should had been generated using "get_var_as_type"
 macro_rules! impl_getter {
     ($sized_type: ty, $nc_type: ident, $nc_fn: ident) => {
-        impl FromVariable for $sized_type {
+        impl Numeric for $sized_type {
             fn from_variable(variable: &Variable) -> Result<Vec<$sized_type>, String> {
                 let cast = variable.vartype != $nc_type;
                 get_var_as_type!(variable, $nc_type, $sized_type, $nc_fn, cast)
@@ -135,16 +135,15 @@ impl Variable {
     ///
     /// ```
     /// // Each values will be implicitly casted to a f64 if needed
-    /// let values: Vec<64> = some_variable.values().unwrap();
+    /// let values: Vec<f64> = some_variable.values().unwrap();
     /// ```
     ///
-    pub fn values<T: FromVariable>(&self) -> Result<Vec<T>, String> {
+    pub fn values<T: Numeric>(&self) -> Result<Vec<T>, String> {
         T::from_variable(self)
     }
     
-    /// Fetchs variable value at a specific index.
-    pub fn value_at<T: FromVariable>(&self, index: &[usize]) -> Result<T, String> {
-        use std::ptr;
+    /// Fetchs a specificvalue at a specific index.
+    pub fn value_at<T: Numeric>(&self, index: &[usize]) -> Result<T, String> {
         let mut buff: T = T::new();
         let buff_ptr = &mut buff as *mut _ as *mut libc::c_void;
         let err: i32;
@@ -166,10 +165,10 @@ impl Variable {
     ///
     /// ```
     /// // Each values will be implicitly casted to a f64 if needed
-    /// let values: ArrayD<64> = some_variable.as_array().unwrap();
+    /// let values: ArrayD<f64> = some_variable.as_array().unwrap();
     /// ```
     ///
-    pub fn as_array<T: FromVariable>(&self) -> Result<ArrayD<T>, Box<Error>> {
+    pub fn as_array<T: Numeric>(&self) -> Result<ArrayD<T>, Box<Error>> {
         let mut dims: Vec<usize> = Vec::new();
         for dim in &self.dimensions {
             dims.push(dim.len as usize);
