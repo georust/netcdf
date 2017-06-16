@@ -9,6 +9,7 @@ use string_from_c_str;
 use NC_ERRORS;
 use std::error::Error;
 use ndarray::{Array1,ArrayD,IxDyn};
+use libc;
 
 macro_rules! get_var_as_type {
     ( $me:ident, $nc_type:ident, $vec_type:ty, $nc_fn:ident , $cast:ident ) 
@@ -37,6 +38,8 @@ pub trait FromVariable {
 
     fn from_variable(variable: &Variable) -> Result<Vec<Self>, String>
         where Self: Sized;
+    fn new() -> Self
+        where Self: Sized;
 }
 // This macro implements the trait FromVariable for the type "sized_type"
 // if "sized_type" is equivalent to "nc_type" (the constant from the libnetcdf)
@@ -48,6 +51,9 @@ macro_rules! impl_getter {
             fn from_variable(variable: &Variable) -> Result<Vec<$sized_type>, String> {
                 let cast = variable.vartype != $nc_type;
                 get_var_as_type!(variable, $nc_type, $sized_type, $nc_fn, cast)
+            }
+            fn new() -> $sized_type {
+                0 as $sized_type
             }
         }
     }
@@ -134,6 +140,26 @@ impl Variable {
     ///
     pub fn values<T: FromVariable>(&self) -> Result<Vec<T>, String> {
         T::from_variable(self)
+    }
+    
+    /// Fetchs variable value at a specific index.
+    pub fn value_at<T: FromVariable>(&self, index: &[usize]) -> Result<T, String> {
+        use std::ptr;
+        let mut buff: T = T::new();
+        let buff_ptr = &mut buff as *mut _ as *mut libc::c_void;
+        let err: i32;
+
+        let indices: Vec<size_t> = index.iter().map(|i| *i as size_t).collect();
+        let indices_ptr = indices.as_slice().as_ptr();
+        unsafe {
+            let _g = libnetcdf_lock.lock().unwrap();
+            //fn nc_get_var1(ncid: libc::c_int, varid: libc::c_int, indexp: *const size_t, ip: *mut libc::c_void)
+            err = nc_get_var1(self.file_id, self.id, indices_ptr, buff_ptr);
+        }
+        if err != nc_noerr {
+            return Err(NC_ERRORS.get(&err).unwrap().clone());
+        }
+        Ok(buff)
     }
 
     /// Fetchs variable values as a ndarray.

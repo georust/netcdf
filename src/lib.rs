@@ -51,6 +51,7 @@ extern crate ndarray;
 
 #[macro_use]
 extern crate lazy_static;
+extern crate libc;
 
 use netcdf_sys::{libnetcdf_lock, nc_strerror};
 use std::ffi;
