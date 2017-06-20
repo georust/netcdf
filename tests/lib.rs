@@ -9,7 +9,6 @@ use netcdf::{test_file, test_file_new};
 #[should_panic(expected = "No such file or directory")]
 fn bad_filename() {
     let f = test_file("blah_stuff.nc");
-
     let _file = netcdf::open(&f).unwrap();
 }
 
@@ -537,4 +536,18 @@ fn fetch_ndarray() {
     let pres = file.root.variables.get("pressure").unwrap();
     let values_array: ArrayD<f64>  = pres.as_array().unwrap();
     assert_eq!(values_array.shape(),  &[2, 2, 6, 12]);
+}
+
+#[test]
+fn fetch_slice() {
+    let f = test_file("simple_xy.nc");
+    let file = netcdf::open(&f).unwrap();
+    assert_eq!(f, file.name);
+    let pres = file.root.variables.get("data").unwrap();
+    let values: Vec<i32>  = pres.values_at(&[0, 0], &[6, 3]).unwrap();
+    for v in &values {
+        println!("{}", &v);
+    }
+    println!("{}", &values.len());
+
 }

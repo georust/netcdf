@@ -175,6 +175,57 @@ impl Variable {
         Ok(buff)
     }
 
+    /// Fetchs a slice of values
+    ///  indices must has the same length as self.dimensions.
+    pub fn values_at<T: Numeric>(&self, indices: &[usize], slice_len: &[usize]) -> Result<Vec<T>, String> {
+        // Check the length of `indices`
+        if indices.len() != self.dimensions.len() {
+            return Err("`indices` must has the same length as the variable dimensions".into());
+        }
+        if indices.len() != slice_len.len() {
+            return Err("`slice` must has the same length as the variable dimensions".into());
+        }
+        let mut values: Vec<T>;
+        let mut values_len: usize = 1;
+        for i in 0..indices.len() {
+            if (indices[i] as u64) >= self.dimensions[i].len {
+                return Err("requested index is bigger than the dimension length".into());
+            }
+            if ((indices[i] + slice_len[i]) as u64) > self.dimensions[i].len {
+                return Err("requested slice is bigger than the dimension length".into());
+            }
+            // Compute the full size of the request values
+            if slice_len[i] > 0 {
+                values_len *= slice_len[i];
+            }
+        }
+
+        let err: i32;
+
+        // Get a pointer to an array [size_t]
+        let indices: Vec<size_t> = indices.iter().map(|i| *i as size_t).collect();
+        let slice: Vec<size_t> = slice_len.iter().map(|i| *i as size_t).collect();
+        unsafe {
+            let _g = libnetcdf_lock.lock().unwrap();
+
+            values = Vec::with_capacity(values_len);
+            values.set_len(values_len);
+            let buff_ptr = values.as_mut_ptr() as *mut _ as *mut libc::c_void;
+
+            err = nc_get_vara(
+                self.file_id,
+                self.id,
+                indices.as_slice().as_ptr(),
+                slice.as_slice().as_ptr(),
+                buff_ptr
+            );
+        }
+        if err != nc_noerr {
+            return Err(NC_ERRORS.get(&err).unwrap().clone());
+        }
+        Ok(values)
+    }
+
     /// Fetchs variable values as a ndarray.
     ///
     /// ```

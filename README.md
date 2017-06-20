@@ -42,7 +42,7 @@ for x in 0..(6*12) {
     assert_eq!(data[x], x as i32);
 }
 
-// You can also fetch a single value from a datasets,
+// You can also fetch a single value from a dataset,
 // using a array slice to index it
 let first_val: i32 = var.value_at(&[5, 3]).unwrap();
 
