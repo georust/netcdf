@@ -242,6 +242,17 @@ impl Variable {
         let array = Array1::<T>::from_vec(values);
         Ok(array.into_shape(dims)?)
     }
+    
+    /// Fetchs variable values as a ndarray.
+    pub fn array_at<T: Numeric>(&self, indices: &[usize], slice_len: &[usize]) -> Result<ArrayD<T>, Box<Error>> {
+        let mut dims: Vec<usize> = Vec::new();
+        for dim in &self.dimensions {
+            dims.push(dim.len as usize);
+        }
+        let values = self.values_at(indices, slice_len)?;
+        let array = Array1::<T>::from_vec(values);
+        Ok(array.into_shape(slice_len)?)
+    }
 }
 
 pub fn init_variables(vars: &mut HashMap<String, Variable>, grp_id: i32,

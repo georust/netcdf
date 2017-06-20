@@ -539,15 +539,16 @@ fn fetch_ndarray() {
 }
 
 #[test]
+// assert slice fetching
 fn fetch_slice() {
     let f = test_file("simple_xy.nc");
     let file = netcdf::open(&f).unwrap();
     assert_eq!(f, file.name);
     let pres = file.root.variables.get("data").unwrap();
     let values: Vec<i32>  = pres.values_at(&[0, 0], &[6, 3]).unwrap();
-    for v in &values {
-        println!("{}", &v);
+    let expected_values: [i32; 18] = [
+        0,  1,  2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62];
+    for i in 0..values.len() {
+        assert_eq!(expected_values[i], values[i]);
     }
-    println!("{}", &values.len());
-
 }
