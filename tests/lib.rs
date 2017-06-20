@@ -76,7 +76,7 @@ fn test_index_fetch() {
 
     let var = file.root.variables.get("data").unwrap();
     let first_val: i32 = var.value_at(&[0usize, 0usize]).unwrap();
-    let other_val: i32 = var.value_at(&[5usize, 3usize]).unwrap();
+    let other_val: i32 = var.value_at(&[5, 3]).unwrap();
 
     assert_eq!(first_val, 0 as i32);
     assert_eq!(other_val, 63 as i32 );
