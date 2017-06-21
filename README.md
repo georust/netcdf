@@ -12,7 +12,6 @@ Not (yet) supported:
 * user defined types,
 * string variables,
 * multi-valued attributes,
-* strided/subsetted reads. 
 
 All variable data is read into a 1-dimensional Vec with the last variable dimension varying fastest.
 
@@ -45,6 +44,14 @@ for x in 0..(6*12) {
 // You can also fetch a single value from a dataset,
 // using a array slice to index it
 let first_val: i32 = var.value_at(&[5, 3]).unwrap();
+
+// You can also read and fetch values as ArrayD (from the ndarray crate)
+let values_array: ArrayD<f64>  = data.as_array().unwrap();
+assert_eq!(values_array.shape(),  &[2, 2]);
+
+// subsetted reads are also supported
+let values_array: ArrayD<f64>  = data.array_at(&[1, 0], &[2, 3]).unwrap();
+assert_eq!(values_array.shape(),  &[2, 3]);
 
 ```
 

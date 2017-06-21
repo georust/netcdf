@@ -552,3 +552,14 @@ fn fetch_slice() {
         assert_eq!(expected_values[i], values[i]);
     }
 }
+
+#[test]
+// assert slice fetching
+fn fetch_slice_as_ndarray() {
+    let f = test_file("simple_xy.nc");
+    let file = netcdf::open(&f).unwrap();
+    assert_eq!(f, file.name);
+    let pres = file.root.variables.get("data").unwrap();
+    let values_array: ArrayD<i32>  = pres.array_at(&[0, 0], &[6, 3]).unwrap();
+    assert_eq!(values_array.shape(), &[6, 3]);
+}

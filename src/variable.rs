@@ -45,6 +45,7 @@ pub trait Numeric {
     fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> Result<Self, String>
         where Self: Sized;
 }
+
 // This macro implements the trait Numeric for the type "sized_type".
 // The use of this macro reduce code duplication for the implementation of Numeric
 // for the common numeric types (i32, f32 ...): they only differs by the name of the
