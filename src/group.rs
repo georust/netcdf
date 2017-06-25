@@ -6,6 +6,7 @@ use attribute::{init_attributes, Attribute};
 use variable::{init_variables, Variable};
 use string_from_c_str;
 use NC_ERRORS;
+use std::ptr;
 
 pub struct Group {
     pub name : String,
@@ -311,18 +312,25 @@ impl Group {
 fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
                    parent_dims: &HashMap<String, Dimension>) {
     let mut ngrps = 0i32;
-    // Max number of groups in a file is only limited by i32 max (32767)...
-    // allocating a vec this size is inefficient but there's no obvious way
-    // to query the number of groups beforehand!
-    // http://www.unidata.ucar.edu/software/netcdf/docs/group__groups.html#details
-    let mut grpids : Vec<i32> = Vec::with_capacity(nc_max_int as usize);
+    let mut grpids : Vec<i32>;
+
+    // Fetching the group ID's list must be done in 2 steps,
+    // 1 - Find out how many groups there are.
+    // 2 - Get a list of those group IDs.
+    // 
+    // the function `nc_inq_grps()` fulfill those 2 requests
+    // See: http://www.unidata.ucar.edu/software/netcdf/netcdf-4/newdocs/netcdf-c/nc_005finq_005fgrps.html
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
-
-        // number of groups and grp id's
-        let err = nc_inq_grps(grp_id, &mut ngrps, grpids.as_mut_ptr());
+        // Get the number of groups
+        let mut err = nc_inq_grps(grp_id, &mut ngrps, ptr::null_mut());
         assert_eq!(err, nc_noerr);
+        // set the group capacity and len to the number of groups
+        grpids = Vec::with_capacity(ngrps as usize);
         grpids.set_len(ngrps as usize);
+        // Get the list of group IDs
+        err = nc_inq_grps(grp_id, &mut ngrps, grpids.as_mut_ptr());
+        assert_eq!(err, nc_noerr);
     }
     for i_grp in 0..ngrps {
         let mut namelen = 0u64;
@@ -358,10 +366,7 @@ fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
 
 pub fn init_group(grp: &mut Group) {
     init_dimensions(&mut grp.dimensions, grp.id);
-
     init_attributes(&mut grp.attributes, grp.id, nc_global, -1);
-    
     init_variables(&mut grp.variables, grp.id, &grp.dimensions);
-
     init_sub_groups(grp.id, &mut grp.sub_groups, &grp.dimensions);
 }

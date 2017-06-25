@@ -16,6 +16,10 @@
 //! // force a cast:
 //! let data : Vec<i32> = var.get_int(false).unwrap();
 //!
+//! // You can also use values() to read the variable, data will be implicitly casted
+//! // if needed
+//! let data : Vec<i32> = var.values().unwrap();
+//!
 //! // All variable data is read into 1-dimensional Vec.
 //! for x in 0..(6*12) {
 //!     assert_eq!(data[x], x as i32);
@@ -43,9 +47,11 @@
 //! ```
 
 extern crate netcdf_sys;
+extern crate ndarray;
 
 #[macro_use]
 extern crate lazy_static;
+extern crate libc;
 
 use netcdf_sys::{libnetcdf_lock, nc_strerror};
 use std::ffi;

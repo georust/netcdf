@@ -1,5 +1,7 @@
 extern crate netcdf;
 
+extern crate ndarray;
+use ndarray::{ArrayD,IxDyn};
 use netcdf::{test_file, test_file_new};
 
 // Failure tests
@@ -7,7 +9,6 @@ use netcdf::{test_file, test_file_new};
 #[should_panic(expected = "No such file or directory")]
 fn bad_filename() {
     let f = test_file("blah_stuff.nc");
-
     let _file = netcdf::open(&f).unwrap();
 }
 
@@ -59,6 +60,45 @@ fn var_cast() {
 
     // do the same thing but cast to float
     let data : Vec<f32> = var.get_float(true).unwrap();
+
+    assert_eq!(data.len(), 6*12);
+    for x in 0..(6*12) {
+        assert_eq!(data[x], x as f32);
+    }
+}
+
+#[test]
+fn test_index_fetch() {
+    let f = test_file("simple_xy.nc");
+
+    let file = netcdf::open(&f).unwrap();
+
+    let var = file.root.variables.get("data").unwrap();
+    let first_val: i32 = var.value_at(&[0usize, 0usize]).unwrap();
+    let other_val: i32 = var.value_at(&[5, 3]).unwrap();
+
+    assert_eq!(first_val, 0 as i32);
+    assert_eq!(other_val, 63 as i32 );
+}
+
+#[test]
+/// Tests implicit casts
+fn implicit_cast() {
+    let f = test_file("simple_xy.nc");
+
+    let file = netcdf::open(&f).unwrap();
+    assert_eq!(f, file.name);
+
+    let var = file.root.variables.get("data").unwrap();
+    let data : Vec<i32> = var.values().unwrap();
+
+    assert_eq!(data.len(), 6*12);
+    for x in 0..(6*12) {
+        assert_eq!(data[x], x as i32);
+    }
+
+    // do the same thing but cast to float
+    let data : Vec<f32> = var.values().unwrap();
 
     assert_eq!(data.len(), 6*12);
     for x in 0..(6*12) {
@@ -484,4 +524,42 @@ fn all_attr_types() {
           file.root.attributes.get("attr_double").unwrap().get_double(false).unwrap());
 
     }
+}
+
+#[test]
+/// Tests the shape of a variable
+/// when fetched using "Variable::as_array()"
+fn fetch_ndarray() {
+    let f = test_file("pres_temp_4D.nc");
+    let file = netcdf::open(&f).unwrap();
+    assert_eq!(f, file.name);
+    let pres = file.root.variables.get("pressure").unwrap();
+    let values_array: ArrayD<f64>  = pres.as_array().unwrap();
+    assert_eq!(values_array.shape(),  &[2, 2, 6, 12]);
+}
+
+#[test]
+// assert slice fetching
+fn fetch_slice() {
+    let f = test_file("simple_xy.nc");
+    let file = netcdf::open(&f).unwrap();
+    assert_eq!(f, file.name);
+    let pres = file.root.variables.get("data").unwrap();
+    let values: Vec<i32>  = pres.values_at(&[0, 0], &[6, 3]).unwrap();
+    let expected_values: [i32; 18] = [
+        0,  1,  2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62];
+    for i in 0..values.len() {
+        assert_eq!(expected_values[i], values[i]);
+    }
+}
+
+#[test]
+// assert slice fetching
+fn fetch_slice_as_ndarray() {
+    let f = test_file("simple_xy.nc");
+    let file = netcdf::open(&f).unwrap();
+    assert_eq!(f, file.name);
+    let pres = file.root.variables.get("data").unwrap();
+    let values_array: ArrayD<i32>  = pres.array_at(&[0, 0], &[6, 3]).unwrap();
+    assert_eq!(values_array.shape(), &[6, 3]);
 }

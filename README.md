@@ -6,7 +6,14 @@ High-level [NetCDF](http://www.unidata.ucar.edu/software/netcdf/) bindings for R
 
 ## Status
 
-Not (yet) supported: appending to existing files (using unlimited dimensions), user defined types, string variables, multi-valued attributes, strided/subsetted reads. All variable data is read into a 1-dimensional Vec with the last variable dimension varying fastest.
+Not (yet) supported:
+
+* appending to existing files (using unlimited dimensions),
+* user defined types,
+* string variables,
+* multi-valued attributes,
+
+All variable data is read into a 1-dimensional Vec with the last variable dimension varying fastest.
 
 ## Building
 
@@ -25,10 +32,27 @@ let var = file.root.variables.get("data").unwrap();
 // force a cast:
 let data : Vec<i32> = var.get_int(false).unwrap();
 
+// You can also use values() to read the variable, data will be implicitly casted
+// if needed
+let data : Vec<i32> = var.values().unwrap();
+
 // All variable data is read into 1-dimensional Vec.
 for x in 0..(6*12) {
     assert_eq!(data[x], x as i32);
 }
+
+// You can also fetch a single value from a dataset,
+// using a array slice to index it
+let first_val: i32 = var.value_at(&[5, 3]).unwrap();
+
+// You can also read and fetch values as ArrayD (from the ndarray crate)
+let values_array: ArrayD<f64>  = data.as_array().unwrap();
+assert_eq!(values_array.shape(),  &[2, 2]);
+
+// subsetted reads are also supported
+let values_array: ArrayD<f64>  = data.array_at(&[1, 0], &[2, 3]).unwrap();
+assert_eq!(values_array.shape(),  &[2, 3]);
+
 ```
 
 ## Write Example

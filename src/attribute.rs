@@ -1,3 +1,4 @@
+use std::fmt;
 use std::ffi;
 use std::collections::HashMap;
 use netcdf_sys::*;
@@ -119,6 +120,15 @@ impl Attribute {
 
     pub fn get_double(&self, cast: bool) -> Result<f64, String> {
         get_attr_as_type!(self, nc_double, f64, nc_get_att_double, cast)
+    }
+}
+
+impl fmt::Display for Attribute {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.get_char(true) {
+            Ok(chars) => write!(f, "{}", chars),
+            Err(e) => write!(f, "ERROR: {}", e)
+        }
     }
 }
 
