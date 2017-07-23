@@ -560,6 +560,41 @@ fn fetch_slice_as_ndarray() {
     let file = netcdf::open(&f).unwrap();
     assert_eq!(f, file.name);
     let pres = file.root.variables.get("data").unwrap();
-    let values_array: ArrayD<i32>  = pres.array_at(&[0, 0], &[6, 3]).unwrap();
+    let values_array: ArrayD<i32> = pres.array_at(&[0, 0], &[6, 3]).unwrap();
     assert_eq!(values_array.shape(), &[6, 3]);
+}
+
+#[test]
+// test file modification
+fn append() {
+    let f = test_file_new("append.nc");
+    let dim_name = "some_dimension";
+    {
+        // first creates a simple netCDF file
+        // and create a variable called "some_variable" in it
+        let mut file_w = netcdf::create(&f).unwrap();
+        file_w.root.add_dimension(dim_name, 3).unwrap();
+        file_w.root.add_variable(
+                    "some_variable", 
+                    &vec![dim_name.into()],
+                    &vec![1., 2., 3.]
+                ).unwrap();
+        // close it (done when `file_w` goes out of scope)
+    }
+    {
+        // re-open it in append mode
+        // and create a variable called "some_other_variable"
+        let mut file_a = netcdf::append(&f).unwrap();
+        file_a.root.add_variable(
+                    "some_other_variable", 
+                    &vec![dim_name.into()],
+                    &vec![2., 4., 6.]
+                ).unwrap();
+        // close it (done when `file_a` goes out of scope)
+    }
+    // finally open  the file in read only mode
+    // and test the existence of both variable 
+    let file = netcdf::open(&f).unwrap();
+    assert!(file.root.variables.contains_key("some_variable"));
+    assert!(file.root.variables.contains_key("some_other_variable"));
 }
