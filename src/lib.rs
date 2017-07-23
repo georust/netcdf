@@ -30,7 +30,6 @@
 //!
 //! ```
 //! let f = netcdf::test_file_new("crabs2.nc"); // just gets a path inside repo
-//! 
 //! let mut file = netcdf::create(&f).unwrap();
 //! 
 //! let dim_name = "ncrabs";
@@ -44,11 +43,11 @@
 //!             &vec![dim_name.to_string()],
 //!             &data
 //!         ).unwrap();
-//! ```
+//! file.close();
 //!
-//! Append:
 //!
-//! ```
+//! // Append:
+//!
 //! // You can also modify a Variable inside an existing netCDF file
 //! let f = netcdf::test_file_new("crabs2.nc"); // get the previously written netCDF file path
 //! // open it in read/write mode
