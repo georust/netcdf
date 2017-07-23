@@ -628,7 +628,7 @@ fn put_single_value() {
     }
     // finally open  the file in read only mode
     // and test the values of 'some_variable'
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::append(&f).unwrap();
     let var = file.root.variables.get(var_name).unwrap();
     assert_eq!(var.value_at(&indices), Ok(100.));
 }
@@ -663,7 +663,7 @@ fn put_values() {
     }
     // finally open  the file in read only mode
     // and test the values of 'some_variable'
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::append(&f).unwrap();
     let var = file.root.variables.get(var_name).unwrap();
     assert_eq!(
         var.values_at::<f32>(&indices, &[values.len()]).unwrap().as_slice(),
