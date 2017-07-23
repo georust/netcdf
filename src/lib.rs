@@ -29,37 +29,38 @@
 //! Write:
 //!
 //! ```
+//! // Write
 //! let f = netcdf::test_file_new("crabs2.nc"); // just gets a path inside repo
-//! let mut file = netcdf::create(&f).unwrap();
-//! 
-//! let dim_name = "ncrabs";
-//! file.root.add_dimension(dim_name, 10).unwrap();
-//! 
-//! let var_name = "crab_coolness_level";
-//! let data : Vec<i32> = vec![42; 10];
-//! // Variable type written to file is inferred from Vec type:
-//! file.root.add_variable(
-//!             var_name, 
-//!             &vec![dim_name.to_string()],
-//!             &data
-//!         ).unwrap();
-//! file.close();
-//!
+//! {
+//!     let mut file = netcdf::create(&f).unwrap();
+//!     
+//!     let dim_name = "ncrabs";
+//!     file.root.add_dimension(dim_name, 10).unwrap();
+//!     
+//!     let var_name = "crab_coolness_level";
+//!     let data : Vec<i32> = vec![42; 10];
+//!     // Variable type written to file is inferred from Vec type:
+//!     file.root.add_variable(
+//!                 var_name, 
+//!                 &vec![dim_name.to_string()],
+//!                 &data
+//!             ).unwrap();
+//! }
 //!
 //! // Append:
-//!
-//! // You can also modify a Variable inside an existing netCDF file
-//! let f = netcdf::test_file_new("crabs2.nc"); // get the previously written netCDF file path
-//! // open it in read/write mode
-//! let mut file = netcdf::append(&f).unwrap();
-//! // get a mutable binding of the variable "crab_coolness_level"
-//! let mut var = file.root.variables.get_mut("crab_coolness_level").unwrap();
-//!
-//! let data : Vec<i32> = vec![100; 10];
-//! // write 5 first elements of the vector `data` into `var` starting at index 2;
-//! var.put_values_at(&data, &[2], &[5]);
-//! // Change the first value of `var` into '999'
-//! var.put_value_at(999 as f32, &[0]);
+//! {
+//!     // You can also modify a Variable inside an existing netCDF file
+//!     // open it in read/write mode
+//!     let mut file = netcdf::append(&f).unwrap();
+//!     // get a mutable binding of the variable "crab_coolness_level"
+//!     let mut var = file.root.variables.get_mut("crab_coolness_level").unwrap();
+//!    
+//!     let data : Vec<i32> = vec![100; 10];
+//!     // write 5 first elements of the vector `data` into `var` starting at index 2;
+//!     var.put_values_at(&data, &[2], &[5]);
+//!     // Change the first value of `var` into '999'
+//!     var.put_value_at(999 as f32, &[0]);
+//! }
 //! ```
 
 extern crate netcdf_sys;
