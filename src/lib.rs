@@ -29,7 +29,7 @@
 //! Write:
 //!
 //! ```
-//! let f = netcdf::test_file_new("crabs.nc"); // just gets a path inside repo
+//! let f = netcdf::test_file_new("crabs2.nc"); // just gets a path inside repo
 //! 
 //! let mut file = netcdf::create(&f).unwrap();
 //! 
@@ -50,7 +50,7 @@
 //!
 //! ```
 //! // You can also modify a Variable inside an existing netCDF file
-//! let f = netcdf::test_file_new("crabs.nc"); // get the previously written netCDF file path
+//! let f = netcdf::test_file_new("crabs2.nc"); // get the previously written netCDF file path
 //! // open it in read/write mode
 //! let mut file = netcdf::append(&f).unwrap();
 //! // get a mutable binding of the variable "crab_coolness_level"
