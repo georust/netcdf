@@ -8,7 +8,7 @@ use attribute::{init_attributes, Attribute};
 use string_from_c_str;
 use NC_ERRORS;
 use std::error::Error;
-use ndarray::{Array1,ArrayD,IxDyn};
+use ndarray::{Array1,ArrayBase,ArrayD,IxDyn,Data};
 use libc;
 
 macro_rules! get_var_as_type {
@@ -44,6 +44,12 @@ pub trait Numeric {
     /// Returns a single indexed value of the variable as Self
     fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> Result<Self, String>
         where Self: Sized;
+    /// Put a single value into a netCDF variable
+    fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> Result<(), String>
+        where Self: Sized;
+    /// put a SLICE of values into a netCDF variable at the given index
+    fn put_values_at(variable: &mut Variable, indices: &[usize], slice_len: &[usize], values: &[Self]) -> Result<(), String>
+        where Self: Sized;
 }
 
 // This macro implements the trait Numeric for the type "sized_type".
@@ -52,7 +58,14 @@ pub trait Numeric {
 // C function used to fetch values from the NetCDF variable (eg: 'nc_get_var_ushort', ...).
 //
 macro_rules! impl_numeric {
-    ($sized_type: ty, $nc_type: ident, $nc_get_var: ident, $nc_get_vara_type: ident, $nc_get_var1_type: ident ) => {
+    ( 
+        $sized_type: ty,
+        $nc_type: ident, 
+        $nc_get_var: ident, 
+        $nc_get_vara_type: ident,
+        $nc_get_var1_type: ident, 
+        $nc_put_var1_type: ident,
+        $nc_put_vara_type: ident) => {
 
         impl Numeric for $sized_type {
 
@@ -101,9 +114,6 @@ macro_rules! impl_numeric {
             
             // fetch a SLICE of values from variable using `$nc_get_vara`
             fn slice_from_variable(variable: &Variable, indices: &[usize], slice_len: &[usize]) -> Result<Vec<$sized_type>, String> {
-                //if variable.vartype != $nc_type {
-                    //return Err("Types are not equivalent".to_string());
-                //}
                 // Check the length of `indices`
                 if indices.len() != variable.dimensions.len() {
                     return Err("`indices` must has the same length as the variable dimensions".into());
@@ -152,19 +162,169 @@ macro_rules! impl_numeric {
                 }
                 Ok(values)
             }
+
+            // put a SINGLE value into a netCDF variable at the given index
+            fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> Result<(), String> {
+                // Check the length of `indices`
+                if indices.len() != variable.dimensions.len() {
+                    return Err("`indices` must has the same length as the variable dimensions".into());
+                }
+                for i in 0..indices.len() {
+                    if (indices[i] as u64) >= variable.dimensions[i].len {
+                        return Err("requested index is bigger than the dimension length".into());
+                    }
+                }
+                let err: i32;
+                // Get a pointer to an array [size_t]
+                let indices: Vec<size_t> = indices.iter().map(|i| *i as size_t).collect();
+                let indices_ptr = indices.as_slice().as_ptr();
+                unsafe {
+                    let _g = libnetcdf_lock.lock().unwrap();
+                    err = $nc_put_var1_type(variable.file_id, variable.id, indices_ptr, &value);
+                }
+                if err != nc_noerr {
+                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                }
+
+                Ok(())
+            }
+            
+            // put a SLICE of values into a netCDF variable at the given index
+            fn put_values_at(variable: &mut Variable, indices: &[usize], slice_len: &[usize], values: &[Self]) -> Result<(), String> {
+                if indices.len() != slice_len.len() {
+                    return Err("`slice` must has the same length as the variable dimensions".into());
+                }
+                let mut values_len = 0;
+                for i in 0..indices.len() {
+                    if (indices[i] as u64) >= variable.dimensions[i].len {
+                        return Err("requested index is bigger than the dimension length".into());
+                    }
+                    if ((indices[i] + slice_len[i]) as u64) > variable.dimensions[i].len {
+                        return Err("requested slice is bigger than the dimension length".into());
+                    }
+                    // Check for empty slice
+                    if slice_len[i] == 0 {
+                        return Err("Each slice element must be superior than 0".into());
+                    }
+                    values_len += slice_len[i];
+                }
+                if values_len  != values.len() {
+                    return Err("number of element in `values` doesn't match `slice_len`".into());
+                }
+
+                let err: i32;
+                // Get a pointer to an array [size_t]
+                let indices: Vec<size_t> = indices.iter().map(|i| *i as size_t).collect();
+                let slice: Vec<size_t> = slice_len.iter().map(|i| *i as size_t).collect();
+                unsafe {
+                    let _g = libnetcdf_lock.lock().unwrap();
+                    err = $nc_put_vara_type(
+                        variable.file_id,
+                        variable.id,
+                        indices.as_slice().as_ptr(),
+                        slice.as_slice().as_ptr(),
+                        values.as_ptr()
+                    );
+                }
+                if err != nc_noerr {
+                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                }
+
+                Ok(())
+            }
         }
     }
 }
-impl_numeric!(u8, nc_char, nc_get_var_uchar, nc_get_vara_uchar, nc_get_var1_uchar);
-impl_numeric!(i8, nc_byte, nc_get_var_schar, nc_get_vara_schar, nc_get_var1_schar);
-impl_numeric!(i16, nc_short, nc_get_var_short, nc_get_vara_short, nc_get_var1_short);
-impl_numeric!(u16, nc_ushort, nc_get_var_ushort, nc_get_vara_ushort, nc_get_var1_ushort);
-impl_numeric!(i32, nc_int, nc_get_var_int, nc_get_vara_int, nc_get_var1_int);
-impl_numeric!(u32, nc_uint, nc_get_var_uint, nc_get_vara_uint, nc_get_var1_uint );
-impl_numeric!(i64, nc_int64, nc_get_var_longlong, nc_get_vara_longlong, nc_get_var1_longlong);
-impl_numeric!(u64, nc_uint64, nc_get_var_ulonglong, nc_get_vara_ulonglong, nc_get_var1_ulonglong);
-impl_numeric!(f32, nc_float, nc_get_var_float, nc_get_vara_float, nc_get_var1_float);
-impl_numeric!(f64, nc_double, nc_get_var_double, nc_get_vara_double, nc_get_var1_double);
+impl_numeric!(u8,
+	 nc_char,
+	 nc_get_var_uchar,
+	 nc_get_vara_uchar,
+	 nc_get_var1_uchar,
+	 nc_put_var1_uchar,
+	 nc_put_vara_uchar
+);
+
+impl_numeric!(i8,
+	 nc_byte,
+	 nc_get_var_schar,
+	 nc_get_vara_schar,
+	 nc_get_var1_schar,
+	 nc_put_var1_schar,
+	 nc_put_vara_schar
+);
+
+impl_numeric!(i16,
+	 nc_short,
+	 nc_get_var_short,
+	 nc_get_vara_short,
+	 nc_get_var1_short,
+	 nc_put_var1_short,
+	 nc_put_vara_short
+);
+
+impl_numeric!(u16,
+	 nc_ushort,
+	 nc_get_var_ushort,
+	 nc_get_vara_ushort,
+	 nc_get_var1_ushort,
+	 nc_put_var1_ushort,
+	 nc_put_vara_ushort
+);
+
+impl_numeric!(i32,
+	 nc_int,
+	 nc_get_var_int,
+	 nc_get_vara_int,
+	 nc_get_var1_int,
+	 nc_put_var1_int,
+	 nc_put_vara_int
+);
+
+impl_numeric!(u32,
+	 nc_uint,
+	 nc_get_var_uint,
+	 nc_get_vara_uint,
+	 nc_get_var1_uint,
+	 nc_put_var1_uint,
+	 nc_put_vara_uint
+);
+
+impl_numeric!(i64,
+	 nc_int64,
+	 nc_get_var_longlong,
+	 nc_get_vara_longlong,
+	 nc_get_var1_longlong,
+	 nc_put_var1_longlong,
+	 nc_put_vara_longlong
+);
+
+impl_numeric!(u64,
+	 nc_uint64,
+	 nc_get_var_ulonglong,
+	 nc_get_vara_ulonglong,
+	 nc_get_var1_ulonglong,
+	 nc_put_var1_ulonglong,
+	 nc_put_vara_ulonglong
+);
+
+impl_numeric!(f32,
+	 nc_float,
+	 nc_get_var_float,
+	 nc_get_vara_float,
+	 nc_get_var1_float,
+	 nc_put_var1_float,
+	 nc_put_vara_float
+);
+
+impl_numeric!(f64,
+	 nc_double,
+	 nc_get_var_double,
+	 nc_get_vara_double,
+	 nc_get_var1_double,
+	 nc_put_var1_double,
+	 nc_put_vara_double
+);
+
 
 /// This struct defines a netCDF variable.
 pub struct Variable {
@@ -277,6 +437,16 @@ impl Variable {
         let values = self.values_at(indices, slice_len)?;
         let array = Array1::<T>::from_vec(values);
         Ok(array.into_shape(slice_len)?)
+    }
+
+    /// Put a single value at `indices`
+    pub fn put_value_at<T: Numeric>(&mut self, value: T, indices: &[usize]) -> Result<(), String> {
+        T::put_value_at(self, indices, value)
+    }
+
+    /// Put a slice of values at `indices`
+    pub fn put_values_at<T: Numeric>(&mut self, values: &[T], indices: &[usize], slice_len: &[usize]) -> Result<(), String> {
+        T::put_values_at(self, indices, slice_len, values)
     }
 }
 

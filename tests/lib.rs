@@ -1,7 +1,7 @@
 extern crate netcdf;
 
 extern crate ndarray;
-use ndarray::{ArrayD,IxDyn};
+use ndarray::ArrayD;
 use netcdf::{test_file, test_file_new};
 
 // Failure tests
@@ -597,4 +597,76 @@ fn append() {
     let file = netcdf::open(&f).unwrap();
     assert!(file.root.variables.contains_key("some_variable"));
     assert!(file.root.variables.contains_key("some_other_variable"));
+}
+
+#[test]
+// test file modification
+fn put_single_value() {
+    let f = test_file_new("append.nc");
+    let dim_name = "some_dimension";
+    let var_name = "some_variable";
+    {
+        // first creates a simple netCDF file
+        // and create a variable called "some_variable" in it
+        let mut file_w = netcdf::create(&f).unwrap();
+        file_w.root.add_dimension(dim_name, 3).unwrap();
+        file_w.root.add_variable(
+                    var_name,
+                    &vec![dim_name.into()],
+                    &vec![1., 2., 3.]
+                ).unwrap();
+        // close it (done when `file_w` goes out of scope)
+    }
+    let indices: [usize; 1] = [0];
+    {
+        // re-open it in append mode
+        let mut file_a = netcdf::append(&f).unwrap();
+        let mut var = file_a.root.variables.get_mut(var_name).unwrap();
+        let res = var.put_value_at(100., &indices);
+        assert_eq!(res, Ok(()));
+        // close it (done when `file_a` goes out of scope)
+    }
+    // finally open  the file in read only mode
+    // and test the values of 'some_variable'
+    let file = netcdf::open(&f).unwrap();
+    let var = file.root.variables.get(var_name).unwrap();
+    assert_eq!(var.value_at(&indices), Ok(100.));
+}
+
+#[test]
+// test file modification
+fn put_values() {
+    let f = test_file_new("append.nc");
+    let dim_name = "some_dimension";
+    let var_name = "some_variable";
+    {
+        // first creates a simple netCDF file
+        // and create a variable called "some_variable" in it
+        let mut file_w = netcdf::create(&f).unwrap();
+        file_w.root.add_dimension(dim_name, 3).unwrap();
+        file_w.root.add_variable(
+                    var_name,
+                    &vec![dim_name.into()],
+                    &vec![1., 2., 3.]
+                ).unwrap();
+        // close it (done when `file_w` goes out of scope)
+    }
+    let indices: [usize; 1] = [1];
+    let values: [f32; 2] = [100., 200.];
+    {
+        // re-open it in append mode
+        let mut file_a = netcdf::append(&f).unwrap();
+        let mut var = file_a.root.variables.get_mut(var_name).unwrap();
+        let res = var.put_values_at(&values, &indices, &[values.len()]);
+        assert_eq!(res, Ok(()));
+        // close it (done when `file_a` goes out of scope)
+    }
+    // finally open  the file in read only mode
+    // and test the values of 'some_variable'
+    let file = netcdf::open(&f).unwrap();
+    let var = file.root.variables.get(var_name).unwrap();
+    assert_eq!(
+        var.values_at::<f32>(&indices, &[values.len()]).unwrap().as_slice(),
+        values
+    );
 }
