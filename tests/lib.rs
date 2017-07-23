@@ -594,7 +594,7 @@ fn append() {
     }
     // finally open  the file in read only mode
     // and test the existence of both variable 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::append(&f).unwrap();
     assert!(file.root.variables.contains_key("some_variable"));
     assert!(file.root.variables.contains_key("some_other_variable"));
 }
@@ -602,7 +602,7 @@ fn append() {
 #[test]
 // test file modification
 fn put_single_value() {
-    let f = test_file_new("append.nc");
+    let f = test_file_new("append_value.nc");
     let dim_name = "some_dimension";
     let var_name = "some_variable";
     {
@@ -628,7 +628,7 @@ fn put_single_value() {
     }
     // finally open  the file in read only mode
     // and test the values of 'some_variable'
-    let file = netcdf::append(&f).unwrap();
+    let file = netcdf::open(&f).unwrap();
     let var = file.root.variables.get(var_name).unwrap();
     assert_eq!(var.value_at(&indices), Ok(100.));
 }
@@ -636,7 +636,7 @@ fn put_single_value() {
 #[test]
 // test file modification
 fn put_values() {
-    let f = test_file_new("append.nc");
+    let f = test_file_new("append_values.nc");
     let dim_name = "some_dimension";
     let var_name = "some_variable";
     {
@@ -663,7 +663,7 @@ fn put_values() {
     }
     // finally open  the file in read only mode
     // and test the values of 'some_variable'
-    let file = netcdf::append(&f).unwrap();
+    let file = netcdf::open(&f).unwrap();
     let var = file.root.variables.get(var_name).unwrap();
     assert_eq!(
         var.values_at::<f32>(&indices, &[values.len()]).unwrap().as_slice(),

@@ -98,13 +98,20 @@ pub fn create(file: &str) -> Result<File, String> {
     })
 }
 
-impl Drop for File {
-    fn drop(&mut self) {
+impl File{
+    fn close(&mut self) {
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
             let err = nc_close(self.id);
             assert_eq!(err, nc_noerr);
         }
+    }
+}
+
+impl Drop for File {
+    fn drop(&mut self) {
+        // Automatically close file when it goes out of scope
+        self.close();
     }
 }
 
