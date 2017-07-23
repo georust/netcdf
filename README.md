@@ -13,7 +13,8 @@ Not (yet) supported:
 * string variables,
 * multi-valued attributes,
 
-All variable data is read into a 1-dimensional Vec with the last variable dimension varying fastest.
+All variable data is read into a 1-dimensional Vec with the last variable dimension varying fastest,
+or as a [ndarray](https://github.com/bluss/rust-ndarray).
 
 ## Building
 
@@ -43,7 +44,7 @@ for x in 0..(6*12) {
 
 // You can also fetch a single value from a dataset,
 // using a array slice to index it
-let first_val: i32 = var.value_at(&[5, 3]).unwrap();
+let value: i32 = var.value_at(&[5, 3]).unwrap();
 
 // You can also read and fetch values as ArrayD (from the ndarray crate)
 let values_array: ArrayD<f64>  = data.as_array().unwrap();
@@ -73,6 +74,24 @@ file.root.add_variable(
             &vec![dim_name.to_string()],
             &data
         ).unwrap();
+```
+
+
+You can also modify a Variable inside an existing netCDF file, for instance using the previously 
+created file :
+
+```Rust
+let f = netcdf::test_file_new("crabs.nc"); // get the previously written netCDF file path
+// open it in read/write mode
+let mut file = netcdf::append(&f).unwrap();
+// get a mutable binding of the variable "crab_coolness_level"
+let mut var = file.root.variables.get_mut("crab_coolness_level").unwrap();
+
+let data : Vec<i32> = vec![100; 10];
+// write 5 first elements of the vector `data` into `var` starting at index 2;
+var.put_values_at(&data, &[2], &[5]);
+// Change the first value of `var` into '999'
+var.put_value_at(999 as f32, &[0]);
 ```
 
 ## Documentation

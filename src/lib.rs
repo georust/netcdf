@@ -45,6 +45,23 @@
 //!             &data
 //!         ).unwrap();
 //! ```
+//!
+//! Append:
+//!
+//! ```
+//! // You can also modify a Variable inside an existing netCDF file
+//! let f = netcdf::test_file_new("crabs.nc"); // get the previously written netCDF file path
+//! // open it in read/write mode
+//! let mut file = netcdf::append(&f).unwrap();
+//! // get a mutable binding of the variable "crab_coolness_level"
+//! let mut var = file.root.variables.get_mut("crab_coolness_level").unwrap();
+//!
+//! let data : Vec<i32> = vec![100; 10];
+//! // write 5 first elements of the vector `data` into `var` starting at index 2;
+//! var.put_values_at(&data, &[2], &[5]);
+//! // Change the first value of `var` into '999'
+//! var.put_value_at(999 as f32, &[0]);
+//! ```
 
 extern crate netcdf_sys;
 extern crate ndarray;
