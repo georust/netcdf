@@ -19,9 +19,9 @@ pub fn open(file: &str) -> Result<File, String> {
     let err : i32;
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
-        err = nc_open(f.as_ptr(), nc_nowrite, &mut ncid);
+        err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
     }
-    if err != nc_noerr {
+    if err != NC_NOERR {
         return Err(NC_ERRORS.get(&err).unwrap().clone());
     }
     let mut root = Group {
@@ -49,9 +49,9 @@ pub fn append(file: &str) -> Result<File, String> {
     let err : i32;
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
-        err = nc_open(f.as_ptr(), nc_write, &mut ncid);
+        err = nc_open(f.as_ptr(), NC_WRITE, &mut ncid);
     }
-    if err != nc_noerr {
+    if err != NC_NOERR {
         return Err(NC_ERRORS.get(&err).unwrap().clone());
     }
     let mut root = Group {
@@ -78,9 +78,9 @@ pub fn create(file: &str) -> Result<File, String> {
     let err : i32;
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
-        err = nc_create(f.as_ptr(), nc_netcdf4, &mut ncid);
+        err = nc_create(f.as_ptr(), NC_NETCDF4, &mut ncid);
     }
-    if err != nc_noerr {
+    if err != NC_NOERR {
         return Err(NC_ERRORS.get(&err).unwrap().clone());
     }
     let root = Group {
@@ -103,7 +103,7 @@ impl File{
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
             let err = nc_close(self.id);
-            assert_eq!(err, nc_noerr);
+            assert_eq!(err, NC_NOERR);
         }
     }
 }

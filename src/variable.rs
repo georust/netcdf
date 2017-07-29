@@ -8,8 +8,7 @@ use attribute::{init_attributes, Attribute};
 use string_from_c_str;
 use NC_ERRORS;
 use std::error::Error;
-use ndarray::{Array1,ArrayBase,ArrayD,IxDyn,Data};
-use libc;
+use ndarray::{Array1,ArrayD};
 
 macro_rules! get_var_as_type {
     ( $me:ident, $nc_type:ident, $vec_type:ty, $nc_fn:ident , $cast:ident ) 
@@ -25,7 +24,7 @@ macro_rules! get_var_as_type {
             buf.set_len($me.len as usize);
             err = $nc_fn($me.file_id, $me.id, buf.as_mut_ptr());
         }
-        if err != nc_noerr {
+        if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         Ok(buf)
@@ -78,7 +77,7 @@ macro_rules! impl_numeric {
                     buf.set_len(variable.len as usize);
                     err = $nc_get_var(variable.file_id, variable.id, buf.as_mut_ptr());
                 }
-                if err != nc_noerr {
+                if err != NC_NOERR {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
                 }
                 Ok(buf)
@@ -106,7 +105,7 @@ macro_rules! impl_numeric {
                     //fn nc_get_var1(ncid: libc::c_int, varid: libc::c_int, indexp: *const size_t, ip: *mut libc::c_void)
                     err = $nc_get_var1_type(variable.file_id, variable.id, indices_ptr, &mut buff);
                 }
-                if err != nc_noerr {
+                if err != NC_NOERR {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
                 }
                 Ok(buff)
@@ -157,7 +156,7 @@ macro_rules! impl_numeric {
                         values.as_mut_ptr()
                     );
                 }
-                if err != nc_noerr {
+                if err != NC_NOERR {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
                 }
                 Ok(values)
@@ -182,7 +181,7 @@ macro_rules! impl_numeric {
                     let _g = libnetcdf_lock.lock().unwrap();
                     err = $nc_put_var1_type(variable.file_id, variable.id, indices_ptr, &value);
                 }
-                if err != nc_noerr {
+                if err != NC_NOERR {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
                 }
 
@@ -226,7 +225,7 @@ macro_rules! impl_numeric {
                         values.as_ptr()
                     );
                 }
-                if err != nc_noerr {
+                if err != NC_NOERR {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
                 }
 
@@ -236,7 +235,7 @@ macro_rules! impl_numeric {
     }
 }
 impl_numeric!(u8,
-	 nc_char,
+	 NC_CHAR,
 	 nc_get_var_uchar,
 	 nc_get_vara_uchar,
 	 nc_get_var1_uchar,
@@ -245,7 +244,7 @@ impl_numeric!(u8,
 );
 
 impl_numeric!(i8,
-	 nc_byte,
+	 NC_BYTE,
 	 nc_get_var_schar,
 	 nc_get_vara_schar,
 	 nc_get_var1_schar,
@@ -254,7 +253,7 @@ impl_numeric!(i8,
 );
 
 impl_numeric!(i16,
-	 nc_short,
+	 NC_SHORT,
 	 nc_get_var_short,
 	 nc_get_vara_short,
 	 nc_get_var1_short,
@@ -263,7 +262,7 @@ impl_numeric!(i16,
 );
 
 impl_numeric!(u16,
-	 nc_ushort,
+	 NC_USHORT,
 	 nc_get_var_ushort,
 	 nc_get_vara_ushort,
 	 nc_get_var1_ushort,
@@ -272,7 +271,7 @@ impl_numeric!(u16,
 );
 
 impl_numeric!(i32,
-	 nc_int,
+	 NC_INT,
 	 nc_get_var_int,
 	 nc_get_vara_int,
 	 nc_get_var1_int,
@@ -281,7 +280,7 @@ impl_numeric!(i32,
 );
 
 impl_numeric!(u32,
-	 nc_uint,
+	 NC_UINT,
 	 nc_get_var_uint,
 	 nc_get_vara_uint,
 	 nc_get_var1_uint,
@@ -290,7 +289,7 @@ impl_numeric!(u32,
 );
 
 impl_numeric!(i64,
-	 nc_int64,
+	 NC_INT64,
 	 nc_get_var_longlong,
 	 nc_get_vara_longlong,
 	 nc_get_var1_longlong,
@@ -299,7 +298,7 @@ impl_numeric!(i64,
 );
 
 impl_numeric!(u64,
-	 nc_uint64,
+	 NC_UINT64,
 	 nc_get_var_ulonglong,
 	 nc_get_vara_ulonglong,
 	 nc_get_var1_ulonglong,
@@ -308,7 +307,7 @@ impl_numeric!(u64,
 );
 
 impl_numeric!(f32,
-	 nc_float,
+	 NC_FLOAT,
 	 nc_get_var_float,
 	 nc_get_vara_float,
 	 nc_get_var1_float,
@@ -317,7 +316,7 @@ impl_numeric!(f32,
 );
 
 impl_numeric!(f64,
-	 nc_double,
+	 NC_DOUBLE,
 	 nc_get_var_double,
 	 nc_get_vara_double,
 	 nc_get_var1_double,
@@ -342,34 +341,34 @@ pub struct Variable {
 
 impl Variable {
     pub fn get_char(&self, cast: bool) -> Result<Vec<u8>, String> {
-        get_var_as_type!(self, nc_char, u8, nc_get_var_uchar, cast)
+        get_var_as_type!(self, NC_CHAR, u8, nc_get_var_uchar, cast)
     }
     pub fn get_byte(&self, cast: bool) -> Result<Vec<i8>, String> {
-        get_var_as_type!(self, nc_byte, i8, nc_get_var_schar, cast)
+        get_var_as_type!(self, NC_BYTE, i8, nc_get_var_schar, cast)
     }
     pub fn get_short(&self, cast: bool) -> Result<Vec<i16>, String> {
-        get_var_as_type!(self, nc_short, i16, nc_get_var_short, cast)
+        get_var_as_type!(self, NC_SHORT, i16, nc_get_var_short, cast)
     }
     pub fn get_ushort(&self, cast: bool) -> Result<Vec<u16>, String> {
-        get_var_as_type!(self, nc_ushort, u16, nc_get_var_ushort, cast)
+        get_var_as_type!(self, NC_USHORT, u16, nc_get_var_ushort, cast)
     }
     pub fn get_int(&self, cast: bool) -> Result<Vec<i32>, String> {
-        get_var_as_type!(self, nc_int, i32, nc_get_var_int, cast)
+        get_var_as_type!(self, NC_INT, i32, nc_get_var_int, cast)
     }
     pub fn get_uint(&self, cast: bool) -> Result<Vec<u32>, String> {
-        get_var_as_type!(self, nc_uint, u32, nc_get_var_uint, cast)
+        get_var_as_type!(self, NC_UINT, u32, nc_get_var_uint, cast)
     }
     pub fn get_int64(&self, cast: bool) -> Result<Vec<i64>, String> {
-        get_var_as_type!(self, nc_int64, i64, nc_get_var_longlong, cast)
+        get_var_as_type!(self, NC_INT64, i64, nc_get_var_longlong, cast)
     }
     pub fn get_uint64(&self, cast: bool) -> Result<Vec<u64>, String> {
-        get_var_as_type!(self, nc_uint64, u64, nc_get_var_ulonglong, cast)
+        get_var_as_type!(self, NC_UINT64, u64, nc_get_var_ulonglong, cast)
     }
     pub fn get_float(&self, cast: bool) -> Result<Vec<f32>, String> {
-        get_var_as_type!(self, nc_float, f32, nc_get_var_float, cast)
+        get_var_as_type!(self, NC_FLOAT, f32, nc_get_var_float, cast)
     }
     pub fn get_double(&self, cast: bool) -> Result<Vec<f64>, String> {
-        get_var_as_type!(self, nc_double, f64, nc_get_var_double, cast)
+        get_var_as_type!(self, NC_DOUBLE, f64, nc_get_var_double, cast)
     }
 
     pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) 
@@ -457,15 +456,15 @@ pub fn init_variables(vars: &mut HashMap<String, Variable>, grp_id: i32,
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
         let err = nc_inq_nvars(grp_id, &mut nvars);
-        assert_eq!(err, nc_noerr);
+        assert_eq!(err, NC_NOERR);
     }
     // read each dim name and length
     for i_var in 0..nvars {
-        let mut buf_vec = vec![0i8; (nc_max_name + 1) as usize];
+        let mut buf_vec = vec![0i8; (NC_MAX_NAME + 1) as usize];
         let c_str: &ffi::CStr;
         let mut var_type : i32 = 0;
         let mut ndims : i32 = 0;
-        let mut dimids : Vec<i32> = Vec::with_capacity(nc_max_dims as usize);
+        let mut dimids : Vec<i32> = Vec::with_capacity(NC_MAX_DIMS as usize);
         let mut natts : i32 = 0;
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
@@ -474,7 +473,7 @@ pub fn init_variables(vars: &mut HashMap<String, Variable>, grp_id: i32,
                                     &mut var_type, &mut ndims,
                                     dimids.as_mut_ptr(), &mut natts);
             dimids.set_len(ndims as usize);
-            assert_eq!(err, nc_noerr);
+            assert_eq!(err, NC_NOERR);
             c_str = ffi::CStr::from_ptr(buf_ptr);
         }
         let str_buf: String = string_from_c_str(c_str);

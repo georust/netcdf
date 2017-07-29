@@ -41,7 +41,7 @@ macro_rules! impl_putvar {
                     let _g = libnetcdf_lock.lock().unwrap();
                     err = $nc_put_var(ncid, varid, self.as_ptr());
                 }
-                if err != nc_noerr {
+                if err != NC_NOERR {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
                 }
                 Ok(())
@@ -49,15 +49,15 @@ macro_rules! impl_putvar {
         }
     }
 }
-impl_putvar!(i8, nc_byte, nc_put_var_schar);
-impl_putvar!(i16, nc_short, nc_put_var_short);
-impl_putvar!(u16, nc_ushort, nc_put_var_ushort);
-impl_putvar!(i32, nc_int, nc_put_var_int);
-impl_putvar!(u32, nc_uint, nc_put_var_uint);
-impl_putvar!(i64, nc_int64, nc_put_var_longlong);
-impl_putvar!(u64, nc_uint64, nc_put_var_ulonglong);
-impl_putvar!(f32, nc_float, nc_put_var_float);
-impl_putvar!(f64, nc_double, nc_put_var_double);
+impl_putvar!(i8, NC_BYTE, nc_put_var_schar);
+impl_putvar!(i16, NC_SHORT, nc_put_var_short);
+impl_putvar!(u16, NC_USHORT, nc_put_var_ushort);
+impl_putvar!(i32, NC_INT, nc_put_var_int);
+impl_putvar!(u32, NC_UINT, nc_put_var_uint);
+impl_putvar!(i64, NC_INT64, nc_put_var_longlong);
+impl_putvar!(u64, NC_UINT64, nc_put_var_ulonglong);
+impl_putvar!(f32, NC_FLOAT, nc_put_var_float);
+impl_putvar!(f64, NC_DOUBLE, nc_put_var_double);
 
 
 // Write support for all attribute types
@@ -82,7 +82,7 @@ macro_rules! impl_putattr {
                     let _g = libnetcdf_lock.lock().unwrap();
                     err = $nc_put_att(ncid, varid, name_c.as_ptr(), $nc_type, 1, self);
                 }
-                if err != nc_noerr {
+                if err != NC_NOERR {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
                 }
                 Ok(())
@@ -90,18 +90,18 @@ macro_rules! impl_putattr {
         }
     }
 }
-impl_putattr!(i8, nc_byte, nc_put_att_schar);
-impl_putattr!(i16, nc_short, nc_put_att_short);
-impl_putattr!(u16, nc_ushort, nc_put_att_ushort);
-impl_putattr!(i32, nc_int, nc_put_att_int);
-impl_putattr!(u32, nc_uint, nc_put_att_uint);
-impl_putattr!(i64, nc_int64, nc_put_att_longlong);
-impl_putattr!(u64, nc_uint64, nc_put_att_ulonglong);
-impl_putattr!(f32, nc_float, nc_put_att_float);
-impl_putattr!(f64, nc_double, nc_put_att_double);
+impl_putattr!(i8, NC_BYTE, nc_put_att_schar);
+impl_putattr!(i16, NC_SHORT, nc_put_att_short);
+impl_putattr!(u16, NC_USHORT, nc_put_att_ushort);
+impl_putattr!(i32, NC_INT, nc_put_att_int);
+impl_putattr!(u32, NC_UINT, nc_put_att_uint);
+impl_putattr!(i64, NC_INT64, nc_put_att_longlong);
+impl_putattr!(u64, NC_UINT64, nc_put_att_ulonglong);
+impl_putattr!(f32, NC_FLOAT, nc_put_att_float);
+impl_putattr!(f64, NC_DOUBLE, nc_put_att_double);
 
 impl PutAttr for String {
-    fn get_nc_type(&self) -> i32 { nc_char }
+    fn get_nc_type(&self) -> i32 { NC_CHAR }
     fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
         let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
         let attr_c: ffi::CString = ffi::CString::new(self.clone()).unwrap();
@@ -112,7 +112,7 @@ impl PutAttr for String {
                 ncid, varid, name_c.as_ptr(), 
                 attr_c.to_bytes().len() as u64, attr_c.as_ptr());
         }
-        if err != nc_noerr {
+        if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         Ok(())
@@ -122,14 +122,14 @@ impl PutAttr for String {
 impl Group {
     pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) 
             -> Result<(), String> {
-        try!(val.put(self.id, nc_global, name));
+        try!(val.put(self.id, NC_GLOBAL, name));
         self.attributes.insert(
                 name.to_string().clone(),
                 Attribute {
                     name: name.to_string().clone(),
                     attrtype: val.get_nc_type(),
                     id: 0, // XXX Should Attribute even keep track of an id?
-                    var_id: nc_global,
+                    var_id: NC_GLOBAL,
                     file_id: self.id
                 }
             );
@@ -145,7 +145,7 @@ impl Group {
             let _g = libnetcdf_lock.lock().unwrap();
             err = nc_def_dim(self.id, name_c.as_ptr(), len, &mut dimid);
         }
-        if err != nc_noerr {
+        if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         self.dimensions.insert(
@@ -189,7 +189,7 @@ impl Group {
             err = nc_def_var(self.id, name_c.as_ptr(), nctype,
                                 dims.len() as i32, dimids.as_ptr(), &mut varid);
         }
-        if err != nc_noerr {
+        if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         try!(data.put(self.id, varid));
@@ -224,13 +224,13 @@ fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
         let _g = libnetcdf_lock.lock().unwrap();
         // Get the number of groups
         let mut err = nc_inq_grps(grp_id, &mut ngrps, ptr::null_mut());
-        assert_eq!(err, nc_noerr);
+        assert_eq!(err, NC_NOERR);
         // set the group capacity and len to the number of groups
         grpids = Vec::with_capacity(ngrps as usize);
         grpids.set_len(ngrps as usize);
         // Get the list of group IDs
         err = nc_inq_grps(grp_id, &mut ngrps, grpids.as_mut_ptr());
-        assert_eq!(err, nc_noerr);
+        assert_eq!(err, NC_NOERR);
     }
     for i_grp in 0..ngrps {
         let mut namelen = 0u64;
@@ -239,12 +239,12 @@ fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
             let _g = libnetcdf_lock.lock().unwrap();
             // name length
             let err = nc_inq_grpname_len(grpids[i_grp as usize], &mut namelen);
-            assert_eq!(err, nc_noerr);
+            assert_eq!(err, NC_NOERR);
             // name
             let mut buf_vec = vec![0i8; (namelen+1) as usize];
             let buf_ptr : *mut i8 = buf_vec.as_mut_ptr();
             let err = nc_inq_grpname(grpids[i_grp as usize], buf_ptr);
-            assert_eq!(err, nc_noerr);
+            assert_eq!(err, NC_NOERR);
             c_str = ffi::CStr::from_ptr(buf_ptr);
         }
         let str_buf: String = string_from_c_str(c_str);
@@ -266,7 +266,7 @@ fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
 
 pub fn init_group(grp: &mut Group) {
     init_dimensions(&mut grp.dimensions, grp.id);
-    init_attributes(&mut grp.attributes, grp.id, nc_global, -1);
+    init_attributes(&mut grp.attributes, grp.id, NC_GLOBAL, -1);
     init_variables(&mut grp.variables, grp.id, &grp.dimensions);
     init_sub_groups(grp.id, &mut grp.sub_groups, &grp.dimensions);
 }

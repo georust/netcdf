@@ -21,7 +21,7 @@ macro_rules! get_attr_as_type {
             err = nc_inq_attlen($me.file_id, $me.var_id, name_copy.as_ptr(),
                                     &mut attlen);
         }
-        if err != nc_noerr {
+        if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         if attlen != 1 {
@@ -34,7 +34,7 @@ macro_rules! get_attr_as_type {
                                        name_copy.as_ptr(),
                                        &mut buf);
         }
-        if err != nc_noerr {
+        if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         Ok(buf)
@@ -51,7 +51,7 @@ pub struct Attribute {
 
 impl Attribute {
     pub fn get_char(&self, cast: bool) -> Result<String, String> {
-        if (!cast) && (self.attrtype != nc_char) {
+        if (!cast) && (self.attrtype != NC_CHAR) {
             return Err("Types are not equivalent and cast==false".to_string());
         }
         let attr_char_str;
@@ -65,7 +65,7 @@ impl Attribute {
                 err = nc_inq_attlen(self.file_id, self.var_id, name_copy.as_ptr(),
                                         &mut attlen);
             }
-            if err != nc_noerr {
+            if err != NC_NOERR {
                 return Err(NC_ERRORS.get(&err).unwrap().clone());
             }
             // careful; netcdf does not write null terminators here
@@ -77,7 +77,7 @@ impl Attribute {
                                             name_copy.as_ptr(),
                                             attr_char_buf_ptr);
             }
-            if err != nc_noerr {
+            if err != NC_NOERR {
                 return Err(NC_ERRORS.get(&err).unwrap().clone());
             }
             let attr_c_str = ffi::CStr::from_ptr(attr_char_buf_ptr);
@@ -87,39 +87,39 @@ impl Attribute {
     }
 
     pub fn get_byte(&self, cast: bool) -> Result<i8, String> {
-        get_attr_as_type!(self, nc_byte, i8, nc_get_att_schar, cast)
+        get_attr_as_type!(self, NC_BYTE, i8, nc_get_att_schar, cast)
     }
 
     pub fn get_short(&self, cast: bool) -> Result<i16, String> {
-        get_attr_as_type!(self, nc_short, i16, nc_get_att_short, cast)
+        get_attr_as_type!(self, NC_SHORT, i16, nc_get_att_short, cast)
     }
 
     pub fn get_ushort(&self, cast: bool) -> Result<u16, String> {
-        get_attr_as_type!(self, nc_ushort, u16, nc_get_att_ushort, cast)
+        get_attr_as_type!(self, NC_USHORT, u16, nc_get_att_ushort, cast)
     }
 
     pub fn get_int(&self, cast: bool) -> Result<i32, String> {
-        get_attr_as_type!(self, nc_int, i32, nc_get_att_int, cast)
+        get_attr_as_type!(self, NC_INT, i32, nc_get_att_int, cast)
     }
 
     pub fn get_uint(&self, cast: bool) -> Result<u32, String> {
-        get_attr_as_type!(self, nc_uint, u32, nc_get_att_uint, cast)
+        get_attr_as_type!(self, NC_UINT, u32, nc_get_att_uint, cast)
     }
 
     pub fn get_int64(&self, cast: bool) -> Result<i64, String> {
-        get_attr_as_type!(self, nc_int64, i64, nc_get_att_longlong, cast)
+        get_attr_as_type!(self, NC_INT64, i64, nc_get_att_longlong, cast)
     }
 
     pub fn get_uint64(&self, cast: bool) -> Result<u64, String> {
-        get_attr_as_type!(self, nc_uint64, u64, nc_get_att_ulonglong, cast)
+        get_attr_as_type!(self, NC_UINT64, u64, nc_get_att_ulonglong, cast)
     }
 
     pub fn get_float(&self, cast: bool) -> Result<f32, String> {
-        get_attr_as_type!(self, nc_float, f32, nc_get_att_float, cast)
+        get_attr_as_type!(self, NC_FLOAT, f32, nc_get_att_float, cast)
     }
 
     pub fn get_double(&self, cast: bool) -> Result<f64, String> {
-        get_attr_as_type!(self, nc_double, f64, nc_get_att_double, cast)
+        get_attr_as_type!(self, NC_DOUBLE, f64, nc_get_att_double, cast)
     }
 }
 
@@ -142,7 +142,7 @@ pub fn init_attributes(attrs: &mut HashMap<String, Attribute>,
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
             let err = nc_inq_natts(file_id, &mut nattrs);
-            assert_eq!(err, nc_noerr);
+            assert_eq!(err, NC_NOERR);
         }
     } else {
         nattrs = natts_in;
@@ -151,15 +151,15 @@ pub fn init_attributes(attrs: &mut HashMap<String, Attribute>,
     // read each attr name, type, value
     let mut attr_type: nc_type = 0;
     for i_attr in 0..nattrs {
-        let mut name_buf_vec = vec![0i8; (nc_max_name + 1) as usize];
+        let mut name_buf_vec = vec![0i8; (NC_MAX_NAME + 1) as usize];
         let name_c_str: &ffi::CStr;
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
             let name_buf_ptr : *mut i8 = name_buf_vec.as_mut_ptr();
             let err = nc_inq_attname(file_id, var_id, i_attr, name_buf_ptr);
-            assert_eq!(err, nc_noerr);
+            assert_eq!(err, NC_NOERR);
             let err = nc_inq_atttype(file_id, var_id, name_buf_ptr, &mut attr_type);
-            assert_eq!(err, nc_noerr);
+            assert_eq!(err, NC_NOERR);
             name_c_str = ffi::CStr::from_ptr(name_buf_ptr);
         }
         let name_str: String = string_from_c_str(name_c_str);

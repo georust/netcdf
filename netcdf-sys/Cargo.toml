@@ -8,12 +8,6 @@ repository = "https://github.com/mhiley/rust-netcdf"
 documentation = "https://github.com/mhiley/rust-netcdf"
 keywords = ["netcdf", "hdf", "hdf4", "hdf5", "cdm"]
 
-links = "netcdf"
-build = "build.rs"
-
-[build-dependencies]
-gcc = "0.3.8"
-
 [dependencies]
 libc = "0.2"
 lazy_static = "0.2.8"
