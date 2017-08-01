@@ -17,118 +17,47 @@ pub struct Group {
     pub sub_groups : HashMap<String, Group>,
 }
 
-macro_rules! put_var_as_type {
-    ( $me:ident, $ncid:ident, $varid:ident, $nc_fn:ident )
-        => 
-    {{
-        let err : i32;
-        unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
-            err = $nc_fn($ncid, $varid, $me.as_ptr());
-        }
-        if err != nc_noerr {
-            return Err(NC_ERRORS.get(&err).unwrap().clone());
-        }
-        Ok(())
-    }};
-}
 
-macro_rules! put_attr_as_type {
-    ( $me:ident, $attname:ident, $ncid:ident, $nctype: ident, 
-      $varid:ident, $nc_fn:ident )
-        => 
-    {{
-        let name_c: ffi::CString = ffi::CString::new($attname.clone()).unwrap();
-        let err : i32;
-        unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
-            err = $nc_fn($ncid, $varid, name_c.as_ptr(), $nctype, 1, $me);
-        }
-        if err != nc_noerr {
-            return Err(NC_ERRORS.get(&err).unwrap().clone());
-        }
-        Ok(())
-    }};
-}
-
-// Write support for all variable types ... excuse the repetition :(
+// Write support for all variable types
 pub trait PutVar {
     fn get_nc_type(&self) -> i32;
     fn put(&self, ncid: i32, varid: i32) -> Result<(), String> ;
     fn len(&self) -> usize;
 }
 
-impl PutVar for Vec<i8> {
-    fn get_nc_type(&self) -> i32 { nc_byte }
-    fn len(&self) -> usize { self.len() }
-    fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
-        put_var_as_type!(self, ncid, varid, nc_put_var_schar)
+// This macro implements the trait PutVar for Vec<$type>
+// It just avoid code repetition for all numeric types
+// (the only difference between each type beeing the 
+// netCDF funtion to call and the numeric identifier
+// of the type used by the libnetCDF library)
+macro_rules! impl_putvar {
+    ($type: ty, $nc_type: ident, $nc_put_var: ident) => {
+        impl PutVar for Vec<$type> {
+            fn get_nc_type(&self) -> i32 { $nc_type }
+            fn len(&self) -> usize { self.len() }
+            fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
+                let err : i32;
+                unsafe {
+                    let _g = libnetcdf_lock.lock().unwrap();
+                    err = $nc_put_var(ncid, varid, self.as_ptr());
+                }
+                if err != NC_NOERR {
+                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                }
+                Ok(())
+            }
+        }
     }
 }
-
-impl PutVar for Vec<i16> {
-    fn get_nc_type(&self) -> i32 { nc_short }
-    fn len(&self) -> usize { self.len() }
-    fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
-        put_var_as_type!(self, ncid, varid, nc_put_var_short)
-    }
-}
-
-impl PutVar for Vec<u16> {
-    fn get_nc_type(&self) -> i32 { nc_ushort }
-    fn len(&self) -> usize { self.len() }
-    fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
-        put_var_as_type!(self, ncid, varid, nc_put_var_ushort)
-    }
-}
-
-impl PutVar for Vec<i32> {
-    fn get_nc_type(&self) -> i32 { nc_int }
-    fn len(&self) -> usize { self.len() }
-    fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
-        put_var_as_type!(self, ncid, varid, nc_put_var_int)
-    }
-}
-
-impl PutVar for Vec<u32> {
-    fn get_nc_type(&self) -> i32 { nc_uint }
-    fn len(&self) -> usize { self.len() }
-    fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
-        put_var_as_type!(self, ncid, varid, nc_put_var_uint)
-    }
-}
-
-impl PutVar for Vec<i64> {
-    fn get_nc_type(&self) -> i32 { nc_int64 }
-    fn len(&self) -> usize { self.len() }
-    fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
-        put_var_as_type!(self, ncid, varid, nc_put_var_longlong)
-    }
-}
-
-impl PutVar for Vec<u64> {
-    fn get_nc_type(&self) -> i32 { nc_uint64 }
-    fn len(&self) -> usize { self.len() }
-    fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
-        put_var_as_type!(self, ncid, varid, nc_put_var_ulonglong)
-    }
-}
-
-impl PutVar for Vec<f32> {
-    fn get_nc_type(&self) -> i32 { nc_float }
-    fn len(&self) -> usize { self.len() }
-    fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
-        put_var_as_type!(self, ncid, varid, nc_put_var_float)
-    }
-}
-
-impl PutVar for Vec<f64> {
-    fn get_nc_type(&self) -> i32 { nc_double }
-    fn len(&self) -> usize { self.len() }
-    fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
-        put_var_as_type!(self, ncid, varid, nc_put_var_double)
-    }
-}
+impl_putvar!(i8, NC_BYTE, nc_put_var_schar);
+impl_putvar!(i16, NC_SHORT, nc_put_var_short);
+impl_putvar!(u16, NC_USHORT, nc_put_var_ushort);
+impl_putvar!(i32, NC_INT, nc_put_var_int);
+impl_putvar!(u32, NC_UINT, nc_put_var_uint);
+impl_putvar!(i64, NC_INT64, nc_put_var_longlong);
+impl_putvar!(u64, NC_UINT64, nc_put_var_ulonglong);
+impl_putvar!(f32, NC_FLOAT, nc_put_var_float);
+impl_putvar!(f64, NC_DOUBLE, nc_put_var_double);
 
 
 // Write support for all attribute types
@@ -137,71 +66,42 @@ pub trait PutAttr {
     fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> ;
 }
 
-impl PutAttr for i8 {
-    fn get_nc_type(&self) -> i32 { nc_byte }
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-        put_attr_as_type!(self, name, ncid, nc_byte, varid, nc_put_att_schar)
+// This macro implements the trait PutAttr for $type
+// It just avoid code repetition for all numeric types
+// (the only difference between each type beeing the 
+// netCDF funtion to call and the numeric identifier
+// of the type used by the libnetCDF library)
+macro_rules! impl_putattr {
+    ($type: ty, $nc_type: ident, $nc_put_att: ident) => {
+        impl PutAttr for $type {
+            fn get_nc_type(&self) -> i32 { $nc_type }
+            fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
+                let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
+                let err : i32;
+                unsafe {
+                    let _g = libnetcdf_lock.lock().unwrap();
+                    err = $nc_put_att(ncid, varid, name_c.as_ptr(), $nc_type, 1, self);
+                }
+                if err != NC_NOERR {
+                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                }
+                Ok(())
+            }
+        }
     }
 }
-
-impl PutAttr for i16 {
-    fn get_nc_type(&self) -> i32 { nc_short }
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-        put_attr_as_type!(self, name, ncid, nc_short, varid, nc_put_att_short)
-    }
-}
-
-impl PutAttr for u16 {
-    fn get_nc_type(&self) -> i32 { nc_ushort }
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-        put_attr_as_type!(self, name, ncid, nc_ushort, varid, nc_put_att_ushort)
-    }
-}
-
-impl PutAttr for i32 {
-    fn get_nc_type(&self) -> i32 { nc_int }
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-        put_attr_as_type!(self, name, ncid, nc_int, varid, nc_put_att_int)
-    }
-}
-
-impl PutAttr for u32 {
-    fn get_nc_type(&self) -> i32 { nc_uint }
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-        put_attr_as_type!(self, name, ncid, nc_uint, varid, nc_put_att_uint)
-    }
-}
-
-impl PutAttr for i64 {
-    fn get_nc_type(&self) -> i32 { nc_int64 }
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-        put_attr_as_type!(self, name, ncid, nc_int64, varid, nc_put_att_longlong)
-    }
-}
-
-impl PutAttr for u64 {
-    fn get_nc_type(&self) -> i32 { nc_uint64 }
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-        put_attr_as_type!(self, name, ncid, nc_uint64, varid, nc_put_att_ulonglong)
-    }
-}
-
-impl PutAttr for f32 {
-    fn get_nc_type(&self) -> i32 { nc_float }
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-        put_attr_as_type!(self, name, ncid, nc_float, varid, nc_put_att_float)
-    }
-}
-
-impl PutAttr for f64 {
-    fn get_nc_type(&self) -> i32 { nc_double }
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-        put_attr_as_type!(self, name, ncid, nc_double, varid, nc_put_att_double)
-    }
-}
+impl_putattr!(i8, NC_BYTE, nc_put_att_schar);
+impl_putattr!(i16, NC_SHORT, nc_put_att_short);
+impl_putattr!(u16, NC_USHORT, nc_put_att_ushort);
+impl_putattr!(i32, NC_INT, nc_put_att_int);
+impl_putattr!(u32, NC_UINT, nc_put_att_uint);
+impl_putattr!(i64, NC_INT64, nc_put_att_longlong);
+impl_putattr!(u64, NC_UINT64, nc_put_att_ulonglong);
+impl_putattr!(f32, NC_FLOAT, nc_put_att_float);
+impl_putattr!(f64, NC_DOUBLE, nc_put_att_double);
 
 impl PutAttr for String {
-    fn get_nc_type(&self) -> i32 { nc_char }
+    fn get_nc_type(&self) -> i32 { NC_CHAR }
     fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
         let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
         let attr_c: ffi::CString = ffi::CString::new(self.clone()).unwrap();
@@ -212,7 +112,7 @@ impl PutAttr for String {
                 ncid, varid, name_c.as_ptr(), 
                 attr_c.to_bytes().len() as u64, attr_c.as_ptr());
         }
-        if err != nc_noerr {
+        if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         Ok(())
@@ -222,14 +122,14 @@ impl PutAttr for String {
 impl Group {
     pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) 
             -> Result<(), String> {
-        try!(val.put(self.id, nc_global, name));
+        try!(val.put(self.id, NC_GLOBAL, name));
         self.attributes.insert(
                 name.to_string().clone(),
                 Attribute {
                     name: name.to_string().clone(),
                     attrtype: val.get_nc_type(),
                     id: 0, // XXX Should Attribute even keep track of an id?
-                    var_id: nc_global,
+                    var_id: NC_GLOBAL,
                     file_id: self.id
                 }
             );
@@ -245,7 +145,7 @@ impl Group {
             let _g = libnetcdf_lock.lock().unwrap();
             err = nc_def_dim(self.id, name_c.as_ptr(), len, &mut dimid);
         }
-        if err != nc_noerr {
+        if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         self.dimensions.insert(
@@ -289,7 +189,7 @@ impl Group {
             err = nc_def_var(self.id, name_c.as_ptr(), nctype,
                                 dims.len() as i32, dimids.as_ptr(), &mut varid);
         }
-        if err != nc_noerr {
+        if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         try!(data.put(self.id, varid));
@@ -324,13 +224,13 @@ fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
         let _g = libnetcdf_lock.lock().unwrap();
         // Get the number of groups
         let mut err = nc_inq_grps(grp_id, &mut ngrps, ptr::null_mut());
-        assert_eq!(err, nc_noerr);
+        assert_eq!(err, NC_NOERR);
         // set the group capacity and len to the number of groups
         grpids = Vec::with_capacity(ngrps as usize);
         grpids.set_len(ngrps as usize);
         // Get the list of group IDs
         err = nc_inq_grps(grp_id, &mut ngrps, grpids.as_mut_ptr());
-        assert_eq!(err, nc_noerr);
+        assert_eq!(err, NC_NOERR);
     }
     for i_grp in 0..ngrps {
         let mut namelen = 0u64;
@@ -339,12 +239,12 @@ fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
             let _g = libnetcdf_lock.lock().unwrap();
             // name length
             let err = nc_inq_grpname_len(grpids[i_grp as usize], &mut namelen);
-            assert_eq!(err, nc_noerr);
+            assert_eq!(err, NC_NOERR);
             // name
             let mut buf_vec = vec![0i8; (namelen+1) as usize];
             let buf_ptr : *mut i8 = buf_vec.as_mut_ptr();
             let err = nc_inq_grpname(grpids[i_grp as usize], buf_ptr);
-            assert_eq!(err, nc_noerr);
+            assert_eq!(err, NC_NOERR);
             c_str = ffi::CStr::from_ptr(buf_ptr);
         }
         let str_buf: String = string_from_c_str(c_str);
@@ -366,7 +266,7 @@ fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
 
 pub fn init_group(grp: &mut Group) {
     init_dimensions(&mut grp.dimensions, grp.id);
-    init_attributes(&mut grp.attributes, grp.id, nc_global, -1);
+    init_attributes(&mut grp.attributes, grp.id, NC_GLOBAL, -1);
     init_variables(&mut grp.variables, grp.id, &grp.dimensions);
     init_sub_groups(grp.id, &mut grp.sub_groups, &grp.dimensions);
 }
