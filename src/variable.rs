@@ -9,6 +9,7 @@ use string_from_c_str;
 use NC_ERRORS;
 use std::error::Error;
 use ndarray::{Array1,ArrayD};
+use libc;
 
 macro_rules! get_var_as_type {
     ( $me:ident, $nc_type:ident, $vec_type:ty, $nc_fn:ident , $cast:ident ) 
@@ -22,7 +23,7 @@ macro_rules! get_var_as_type {
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
             buf.set_len($me.len as usize);
-            err = $nc_fn($me.file_id, $me.id, buf.as_mut_ptr());
+            err = $nc_fn($me.grp_id, $me.id, buf.as_mut_ptr());
         }
         if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
@@ -49,6 +50,7 @@ pub trait Numeric {
     /// put a SLICE of values into a netCDF variable at the given index
     fn put_values_at(variable: &mut Variable, indices: &[usize], slice_len: &[usize], values: &[Self]) -> Result<(), String>
         where Self: Sized;
+    fn as_void_ptr(&self) -> *const libc::c_void;
 }
 
 // This macro implements the trait Numeric for the type "sized_type".
@@ -75,7 +77,7 @@ macro_rules! impl_numeric {
                 unsafe {
                     let _g = libnetcdf_lock.lock().unwrap();
                     buf.set_len(variable.len as usize);
-                    err = $nc_get_var(variable.file_id, variable.id, buf.as_mut_ptr());
+                    err = $nc_get_var(variable.grp_id, variable.id, buf.as_mut_ptr());
                 }
                 if err != NC_NOERR {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
@@ -103,7 +105,7 @@ macro_rules! impl_numeric {
                 unsafe {
                     let _g = libnetcdf_lock.lock().unwrap();
                     //fn nc_get_var1(ncid: libc::c_int, varid: libc::c_int, indexp: *const size_t, ip: *mut libc::c_void)
-                    err = $nc_get_var1_type(variable.file_id, variable.id, indices_ptr, &mut buff);
+                    err = $nc_get_var1_type(variable.grp_id, variable.id, indices_ptr, &mut buff);
                 }
                 if err != NC_NOERR {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
@@ -149,7 +151,7 @@ macro_rules! impl_numeric {
                     //let buff_ptr = values.as_mut_ptr() as *mut _ as *mut libc::c_void;
                     //err = nc_get_vara(
                     err = $nc_get_vara_type(
-                        variable.file_id,
+                        variable.grp_id,
                         variable.id,
                         indices.as_slice().as_ptr(),
                         slice.as_slice().as_ptr(),
@@ -179,7 +181,7 @@ macro_rules! impl_numeric {
                 let indices_ptr = indices.as_slice().as_ptr();
                 unsafe {
                     let _g = libnetcdf_lock.lock().unwrap();
-                    err = $nc_put_var1_type(variable.file_id, variable.id, indices_ptr, &value);
+                    err = $nc_put_var1_type(variable.grp_id, variable.id, indices_ptr, &value);
                 }
                 if err != NC_NOERR {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
@@ -218,7 +220,7 @@ macro_rules! impl_numeric {
                 unsafe {
                     let _g = libnetcdf_lock.lock().unwrap();
                     err = $nc_put_vara_type(
-                        variable.file_id,
+                        variable.grp_id,
                         variable.id,
                         indices.as_slice().as_ptr(),
                         slice.as_slice().as_ptr(),
@@ -230,6 +232,10 @@ macro_rules! impl_numeric {
                 }
 
                 Ok(())
+            }
+
+            fn as_void_ptr(&self) -> *const libc::c_void {
+                self as *const _ as *const libc::c_void
             }
         }
     }
@@ -336,7 +342,7 @@ pub struct Variable {
     pub id: i32,
     /// total length; the product of all dim lengths
     pub len: u64, 
-    pub file_id: i32,
+    pub grp_id: i32,
 }
 
 impl Variable {
@@ -373,7 +379,7 @@ impl Variable {
 
     pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) 
             -> Result<(), String> {
-        try!(val.put(self.file_id, self.id, name));
+        try!(val.put(self.grp_id, self.id, name));
         self.attributes.insert(
                 name.to_string().clone(),
                 Attribute {
@@ -381,7 +387,7 @@ impl Variable {
                     attrtype: val.get_nc_type(),
                     id: 0, // XXX Should Attribute even keep track of an id?
                     var_id: self.id,
-                    file_id: self.file_id
+                    file_id: self.grp_id
                 }
             );
         Ok(())
@@ -447,10 +453,39 @@ impl Variable {
     pub fn put_values_at<T: Numeric>(&mut self, values: &[T], indices: &[usize], slice_len: &[usize]) -> Result<(), String> {
         T::put_values_at(self, indices, slice_len, values)
     }
+
+    /// Set a Fill Value
+    pub fn set_fill_value<T: Numeric>(&mut self, fill_value: T) -> Result<(), String> {
+        let err: i32;
+        unsafe {
+            let _g = libnetcdf_lock.lock().unwrap();
+            err = nc_def_var_fill(self.grp_id, self.id, 0 as libc::c_int, fill_value.as_void_ptr());
+        }
+        if err != NC_NOERR {
+            return Err(NC_ERRORS.get(&err).unwrap().clone());
+        }
+        self.update_attributes()?;
+        Ok(())
+    }
+
+    /// update self.attributes, (sync cached attribute and the file)
+    fn update_attributes(&mut self) -> Result<(), String> {
+        let mut natts: i32 = 0;
+        let err: i32;
+        unsafe {
+            let _g = libnetcdf_lock.lock().unwrap();
+            err = nc_inq_varnatts(self.grp_id, self.id, &mut natts);
+        }
+        if err != NC_NOERR {
+            return Err(NC_ERRORS.get(&err).unwrap().clone());
+        }
+        let (grp_id, var_id) = (self.grp_id, self.id);
+        init_attributes(&mut self.attributes, grp_id, var_id, natts);
+        Ok(())
+    }
 }
 
-pub fn init_variables(vars: &mut HashMap<String, Variable>, grp_id: i32,
-                  grp_dims: &HashMap<String, Dimension>) {
+pub fn init_variables(vars: &mut HashMap<String, Variable>, grp_id: i32, grp_dims: &HashMap<String, Dimension>) {
     // determine number of vars
     let mut nvars = 0i32;
     unsafe {
@@ -458,49 +493,58 @@ pub fn init_variables(vars: &mut HashMap<String, Variable>, grp_id: i32,
         let err = nc_inq_nvars(grp_id, &mut nvars);
         assert_eq!(err, NC_NOERR);
     }
-    // read each dim name and length
     for i_var in 0..nvars {
-        let mut buf_vec = vec![0i8; (NC_MAX_NAME + 1) as usize];
-        let c_str: &ffi::CStr;
-        let mut var_type : i32 = 0;
-        let mut ndims : i32 = 0;
-        let mut dimids : Vec<i32> = Vec::with_capacity(NC_MAX_DIMS as usize);
-        let mut natts : i32 = 0;
-        unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
-            let buf_ptr : *mut i8 = buf_vec.as_mut_ptr();
-            let err = nc_inq_var(grp_id, i_var, buf_ptr,
-                                    &mut var_type, &mut ndims,
-                                    dimids.as_mut_ptr(), &mut natts);
-            dimids.set_len(ndims as usize);
-            assert_eq!(err, NC_NOERR);
-            c_str = ffi::CStr::from_ptr(buf_ptr);
-        }
-        let str_buf: String = string_from_c_str(c_str);
-        let mut attr_map : HashMap<String, Attribute> = HashMap::new();
-        init_attributes(&mut attr_map, grp_id, i_var, natts);
-        // var dims should always be a subset of the group dims:
-        let mut dim_vec : Vec<Dimension> = Vec::new();
-        let mut len : u64 = 1;
-        for dimid in dimids {
-            // maintaining dim order is crucial here so we can maintain
-            // rule that "last dim varies fastest" in our 1D return Vec
-            for (_, grp_dim) in grp_dims {
-                if dimid == grp_dim.id {
-                    len *= grp_dim.len;
-                    dim_vec.push(grp_dim.clone());
-                    break
-                }
+        init_variable(vars, grp_id, grp_dims, i_var);
+    }
+}
+
+/// Creates and add a `Variable` Objects, from the dataset
+pub fn init_variable(vars: &mut HashMap<String, Variable>, grp_id: i32, grp_dims: &HashMap<String, Dimension>, varid: i32) {
+    // read each dim name and length
+    let mut buf_vec = vec![0i8; (NC_MAX_NAME + 1) as usize];
+    let c_str: &ffi::CStr;
+    let mut var_type : i32 = 0;
+    let mut ndims : i32 = 0;
+    let mut dimids : Vec<i32> = Vec::with_capacity(NC_MAX_DIMS as usize);
+    let mut natts : i32 = 0;
+    unsafe {
+        let _g = libnetcdf_lock.lock().unwrap();
+        let buf_ptr : *mut i8 = buf_vec.as_mut_ptr();
+        let err = nc_inq_var(grp_id, varid, buf_ptr,
+                                &mut var_type, &mut ndims,
+                                dimids.as_mut_ptr(), &mut natts);
+        dimids.set_len(ndims as usize);
+        assert_eq!(err, NC_NOERR);
+        c_str = ffi::CStr::from_ptr(buf_ptr);
+    }
+    let str_buf: String = string_from_c_str(c_str);
+    let mut attr_map : HashMap<String, Attribute> = HashMap::new();
+    init_attributes(&mut attr_map, grp_id, varid, natts);
+    // var dims should always be a subset of the group dims:
+    let mut dim_vec : Vec<Dimension> = Vec::new();
+    let mut len : u64 = 1;
+    for dimid in dimids {
+        // maintaining dim order is crucial here so we can maintain
+        // rule that "last dim varies fastest" in our 1D return Vec
+        for (_, grp_dim) in grp_dims {
+            if dimid == grp_dim.id {
+                len *= grp_dim.len;
+                dim_vec.push(grp_dim.clone());
+                break
             }
         }
-        vars.insert(str_buf.clone(),
-                      Variable{name: str_buf.clone(),
-                          attributes: attr_map,
-                          dimensions: dim_vec,
-                          vartype: var_type,
-                          len: len,
-                          id: i_var,
-                          file_id: grp_id});
     }
+    vars.insert(
+        str_buf.clone(),
+        Variable{
+            name: str_buf.clone(),
+            attributes: attr_map,
+            dimensions: dim_vec,
+            vartype: var_type,
+            len: len,
+            id: varid,
+            grp_id: grp_id
+        }
+   );
 }
 
