@@ -50,6 +50,7 @@ pub trait Numeric {
     /// put a SLICE of values into a netCDF variable at the given index
     fn put_values_at(variable: &mut Variable, indices: &[usize], slice_len: &[usize], values: &[Self]) -> Result<(), String>
         where Self: Sized;
+    /// Returns `self` as a C (void *) pointer
     fn as_void_ptr(&self) -> *const libc::c_void;
 }
 
@@ -480,6 +481,7 @@ impl Variable {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         let (grp_id, var_id) = (self.grp_id, self.id);
+        self.attributes.clear();
         init_attributes(&mut self.attributes, grp_id, var_id, natts);
         Ok(())
     }
