@@ -3,7 +3,7 @@ use std::ffi;
 use netcdf_sys::*;
 use dimension::{init_dimensions, Dimension};
 use attribute::{init_attributes, Attribute};
-use variable::{init_variables, Variable};
+use variable::{init_variable, init_variables, Variable, Numeric};
 use string_from_c_str;
 use NC_ERRORS;
 use std::ptr;
@@ -160,15 +160,34 @@ impl Group {
     }
 
     // TODO this should probably take &Vec<&str> instead of &Vec<String>
-    pub fn add_variable<T: PutVar>(
-            &mut self, name: &str, dims: &Vec<String>, data: &T) 
-                -> Result<(), String>
+    pub fn add_variable<T: PutVar>(&mut self, name: &str, dims: &Vec<String>, data: &T) 
+                -> Result<(), String> {
+        let nctype: i32 = data.get_nc_type();
+        let grp_id = self.id;
+        let var = self.create_variable(name, dims, nctype)?;
+        data.put(grp_id, var.id)?; 
+        Ok(())
+    }
+
+    // TODO this should probably take &Vec<&str> instead of &Vec<String>
+    pub fn add_variable_with_fill_value<T: PutVar, N: Numeric>(&mut self, name: &str, dims: &Vec<String>, data: &T, fill_value: N) 
+                -> Result<(), String> {
+        let nctype: i32 = data.get_nc_type();
+        let grp_id = self.id;
+        let var = self.create_variable(name, dims, nctype)?;
+        var.set_fill_value(fill_value)?;
+        data.put(grp_id, var.id)?; 
+        Ok(())
+    }
+
+    // TODO this should probably take &Vec<&str> instead of &Vec<String>
+    /// Create a Variable into the dataset, without writting any data into it.
+    pub fn create_variable(&mut self, name: &str, dims: &Vec<String>, nctype: i32) 
+                -> Result<&mut Variable, String>
     {
         let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
         let mut dimids: Vec<i32> = Vec::with_capacity(dims.len());
-        let mut var_len : u64 = 1;
         let mut var_dims : Vec<Dimension> = Vec::with_capacity(dims.len());
-        let nctype = data.get_nc_type();
         for dim_name in dims {
             if !self.dimensions.contains_key(dim_name) {
                 return Err("Invalid dimension name".to_string());
@@ -177,10 +196,6 @@ impl Group {
         }
         for dim in &var_dims {
             dimids.push(dim.id);
-            var_len *= dim.len;
-        }
-        if data.len() != (var_len as usize) {
-            return Err("Vec length must match product of all dims".to_string());
         }
         let mut varid: i32 = 0;
         let err : i32;
@@ -192,20 +207,11 @@ impl Group {
         if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
-        try!(data.put(self.id, varid));
-        self.variables.insert(
-            name.to_string().clone(),
-            Variable {
-                name: name.to_string().clone(),
-                attributes: HashMap::new(),
-                dimensions: var_dims,
-                vartype: nctype,
-                id: varid,
-                len: var_len,
-                file_id: self.id
-            }
-        );
-        Ok(())
+        init_variable(&mut self.variables, self.id, &mut self.dimensions, varid);
+        match self.variables.get_mut(name) {
+            Some(var) => Ok(var),
+            None => Err("Variable creation failed".into())
+        }
     }
 }
 

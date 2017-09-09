@@ -670,3 +670,25 @@ fn put_values() {
         values
     );
 }
+
+#[test]
+/// Test setting a fill value when creating a Variable
+fn set_fill_value() {
+    let f = test_file_new("fill_value.nc");
+    let dim_name = "some_dimension";
+    let var_name = "some_variable";
+    let fill_value = -2. as f32;
+
+    let mut file_w = netcdf::create(&f).unwrap();
+    file_w.root.add_dimension(dim_name, 3).unwrap();
+    file_w.root.add_variable_with_fill_value(
+        var_name,
+        &vec![dim_name.into()],
+        &vec![1. as f32, 2. as f32, 3. as f32],
+        fill_value
+    ).unwrap();
+    let var =  file_w.root.variables.get(var_name).unwrap();
+    let attr = var.attributes.get("_FillValue").unwrap().get_float(false).unwrap();
+    // compare requested fill_value and attribute _FillValue
+    assert_eq!(fill_value, attr);
+}
