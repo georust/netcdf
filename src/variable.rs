@@ -8,7 +8,7 @@ use attribute::{init_attributes, Attribute};
 use string_from_c_str;
 use NC_ERRORS;
 use std::error::Error;
-use ndarray::{Array1,ArrayD};
+use ndarray::{ArrayD};
 use libc;
 
 macro_rules! get_var_as_type {
@@ -430,8 +430,7 @@ impl Variable {
             dims.push(dim.len as usize);
         }
         let values = self.values()?;
-        let array = Array1::<T>::from_vec(values);
-        Ok(array.into_shape(dims)?)
+        Ok(ArrayD::<T>::from_shape_vec(dims, values)?)
     }
     
     /// Fetchs variable slice as a ndarray.
@@ -441,8 +440,7 @@ impl Variable {
             dims.push(dim.len as usize);
         }
         let values = self.values_at(indices, slice_len)?;
-        let array = Array1::<T>::from_vec(values);
-        Ok(array.into_shape(slice_len)?)
+        Ok(ArrayD::<T>::from_shape_vec(slice_len, values)?)
     }
 
     /// Put a single value at `indices`
