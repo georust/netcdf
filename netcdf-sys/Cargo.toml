@@ -10,4 +10,4 @@ keywords = ["netcdf", "hdf", "hdf4", "hdf5", "cdm"]
 
 [dependencies]
 libc = "0.2"
-lazy_static = "0.2.8"
+lazy_static = "1.0"
