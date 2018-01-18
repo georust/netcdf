@@ -2,7 +2,7 @@
 name = "netcdf"
 version = "0.1.0"
 authors = ["Michael Hiley <mike.hiley@ssec.wisc.edu>"]
-license = "GPL-3.0"
+license = "MIT OR Apache-2.0"
 description = "High-level NetCDF bindings for Rust"
 repository = "https://github.com/mhiley/rust-netcdf"
 documentation = "https://github.com/mhiley/rust-netcdf"
