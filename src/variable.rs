@@ -38,6 +38,12 @@ pub trait Numeric {
     /// Returns the whole variable as Vec<Self>
     fn from_variable(variable: &Variable) -> Result<Vec<Self>, String>
         where Self: Sized;
+    /// Read the variable into a buffer and update its length.
+    fn read_variable_into_buffer(variable: &Variable, buffer: &mut Vec<Self>) -> Result<(), String>
+        where Self: Sized;
+    /// Read a slice of a variable into a buffer and update its length.
+    fn read_slice_into_buffer(variable: &Variable, indices: &[usize], slice_len: &[usize], buffer: &mut Vec<Self>) -> Result<(), String>
+        where Self: Sized;
     /// Returns a slice of the variable as Vec<Self>
     fn slice_from_variable(variable: &Variable, indices: &[usize], slice_len: &[usize]) -> Result<Vec<Self>, String>
         where Self: Sized;
@@ -84,6 +90,28 @@ macro_rules! impl_numeric {
                     return Err(NC_ERRORS.get(&err).unwrap().clone());
                 }
                 Ok(buf)
+            }
+            
+            // Read all values from variable using `$nc_get_var` into a pre-allocated buffer
+            fn read_variable_into_buffer(variable: &Variable, buffer: &mut Vec<$sized_type>) -> Result<(), String> {
+                // check buffer capacity
+                if buffer.capacity() < variable.len as usize {
+                    return  Err(
+                        format!("Buffer is not big enough. (size {} needed)", variable.len)
+                    );
+                }
+                let err: i32;
+                unsafe {
+                    let _g = libnetcdf_lock.lock().unwrap();
+                    // update the vector element count
+                    buffer.set_len(variable.len as usize);
+                    // fill the buffer
+                    err = $nc_get_var(variable.grp_id, variable.id, buffer.as_mut_ptr());
+                }
+                if err != NC_NOERR {
+                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                }
+                Ok(())
             }
 
             // fetch ONE value from variable using `$nc_get_var1`
@@ -165,6 +193,59 @@ macro_rules! impl_numeric {
                 Ok(values)
             }
 
+            // read a SLICE of values from variable using `$nc_get_vara` into `buffer`
+            fn read_slice_into_buffer(variable: &Variable, indices: &[usize], slice_len: &[usize], buffer: &mut Vec<$sized_type>) -> Result<(), String> {
+                // Check the length of `indices`
+                if indices.len() != variable.dimensions.len() {
+                    return Err("`indices` must has the same length as the variable dimensions".into());
+                }
+                if indices.len() != slice_len.len() {
+                    return Err("`slice` must has the same length as the variable dimensions".into());
+                }
+                let mut values_len: usize = 1;
+                for i in 0..indices.len() {
+                    if (indices[i] as u64) >= variable.dimensions[i].len {
+                        return Err("requested index is bigger than the dimension length".into());
+                    }
+                    if ((indices[i] + slice_len[i]) as u64) > variable.dimensions[i].len {
+                        return Err("requested slice is bigger than the dimension length".into());
+                    }
+                    // Compute the full size of the request values
+                    if slice_len[i] > 0 {
+                        values_len *= slice_len[i];
+                    } else {
+                        return Err("Each slice element must be superior than 0".into());
+                    }
+                }
+                // check buffer capacity
+                if buffer.capacity() < values_len {
+                    return  Err(
+                        format!("Buffer is not big enough. (size {} needed)", values_len)
+                    );
+                }
+
+                let err: i32;
+                // Get a pointer to an array [size_t]
+                let indices: Vec<size_t> = indices.iter().map(|i| *i as size_t).collect();
+                let slice: Vec<size_t> = slice_len.iter().map(|i| *i as size_t).collect();
+                unsafe {
+                    let _g = libnetcdf_lock.lock().unwrap();
+                    // update the vector element count
+                    buffer.set_len(values_len as usize);
+                    // read values into the buffer
+                    err = $nc_get_vara_type(
+                        variable.grp_id,
+                        variable.id,
+                        indices.as_slice().as_ptr(),
+                        slice.as_slice().as_ptr(),
+                        buffer.as_mut_ptr()
+                    );
+                }
+                if err != NC_NOERR {
+                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                }
+                Ok(())
+            }
             // put a SINGLE value into a netCDF variable at the given index
             fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> Result<(), String> {
                 // Check the length of `indices`
@@ -404,15 +485,33 @@ impl Variable {
         T::from_variable(self)
     }
     
-    /// Fetchs one specific value at specific indices
+    /// Read a slice of a variable into a buffer,
+    /// the buffer must have a capacity at least equal as the number of elements of the slice.
+    /// The buffer length (not its capacity) will be updated.
+    pub fn read_values_into_buffer<T: Numeric>(&self, buffer: &mut Vec<T>) -> Result<(), String> {
+        T::read_variable_into_buffer(self, buffer)
+    }
+
+    ///  Fetchs one specific value at specific indices
     ///  indices must has the same length as self.dimensions.
     pub fn value_at<T: Numeric>(&self, indices: &[usize]) -> Result<T, String> {
         T::single_value_from_variable(self, indices)
     }
 
+    /// Read a slice of a variable into a buffer:
+    ///
+    /// * the 'buffer' must have a capacity at least equal as the product of all elements in 'slice'.
+    /// * 'indices' must has the same length as self.dimensions.
+    /// * all 'slice' elements must be > 0.
+    ///
+    /// The buffer length (not its capacity) will be updated.
+    pub fn read_slice_into_buffer<T: Numeric>(&self, indices: &[usize], slice_len: &[usize], buffer: &mut Vec<T>) -> Result<(), String> {
+        T::read_slice_into_buffer(self, indices, slice_len, buffer)
+    }
+
     /// Fetchs a slice of values
-    ///  indices must has the same length as self.dimensions.
-    ///  slice elements must be > 0
+    /// indices must has the same length as self.dimensions.
+    /// All slice elements must be > 0.
     pub fn values_at<T: Numeric>(&self, indices: &[usize], slice_len: &[usize]) -> Result<Vec<T>, String> {
         T::slice_from_variable(self, indices, slice_len)
     }
@@ -435,10 +534,6 @@ impl Variable {
     
     /// Fetchs variable slice as a ndarray.
     pub fn array_at<T: Numeric>(&self, indices: &[usize], slice_len: &[usize]) -> Result<ArrayD<T>, Box<Error>> {
-        let mut dims: Vec<usize> = Vec::new();
-        for dim in &self.dimensions {
-            dims.push(dim.len as usize);
-        }
         let values = self.values_at(indices, slice_len)?;
         Ok(ArrayD::<T>::from_shape_vec(slice_len, values)?)
     }

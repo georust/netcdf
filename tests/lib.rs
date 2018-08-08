@@ -692,3 +692,35 @@ fn set_fill_value() {
     // compare requested fill_value and attribute _FillValue
     assert_eq!(fill_value, attr);
 }
+
+#[test]
+/// Test reading variable into a buffer
+fn read_values_into_buffer() {
+    let f = test_file("simple_xy.nc");
+    let file = netcdf::open(&f).unwrap();
+    let var = file.root.variables.get("data").unwrap();
+    // pre-allocate the Array
+    let mut data: Vec<i32> = Vec::with_capacity(var.len as usize);
+    var.read_values_into_buffer(&mut data);
+
+    assert_eq!(data.len(), 6*12);
+    for x in 0..(6*12) {
+        assert_eq!(data[x], x as i32);
+    }
+}
+
+#[test]
+/// Test reading a slice of a variable into a buffer
+fn read_slice_into_buffer() {
+    let f = test_file("simple_xy.nc");
+    let file = netcdf::open(&f).unwrap();
+    let pres = file.root.variables.get("data").unwrap();
+    // pre-allocate the Array
+    let mut values: Vec<i32>  = Vec::with_capacity(6 * 3);
+    pres.read_slice_into_buffer(&[0, 0], &[6, 3], &mut values).unwrap();
+    let expected_values: [i32; 18] = [
+        0,  1,  2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62];
+    for i in 0..values.len() {
+        assert_eq!(expected_values[i], values[i]);
+    }
+}
