@@ -44,7 +44,7 @@ extern "C" {
     pub fn nc_open_mem(path: *const ::libc::c_char,
                        mode: ::libc::c_int,
                        size: size_t,
-                       memory: *mut ::libc::c_int,
+                       memory: *const ::libc::c_void,
                        ncidp: *mut ::libc::c_int) -> ::libc::c_int;
 
     pub fn nc_inq_path(ncid: ::libc::c_int, pathlen: *mut size_t,

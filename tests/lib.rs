@@ -25,6 +25,26 @@ fn root_dims() {
 }
 
 #[test]
+fn root_dims_from_bytes() {
+    let f = test_file("simple_xy.nc");
+    use std::io;
+    use std::io::prelude::*;
+    use std::fs::File;
+
+    let mut f = File::open(f).unwrap();
+    let mut buffer = vec![];
+    f.read_to_end(&mut buffer).unwrap();
+
+    let file = netcdf::open_from_bytes(buffer, "simple_xy.nc").unwrap();
+
+    assert_eq!("simple_xy.nc", file.name);
+    assert_eq!(file.root.dimensions.get("x").unwrap().len, 6);
+    assert_eq!(file.root.dimensions.get("y").unwrap().len, 12);
+
+
+}
+
+#[test]
 fn global_attrs() {
     let f = test_file("patmosx_v05r03-preliminary_NOAA-19_asc_d20130630_c20140325.nc");
 

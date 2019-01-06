@@ -87,6 +87,7 @@ pub mod dimension;
 pub use file::open;
 pub use file::create;
 pub use file::append;
+pub use file::open_from_bytes;
 
 fn string_from_c_str(c_str: &ffi::CStr) -> String {
     // see http://stackoverflow.com/questions/24145823/rust-ffi-c-string-handling
