@@ -40,6 +40,37 @@ pub fn open(file: &str) -> Result<File, String> {
     })
 }
 
+
+/// Open a netCDF file held in memory as `&[u8]`.
+pub fn from_slice<S: Into<String>>(file: &[u8], name: S) -> Result<File, String> {
+    let mut ncid : i32 = -999999i32;
+    let err : i32;
+    let string_name: String = name.into();
+    let f = ffi::CString::new(string_name.as_str()).unwrap();
+    unsafe {
+        let _g = libnetcdf_lock.lock().unwrap();
+        err = nc_open_mem(f.as_ptr(), NC_NOWRITE, file.len() as u64, file.as_ptr() as *mut i32, &mut ncid);
+    }
+    if err != NC_NOERR {
+        return Err(NC_ERRORS.get(&err).unwrap().clone());
+    }
+    let mut root = Group {
+            name: "root".to_string(),
+            id: ncid,
+            variables: HashMap::new(),
+            attributes: HashMap::new(),
+            dimensions: HashMap::new(),
+            sub_groups: HashMap::new(),
+        };
+    init_group(&mut root);
+    Ok(File {
+        id: ncid,
+        name: string_name,
+        root: root,
+    })
+}
+
+
 /// Open a netCDF file in append mode (read/write).
 /// The file must already exist.
 pub fn append(file: &str) -> Result<File, String> {

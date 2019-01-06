@@ -37,8 +37,16 @@ extern "C" {
     pub fn nc__open(path: *const ::libc::c_char, mode: ::libc::c_int,
                     chunksizehintp: *mut size_t, ncidp: *mut ::libc::c_int)
      -> ::libc::c_int;
-    pub fn nc_open(path: *const ::libc::c_char, mode: ::libc::c_int,
+    pub fn nc_open(path: *const ::libc::c_char,
+                   mode: ::libc::c_int,
                    ncidp: *mut ::libc::c_int) -> ::libc::c_int;
+
+    pub fn nc_open_mem(path: *const ::libc::c_char,
+                       mode: ::libc::c_int,
+                       size: size_t,
+                       memory: *mut ::libc::c_int,
+                       ncidp: *mut ::libc::c_int) -> ::libc::c_int;
+
     pub fn nc_inq_path(ncid: ::libc::c_int, pathlen: *mut size_t,
                        path: *mut ::libc::c_char) -> ::libc::c_int;
     pub fn nc_inq_ncid(ncid: ::libc::c_int, name: *const ::libc::c_char,

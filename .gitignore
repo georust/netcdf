@@ -2,3 +2,4 @@ target
 testout
 Cargo.lock
 .*.swp
+.idea/
