@@ -31,13 +31,13 @@ fn root_dims_from_bytes() {
     use std::io::prelude::*;
     use std::fs::File;
 
-    let mut f = File::open(f).unwrap();
+    let mut file = File::open(&f).unwrap();
     let mut buffer = vec![];
-    f.read_to_end(&mut buffer).unwrap();
+    file.read_to_end(&mut buffer).unwrap();
 
-    let file = netcdf::open_from_bytes(buffer, "simple_xy.nc").unwrap();
+    let file = netcdf::open_from_bytes(buffer, f.clone()).unwrap();
 
-    assert_eq!("simple_xy.nc", file.name);
+    assert_eq!(f, file.name);
     assert_eq!(file.root.dimensions.get("x").unwrap().len, 6);
     assert_eq!(file.root.dimensions.get("y").unwrap().len, 12);
 

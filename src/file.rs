@@ -45,19 +45,22 @@ pub fn open(file: &str) -> Result<File, String> {
 pub fn open_from_bytes<S: Into<String>>(mut file: Vec<u8>, name: S) -> Result<File, String> {
     let mut ncid : i32 = -999999i32;
     let err : i32;
+
     let string_name: String = name.into();
-    let f = ffi::CString::new(string_name.as_str()).unwrap();
+    let data_path = path::Path::new(&string_name);
+
+    let f = ffi::CString::new(data_path.to_str().unwrap()).unwrap();
+
 
     use std::mem;
     use std::os::raw::c_void;
 
     file.shrink_to_fit();
-    let size = file.len() as u64;
-    let file = Box::new(file);
+    let size = mem::size_of_val(&file);
 
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
-        err = nc_open_mem(f.as_ptr(), NC_NOWRITE, size, Box::into_raw(file) as *mut c_void, &mut ncid);
+        err = nc_open_mem(f.as_ptr(), 0, size, file.as_ptr() as *mut c_void, &mut ncid);
     }
     if err != NC_NOERR {
         eprintln!("Returing error!: {:?}", &err);
@@ -74,7 +77,7 @@ pub fn open_from_bytes<S: Into<String>>(mut file: Vec<u8>, name: S) -> Result<Fi
     init_group(&mut root);
     Ok(File {
         id: ncid,
-        name: string_name,
+        name: string_name.clone(),
         root: root,
     })
 }
