@@ -20,6 +20,13 @@ or as a [ndarray](https://github.com/bluss/rust-ndarray).
 
 rust-netcdf depends on libnetcdf v4.3.3.1
 
+You can build the library and run the tests via Docker like this:
+
+```
+docker build . -t rust-netcdf
+docker run -it --rm rust-netcdf
+```
+
 ## Read Example
 
 ```Rust
