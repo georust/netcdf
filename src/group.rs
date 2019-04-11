@@ -241,6 +241,7 @@ fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
     for i_grp in 0..ngrps {
         let mut namelen = 0u64;
         let c_str: &ffi::CStr;
+        let str_buf: String;
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
             // name length
@@ -252,8 +253,8 @@ fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
             let err = nc_inq_grpname(grpids[i_grp as usize], buf_ptr);
             assert_eq!(err, NC_NOERR);
             c_str = ffi::CStr::from_ptr(buf_ptr);
+            str_buf = string_from_c_str(c_str);
         }
-        let str_buf: String = string_from_c_str(c_str);
 
         // Per NetCDF doc, "Dimensions are visible in their groups, and all 
         // child groups."
