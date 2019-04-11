@@ -1,5 +1,5 @@
 # Mirroring travis build (trusty 14.04) for now...
-FROM ubuntu:14.04
+FROM ubuntu:16.04
 
 RUN apt-get -y update && apt-get -y install \
     libhdf5-serial-dev \
