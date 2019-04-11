@@ -18,7 +18,7 @@ or as a [ndarray](https://github.com/bluss/rust-ndarray).
 
 ## Building
 
-rust-netcdf depends on libnetcdf v4.3.3.1
+rust-netcdf depends on libnetcdf. The Travis build runs on Xenial and Ubuntu 16.04 Xenial and installs libnetcdf via apt, which results in netcdf v.4.4.0. rust-netcdf is not widely tested on other versions of netcdf.
 
 You can build the library and run the tests via Docker like this:
 
