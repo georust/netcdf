@@ -1,9 +1,9 @@
+use super::utils::{string_from_c_str, NC_ERRORS};
+use super::LOCK;
 use netcdf_sys::*;
 use std::collections::HashMap;
-use std::ffi;
+use std::ffi::{CStr, CString};
 use std::fmt;
-use string_from_c_str;
-use NC_ERRORS;
 
 macro_rules! get_attr_as_type {
     ( $me:ident, $nc_type:ident, $rs_type:ty, $nc_fn:ident , $cast:ident ) => {{
@@ -12,9 +12,9 @@ macro_rules! get_attr_as_type {
         }
         let mut err;
         let mut attlen: usize = 0;
-        let name_copy: ffi::CString = ffi::CString::new($me.name.clone()).unwrap();
+        let name_copy: CString = CString::new($me.name.clone()).unwrap();
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             err = nc_inq_attlen($me.file_id, $me.var_id, name_copy.as_ptr(), &mut attlen);
         }
         if err != NC_NOERR {
@@ -25,7 +25,7 @@ macro_rules! get_attr_as_type {
         }
         let mut buf: $rs_type = 0 as $rs_type;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             err = $nc_fn($me.file_id, $me.var_id, name_copy.as_ptr(), &mut buf);
         }
         if err != NC_NOERR {
@@ -50,12 +50,12 @@ impl Attribute {
             return Err("Types are not equivalent and cast==false".to_string());
         }
         let attr_char_str;
-        let name_copy: ffi::CString = ffi::CString::new(self.name.clone()).unwrap();
+        let name_copy: CString = CString::new(self.name.clone()).unwrap();
         let mut attlen: usize = 0;
         unsafe {
             let mut err;
             {
-                let _g = libnetcdf_lock.lock().unwrap();
+                let _g = LOCK.lock().unwrap();
                 err = nc_inq_attlen(self.file_id, self.var_id, name_copy.as_ptr(), &mut attlen);
             }
             if err != NC_NOERR {
@@ -65,7 +65,7 @@ impl Attribute {
             let mut attr_char_buf_vec = vec![0i8; (attlen + 1) as usize];
             let attr_char_buf_ptr: *mut i8 = attr_char_buf_vec.as_mut_ptr();
             {
-                let _g = libnetcdf_lock.lock().unwrap();
+                let _g = LOCK.lock().unwrap();
                 err = nc_get_att_text(
                     self.file_id,
                     self.var_id,
@@ -76,7 +76,7 @@ impl Attribute {
             if err != NC_NOERR {
                 return Err(NC_ERRORS.get(&err).unwrap().clone());
             }
-            let attr_c_str = ffi::CStr::from_ptr(attr_char_buf_ptr);
+            let attr_c_str = CStr::from_ptr(attr_char_buf_ptr);
             attr_char_str = string_from_c_str(attr_c_str);
         }
         Ok(attr_char_str)
@@ -139,7 +139,7 @@ pub fn init_attributes(
     if natts_in == -1 {
         // these are global attrs; have to determine number of attrs
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             let err = nc_inq_natts(file_id, &mut nattrs);
             assert_eq!(err, NC_NOERR);
         }
@@ -151,15 +151,15 @@ pub fn init_attributes(
     let mut attr_type: nc_type = 0;
     for i_attr in 0..nattrs {
         let mut name_buf_vec = vec![0i8; (NC_MAX_NAME + 1) as usize];
-        let name_c_str: &ffi::CStr;
+        let name_c_str: &CStr;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             let name_buf_ptr: *mut i8 = name_buf_vec.as_mut_ptr();
             let err = nc_inq_attname(file_id, var_id, i_attr, name_buf_ptr);
             assert_eq!(err, NC_NOERR);
             let err = nc_inq_atttype(file_id, var_id, name_buf_ptr, &mut attr_type);
             assert_eq!(err, NC_NOERR);
-            name_c_str = ffi::CStr::from_ptr(name_buf_ptr);
+            name_c_str = CStr::from_ptr(name_buf_ptr);
         }
         let name_str: String = string_from_c_str(name_c_str);
         attrs.insert(

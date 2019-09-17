@@ -7,6 +7,7 @@ description = "High-level NetCDF bindings for Rust"
 repository = "https://github.com/mhiley/rust-netcdf"
 documentation = "https://github.com/mhiley/rust-netcdf"
 keywords = ["netcdf", "hdf", "hdf5", "libnetcdf", "netcdf4"]
+edition = "2018"
 
 [dependencies]
 libc = "0.2"

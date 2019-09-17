@@ -1,6 +1,8 @@
-use attribute::{init_attributes, Attribute};
-use dimension::Dimension;
-use group::PutAttr;
+use super::attribute::{init_attributes, Attribute};
+use super::dimension::Dimension;
+use super::group::PutAttr;
+use super::utils::{string_from_c_str, NC_ERRORS};
+use super::LOCK;
 use libc;
 use ndarray::ArrayD;
 use netcdf_sys::*;
@@ -8,8 +10,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::ffi;
 use std::marker::Sized;
-use string_from_c_str;
-use NC_ERRORS;
 
 macro_rules! get_var_as_type {
     ( $me:ident, $nc_type:ident, $vec_type:ty, $nc_fn:ident , $cast:ident ) => {{
@@ -19,7 +19,7 @@ macro_rules! get_var_as_type {
         let mut buf: Vec<$vec_type> = Vec::with_capacity($me.len as usize);
         let err: nc_type;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             buf.set_len($me.len as usize);
             err = $nc_fn($me.grp_id, $me.id, buf.as_mut_ptr());
         }
@@ -99,7 +99,7 @@ macro_rules! impl_numeric {
                 let mut buf: Vec<$sized_type> = Vec::with_capacity(variable.len as usize);
                 let err: nc_type;
                 unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
+                    let _g = LOCK.lock().unwrap();
                     buf.set_len(variable.len as usize);
                     err = $nc_get_var(variable.grp_id, variable.id, buf.as_mut_ptr());
                 }
@@ -123,7 +123,7 @@ macro_rules! impl_numeric {
                 }
                 let err: nc_type;
                 unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
+                    let _g = LOCK.lock().unwrap();
                     // update the vector element count
                     buffer.set_len(variable.len as usize);
                     // fill the buffer
@@ -157,7 +157,7 @@ macro_rules! impl_numeric {
                 // Get a pointer to an array
                 let indices_ptr = indices.as_ptr();
                 unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
+                    let _g = LOCK.lock().unwrap();
                     //fn nc_get_var1(ncid: libc::c_int, varid: libc::c_int, indexp: *const size_t, ip: *mut libc::c_void)
                     err = $nc_get_var1_type(variable.grp_id, variable.id, indices_ptr, &mut buff);
                 }
@@ -203,7 +203,7 @@ macro_rules! impl_numeric {
 
                 let err: nc_type;
                 unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
+                    let _g = LOCK.lock().unwrap();
 
                     values = Vec::with_capacity(values_len);
                     values.set_len(values_len);
@@ -266,7 +266,7 @@ macro_rules! impl_numeric {
 
                 let err: nc_type;
                 unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
+                    let _g = LOCK.lock().unwrap();
                     // update the vector element count
                     buffer.set_len(values_len as usize);
                     // read values into the buffer
@@ -303,7 +303,7 @@ macro_rules! impl_numeric {
                 let err: nc_type;
                 let indices_ptr = indices.as_ptr();
                 unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
+                    let _g = LOCK.lock().unwrap();
                     err = $nc_put_var1_type(variable.grp_id, variable.id, indices_ptr, &value);
                 }
                 if err != NC_NOERR {
@@ -345,7 +345,7 @@ macro_rules! impl_numeric {
 
                 let err: nc_type;
                 unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
+                    let _g = LOCK.lock().unwrap();
                     err = $nc_put_vara_type(
                         variable.grp_id,
                         variable.id,
@@ -624,7 +624,7 @@ impl Variable {
     pub fn set_fill_value<T: Numeric>(&mut self, fill_value: T) -> Result<(), String> {
         let err: nc_type;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             err = nc_def_var_fill(
                 self.grp_id,
                 self.id,
@@ -644,7 +644,7 @@ impl Variable {
         let mut natts: nc_type = 0;
         let err: nc_type;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             err = nc_inq_varnatts(self.grp_id, self.id, &mut natts);
         }
         if err != NC_NOERR {
@@ -665,7 +665,7 @@ pub fn init_variables(
     // determine number of vars
     let mut nvars = 0;
     unsafe {
-        let _g = libnetcdf_lock.lock().unwrap();
+        let _g = LOCK.lock().unwrap();
         let err = nc_inq_nvars(grp_id, &mut nvars);
         assert_eq!(err, NC_NOERR);
     }
@@ -689,7 +689,7 @@ pub fn init_variable(
     let mut dimids: Vec<_> = Vec::with_capacity(NC_MAX_DIMS as usize);
     let mut natts: nc_type = 0;
     unsafe {
-        let _g = libnetcdf_lock.lock().unwrap();
+        let _g = LOCK.lock().unwrap();
         let buf_ptr: *mut i8 = buf_vec.as_mut_ptr();
         let err = nc_inq_var(
             grp_id,

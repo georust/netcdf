@@ -1,12 +1,12 @@
-use attribute::{init_attributes, Attribute};
-use dimension::{init_dimensions, Dimension};
+use super::attribute::{init_attributes, Attribute};
+use super::dimension::{init_dimensions, Dimension};
+use super::utils::{string_from_c_str, NC_ERRORS};
+use super::variable::{init_variable, init_variables, Numeric, Variable};
+use super::LOCK;
 use netcdf_sys::*;
 use std::collections::HashMap;
 use std::ffi;
 use std::ptr;
-use string_from_c_str;
-use variable::{init_variable, init_variables, Numeric, Variable};
-use NC_ERRORS;
 
 #[derive(Debug)]
 pub struct Group {
@@ -42,7 +42,7 @@ macro_rules! impl_putvar {
             fn put(&self, ncid: nc_type, varid: nc_type) -> Result<(), String> {
                 let err;
                 unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
+                    let _g = LOCK.lock().unwrap();
                     err = $nc_put_var(ncid, varid, self.as_ptr());
                 }
                 if err != NC_NOERR {
@@ -84,7 +84,7 @@ macro_rules! impl_putattr {
                 let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
                 let err;
                 unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
+                    let _g = LOCK.lock().unwrap();
                     err = $nc_put_att(ncid, varid, name_c.as_ptr(), $nc_type, 1, self);
                 }
                 if err != NC_NOERR {
@@ -114,7 +114,7 @@ impl PutAttr for String {
         let attr_c: ffi::CString = ffi::CString::new(self.clone()).unwrap();
         let err;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             err = nc_put_att_text(
                 ncid,
                 varid,
@@ -151,7 +151,7 @@ impl Group {
         let mut dimid = 0;
         let err;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             err = nc_def_dim(self.id, name_c.as_ptr(), len, &mut dimid);
         }
         if err != NC_NOERR {
@@ -221,7 +221,7 @@ impl Group {
         let mut varid = 0;
         let err;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             err = nc_def_var(
                 self.id,
                 name_c.as_ptr(),
@@ -257,7 +257,7 @@ fn init_sub_groups(
     // the function `nc_inq_grps()` fulfill those 2 requests
     // See: http://www.unidata.ucar.edu/software/netcdf/netcdf-4/newdocs/netcdf-c/nc_005finq_005fgrps.html
     unsafe {
-        let _g = libnetcdf_lock.lock().unwrap();
+        let _g = LOCK.lock().unwrap();
         // Get the number of groups
         let mut err = nc_inq_grps(grp_id, &mut ngrps, ptr::null_mut());
         assert_eq!(err, NC_NOERR);
@@ -273,7 +273,7 @@ fn init_sub_groups(
         let c_str: &ffi::CStr;
         let str_buf: String;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             // name length
             let err = nc_inq_grpname_len(grpids[i_grp as usize], &mut namelen);
             assert_eq!(err, NC_NOERR);

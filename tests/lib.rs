@@ -1,15 +1,31 @@
-extern crate netcdf;
-
-extern crate ndarray;
+#![cfg(test)]
 use ndarray::ArrayD;
-use netcdf::{test_file, test_file_new};
 
+// Helpers for getting file paths
+pub fn test_file(f: &str) -> String {
+    use std::env;
+    use std::path::Path;
+    let mnf_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let path = Path::new(&mnf_dir).join("testdata").join(f);
+    path.to_str().unwrap().to_string()
+}
+
+pub fn test_file_new(f: &str) -> String {
+    use std::env;
+    use std::fs;
+    use std::path::Path;
+    let mnf_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let path = Path::new(&mnf_dir).join("testout");
+    let new_file = path.join(f);
+    let _err = fs::create_dir(path);
+    new_file.to_str().unwrap().to_string()
+}
 // Failure tests
 #[test]
 #[should_panic(expected = "No such file or directory")]
 fn bad_filename() {
     let f = test_file("blah_stuff.nc");
-    let _file = netcdf::open(&f).unwrap();
+    let _file = netcdf::File::open(&f).unwrap();
 }
 
 // Read tests
@@ -17,7 +33,7 @@ fn bad_filename() {
 fn root_dims() {
     let f = test_file("simple_xy.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
 
     assert_eq!(file.root.dimensions.get("x").unwrap().len, 6);
@@ -28,7 +44,7 @@ fn root_dims() {
 fn global_attrs() {
     let f = test_file("patmosx_v05r03-preliminary_NOAA-19_asc_d20130630_c20140325.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
 
     let ch1_attr = file.root.attributes.get("CH1_DARK_COUNT").unwrap();
@@ -47,7 +63,7 @@ fn global_attrs() {
 fn var_cast() {
     let f = test_file("simple_xy.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
 
     let var = file.root.variables.get("data").unwrap();
@@ -71,7 +87,7 @@ fn var_cast() {
 fn test_index_fetch() {
     let f = test_file("simple_xy.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
 
     let var = file.root.variables.get("data").unwrap();
     let first_val: i32 = var.value_at(&[0usize, 0usize]).unwrap();
@@ -86,7 +102,7 @@ fn test_index_fetch() {
 fn implicit_cast() {
     let f = test_file("simple_xy.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
 
     let var = file.root.variables.get("data").unwrap();
@@ -111,7 +127,7 @@ fn implicit_cast() {
 fn var_cast_fail() {
     let f = test_file("simple_xy.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     let var = file.root.variables.get("data").unwrap();
 
     // getting int Variable as float with false argument should fail.
@@ -122,7 +138,7 @@ fn var_cast_fail() {
 fn last_dim_varies_fastest() {
     let f = test_file("simple_xy.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
 
     let var = file.root.variables.get("data").unwrap();
@@ -147,7 +163,7 @@ fn last_dim_varies_fastest() {
 fn open_pres_temp_4d() {
     let f = test_file("pres_temp_4D.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
 
     let pres = file.root.variables.get("pressure").unwrap();
@@ -171,7 +187,7 @@ fn open_pres_temp_4d() {
 fn nc4_groups() {
     let f = test_file("simple_nc4.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
 
     let grp1 = file.root.sub_groups.get("grp1").unwrap();
@@ -189,7 +205,7 @@ fn nc4_groups() {
 fn create() {
     let f = test_file_new("create.nc");
 
-    let file = netcdf::create(&f).unwrap();
+    let file = netcdf::File::create(&f).unwrap();
     assert_eq!(f, file.name);
 }
 
@@ -198,7 +214,7 @@ fn def_dims_vars_attrs() {
     {
         let f = test_file_new("def_dims_vars_attrs.nc");
 
-        let mut file = netcdf::create(&f).unwrap();
+        let mut file = netcdf::File::create(&f).unwrap();
 
         let dim1_name = "ljkdsjkldfs";
         let dim2_name = "dsfkdfskl";
@@ -250,7 +266,7 @@ fn def_dims_vars_attrs() {
     {
         let f = test_file_new("def_dims_vars_attrs.nc");
 
-        let file = netcdf::open(&f).unwrap();
+        let file = netcdf::File::open(&f).unwrap();
 
         // verify dimensions
         let dim1_name = "ljkdsjkldfs";
@@ -342,7 +358,7 @@ fn all_var_types() {
     // write
     {
         let f = test_file_new("all_var_types.nc");
-        let mut file = netcdf::create(&f).unwrap();
+        let mut file = netcdf::File::create(&f).unwrap();
 
         let dim_name = "dim1";
         file.root.add_dimension(dim_name, 10).unwrap();
@@ -406,7 +422,7 @@ fn all_var_types() {
     // read
     {
         let f = test_file_new("all_var_types.nc");
-        let file = netcdf::open(&f).unwrap();
+        let file = netcdf::File::open(&f).unwrap();
 
         // byte
         let data: Vec<i8> = file
@@ -514,7 +530,7 @@ fn all_var_types() {
 fn all_attr_types() {
     {
         let f = test_file_new("all_attr_types.nc");
-        let mut file = netcdf::create(&f).unwrap();
+        let mut file = netcdf::File::create(&f).unwrap();
 
         // byte
         file.root.add_attribute("attr_byte", 3 as i8).unwrap();
@@ -538,7 +554,7 @@ fn all_attr_types() {
 
     {
         let f = test_file_new("all_attr_types.nc");
-        let file = netcdf::open(&f).unwrap();
+        let file = netcdf::File::open(&f).unwrap();
 
         // byte
         assert_eq!(
@@ -638,7 +654,7 @@ fn all_attr_types() {
 /// when fetched using "Variable::as_array()"
 fn fetch_ndarray() {
     let f = test_file("pres_temp_4D.nc");
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
     let pres = file.root.variables.get("pressure").unwrap();
     let values_array: ArrayD<f64> = pres.as_array().unwrap();
@@ -649,7 +665,7 @@ fn fetch_ndarray() {
 // assert slice fetching
 fn fetch_slice() {
     let f = test_file("simple_xy.nc");
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
     let pres = file.root.variables.get("data").unwrap();
     let values: Vec<i32> = pres.values_at(&[0, 0], &[6, 3]).unwrap();
@@ -665,7 +681,7 @@ fn fetch_slice() {
 // assert slice fetching
 fn fetch_slice_as_ndarray() {
     let f = test_file("simple_xy.nc");
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
     let pres = file.root.variables.get("data").unwrap();
     let values_array: ArrayD<i32> = pres.array_at(&[0, 0], &[6, 3]).unwrap();
@@ -680,7 +696,7 @@ fn append() {
     {
         // first creates a simple netCDF file
         // and create a variable called "some_variable" in it
-        let mut file_w = netcdf::create(&f).unwrap();
+        let mut file_w = netcdf::File::create(&f).unwrap();
         file_w.root.add_dimension(dim_name, 3).unwrap();
         file_w
             .root
@@ -718,7 +734,7 @@ fn put_single_value() {
     {
         // first creates a simple netCDF file
         // and create a variable called "some_variable" in it
-        let mut file_w = netcdf::create(&f).unwrap();
+        let mut file_w = netcdf::File::create(&f).unwrap();
         file_w.root.add_dimension(dim_name, 3).unwrap();
         file_w
             .root
@@ -737,7 +753,7 @@ fn put_single_value() {
     }
     // finally open  the file in read only mode
     // and test the values of 'some_variable'
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     let var = file.root.variables.get(var_name).unwrap();
     assert_eq!(var.value_at(&indices), Ok(100.));
 }
@@ -751,7 +767,7 @@ fn put_values() {
     {
         // first creates a simple netCDF file
         // and create a variable called "some_variable" in it
-        let mut file_w = netcdf::create(&f).unwrap();
+        let mut file_w = netcdf::File::create(&f).unwrap();
         file_w.root.add_dimension(dim_name, 3).unwrap();
         file_w
             .root
@@ -771,7 +787,7 @@ fn put_values() {
     }
     // finally open  the file in read only mode
     // and test the values of 'some_variable'
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     let var = file.root.variables.get(var_name).unwrap();
     assert_eq!(
         var.values_at::<f32>(&indices, &[values.len()])
@@ -789,7 +805,7 @@ fn set_fill_value() {
     let var_name = "some_variable";
     let fill_value = -2. as f32;
 
-    let mut file_w = netcdf::create(&f).unwrap();
+    let mut file_w = netcdf::File::create(&f).unwrap();
     file_w.root.add_dimension(dim_name, 3).unwrap();
     file_w
         .root
@@ -815,7 +831,7 @@ fn set_fill_value() {
 /// Test reading variable into a buffer
 fn read_values_into_buffer() {
     let f = test_file("simple_xy.nc");
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     let var = file.root.variables.get("data").unwrap();
     // pre-allocate the Array
     let mut data: Vec<i32> = Vec::with_capacity(var.len as usize);
@@ -833,14 +849,14 @@ fn use_path_to_open() {
     let f = test_file("simple_xy.nc");
     let path: &std::path::Path = &std::path::Path::new(&f);
 
-    let _file = netcdf::open(path).unwrap();
+    let _file = netcdf::File::open(path).unwrap();
 }
 
 #[test]
 /// Test reading a slice of a variable into a buffer
 fn read_slice_into_buffer() {
     let f = test_file("simple_xy.nc");
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::File::open(&f).unwrap();
     let pres = file.root.variables.get("data").unwrap();
     // pre-allocate the Array
     let mut values: Vec<i32> = Vec::with_capacity(6 * 3);

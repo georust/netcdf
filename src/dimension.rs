@@ -1,7 +1,8 @@
+use super::utils::string_from_c_str;
+use super::LOCK;
 use netcdf_sys::*;
 use std::collections::HashMap;
 use std::ffi;
-use string_from_c_str;
 
 #[derive(Clone, Debug)]
 pub struct Dimension {
@@ -14,7 +15,7 @@ pub fn init_dimensions(dims: &mut HashMap<String, Dimension>, grp_id: i32) {
     // determine number of dims
     let mut ndims = 0i32;
     unsafe {
-        let _g = libnetcdf_lock.lock().unwrap();
+        let _g = LOCK.lock().unwrap();
         let err = nc_inq_ndims(grp_id, &mut ndims);
         assert_eq!(err, NC_NOERR);
     }
@@ -25,7 +26,7 @@ pub fn init_dimensions(dims: &mut HashMap<String, Dimension>, grp_id: i32) {
         let mut dimlen: usize = 0;
         let c_str: &ffi::CStr;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = LOCK.lock().unwrap();
             let buf_ptr: *mut i8 = buf_vec.as_mut_ptr();
             let err = nc_inq_dim(grp_id, i_dim, buf_ptr, &mut dimlen);
             assert_eq!(err, NC_NOERR);

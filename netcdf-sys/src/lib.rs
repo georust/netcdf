@@ -1,27 +1,10 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-#[macro_use]
-extern crate lazy_static;
-
-extern crate libc;
-use std::sync::Mutex;
-
-include!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/src/netcdf_bindings.rs"
-));
-// netcdf_const.rs contains only a definiion of netCDF variables
-// It uses directs values (no 'extern static' binding)
-include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/netcdf_const.rs"));
-
-// Per the NetCDF FAQ, "THE C-BASED LIBRARIES ARE NOT THREAD-SAFE"
-// So, here is our global mutex.
-// Use lazy-static dependency to avoid use of static_mutex feature which
-// breaks compatibility with stable channel.
-lazy_static! {
-    pub static ref libnetcdf_lock: Mutex<()> = Mutex::new(());
-}
+mod netcdf_bindings;
+mod netcdf_const;
+pub use netcdf_bindings::*;
+pub use netcdf_const::*;
 
 #[cfg(test)]
 mod tests {
@@ -29,6 +12,17 @@ mod tests {
     use std::env;
     use std::ffi;
     use std::path;
+
+    use lazy_static::lazy_static;
+    use std::sync::Mutex;
+
+    // Per the NetCDF FAQ, "THE C-BASED LIBRARIES ARE NOT THREAD-SAFE"
+    // So, here is our global mutex.
+    // Use lazy-static dependency to avoid use of static_mutex feature which
+    // breaks compatibility with stable channel.
+    lazy_static! {
+        pub static ref libnetcdf_lock: Mutex<()> = Mutex::new(());
+    }
 
     #[test]
     fn test_nc_open_close() {
@@ -104,7 +98,7 @@ mod tests {
         }
 
         for x in 0..(6 * 12) {
-            assert_eq!(buf[x], x);
+            assert_eq!(buf[x], x as _);
         }
     }
 }
