@@ -1,8 +1,8 @@
+use group::{init_group, Group};
+use netcdf_sys::*;
+use std::collections::HashMap;
 use std::ffi;
 use std::path;
-use std::collections::HashMap;
-use netcdf_sys::*;
-use group::{init_group, Group};
 use NC_ERRORS;
 
 pub struct File {
@@ -12,11 +12,14 @@ pub struct File {
 }
 
 /// Open a netCDF file in read only mode.
-pub fn open(file: &str) -> Result<File, String> {
-    let data_path = path::Path::new(file);
+pub fn open<P>(file: P) -> Result<File, String>
+where
+    P: AsRef<path::Path>,
+{
+    let data_path = file.as_ref();
     let f = ffi::CString::new(data_path.to_str().unwrap()).unwrap();
-    let mut ncid : i32 = -999999i32;
-    let err : i32;
+    let mut ncid: i32 = -999999i32;
+    let err: i32;
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
         err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
@@ -25,28 +28,31 @@ pub fn open(file: &str) -> Result<File, String> {
         return Err(NC_ERRORS.get(&err).unwrap().clone());
     }
     let mut root = Group {
-            name: "root".to_string(),
-            id: ncid,
-            variables: HashMap::new(),
-            attributes: HashMap::new(),
-            dimensions: HashMap::new(),
-            sub_groups: HashMap::new(),
-        };
+        name: "root".to_string(),
+        id: ncid,
+        variables: HashMap::new(),
+        attributes: HashMap::new(),
+        dimensions: HashMap::new(),
+        sub_groups: HashMap::new(),
+    };
     init_group(&mut root);
     Ok(File {
-        id: ncid, 
-        name: file.to_string(),
+        id: ncid,
+        name: data_path.to_string_lossy().into_owned(),
         root: root,
     })
 }
 
 /// Open a netCDF file in append mode (read/write).
 /// The file must already exist.
-pub fn append(file: &str) -> Result<File, String> {
-    let data_path = path::Path::new(file);
+pub fn append<P>(file: P) -> Result<File, String>
+where
+    P: AsRef<path::Path>,
+{
+    let data_path = file.as_ref();
     let f = ffi::CString::new(data_path.to_str().unwrap()).unwrap();
-    let mut ncid : i32 = -999999i32;
-    let err : i32;
+    let mut ncid: i32 = -999999i32;
+    let err: i32;
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
         err = nc_open(f.as_ptr(), NC_WRITE, &mut ncid);
@@ -55,27 +61,30 @@ pub fn append(file: &str) -> Result<File, String> {
         return Err(NC_ERRORS.get(&err).unwrap().clone());
     }
     let mut root = Group {
-            name: "root".to_string(),
-            id: ncid,
-            variables: HashMap::new(),
-            attributes: HashMap::new(),
-            dimensions: HashMap::new(),
-            sub_groups: HashMap::new(),
-        };
+        name: "root".to_string(),
+        id: ncid,
+        variables: HashMap::new(),
+        attributes: HashMap::new(),
+        dimensions: HashMap::new(),
+        sub_groups: HashMap::new(),
+    };
     init_group(&mut root);
     Ok(File {
-        id: ncid, 
-        name: file.to_string(),
+        id: ncid,
+        name: data_path.to_string_lossy().into_owned(),
         root: root,
     })
 }
 
 /// Open a netCDF file in creation mode (write only).
-pub fn create(file: &str) -> Result<File, String> {
-    let data_path = path::Path::new(file);
+pub fn create<P>(file: P) -> Result<File, String>
+where
+    P: AsRef<path::Path>,
+{
+    let data_path = file.as_ref();
     let f = ffi::CString::new(data_path.to_str().unwrap()).unwrap();
-    let mut ncid : i32 = -999999i32;
-    let err : i32;
+    let mut ncid: i32 = -999999i32;
+    let err: i32;
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
         err = nc_create(f.as_ptr(), NC_NETCDF4, &mut ncid);
@@ -84,21 +93,21 @@ pub fn create(file: &str) -> Result<File, String> {
         return Err(NC_ERRORS.get(&err).unwrap().clone());
     }
     let root = Group {
-            name: "root".to_string(),
-            id: ncid,
-            variables: HashMap::new(),
-            attributes: HashMap::new(),
-            dimensions: HashMap::new(),
-            sub_groups: HashMap::new(),
-        };
+        name: "root".to_string(),
+        id: ncid,
+        variables: HashMap::new(),
+        attributes: HashMap::new(),
+        dimensions: HashMap::new(),
+        sub_groups: HashMap::new(),
+    };
     Ok(File {
-        id: ncid, 
-        name: file.to_string(),
+        id: ncid,
+        name: data_path.to_string_lossy().into_owned(),
         root: root,
     })
 }
 
-impl File{
+impl File {
     fn close(&mut self) {
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
@@ -114,4 +123,3 @@ impl Drop for File {
         self.close();
     }
 }
-
