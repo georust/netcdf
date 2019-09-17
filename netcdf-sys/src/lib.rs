@@ -7,14 +7,17 @@ extern crate lazy_static;
 extern crate libc;
 use std::sync::Mutex;
 
-include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/netcdf_bindings.rs"));
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/netcdf_bindings.rs"
+));
 // netcdf_const.rs contains only a definiion of netCDF variables
 // It uses directs values (no 'extern static' binding)
 include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/netcdf_const.rs"));
 
 // Per the NetCDF FAQ, "THE C-BASED LIBRARIES ARE NOT THREAD-SAFE"
 // So, here is our global mutex.
-// Use lazy-static dependency to avoid use of static_mutex feature which 
+// Use lazy-static dependency to avoid use of static_mutex feature which
 // breaks compatibility with stable channel.
 lazy_static! {
     pub static ref libnetcdf_lock: Mutex<()> = Mutex::new(());
@@ -23,18 +26,19 @@ lazy_static! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path;
     use std::env;
     use std::ffi;
+    use std::path;
 
     #[test]
     fn test_nc_open_close() {
         let mnf_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-        let test_data_path = path::Path::new(&mnf_dir).join(
-            "testdata").join("simple_xy.nc");
+        let test_data_path = path::Path::new(&mnf_dir)
+            .join("testdata")
+            .join("simple_xy.nc");
         let f = ffi::CString::new(test_data_path.to_str().unwrap()).unwrap();
-        
-        let mut ncid : i32 = -999999i32;
+
+        let mut ncid: nc_type = -999999;
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
             let err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
@@ -47,14 +51,15 @@ mod tests {
     #[test]
     fn test_inq_varid() {
         let mnf_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-        let test_data_path = path::Path::new(&mnf_dir).join(
-            "testdata").join("simple_xy.nc");
+        let test_data_path = path::Path::new(&mnf_dir)
+            .join("testdata")
+            .join("simple_xy.nc");
         let f = ffi::CString::new(test_data_path.to_str().unwrap()).unwrap();
         let varname = ffi::CString::new("data").unwrap();
-        
-        let mut ncid : i32 = -999999i32;
-        let mut varid : i32 = -999999i32;
-        let mut nvars : i32 = -999999i32;
+
+        let mut ncid: nc_type = -999999;
+        let mut varid: nc_type = -999999;
+        let mut nvars: nc_type = -999999;
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
             let err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
@@ -72,16 +77,17 @@ mod tests {
     #[test]
     fn test_get_var() {
         let mnf_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-        let test_data_path = path::Path::new(&mnf_dir).join(
-            "testdata").join("simple_xy.nc");
+        let test_data_path = path::Path::new(&mnf_dir)
+            .join("testdata")
+            .join("simple_xy.nc");
         let f = ffi::CString::new(test_data_path.to_str().unwrap()).unwrap();
         let varname = ffi::CString::new("data").unwrap();
-        
-        let mut ncid : i32 = -999999i32;
-        let mut varid : i32 = -999999i32;
-        let mut buf : Vec<i32> = Vec::with_capacity(6*12);
+
+        let mut ncid: nc_type = -999999;
+        let mut varid: nc_type = -999999;
+        let mut buf: Vec<nc_type> = Vec::with_capacity(6 * 12);
         unsafe {
-            buf.set_len(6*12);
+            buf.set_len(6 * 12);
 
             let _g = libnetcdf_lock.lock().unwrap();
             let err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
@@ -97,9 +103,8 @@ mod tests {
             assert_eq!(err, NC_NOERR);
         }
 
-        for x in 0..(6*12) {
-            assert_eq!(buf[x], x as i32);
+        for x in 0..(6 * 12) {
+            assert_eq!(buf[x], x);
         }
     }
-
 }
