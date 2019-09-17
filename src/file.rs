@@ -6,7 +6,7 @@ use std::path;
 use NC_ERRORS;
 
 pub struct File {
-    pub id: i32,
+    pub id: nc_type,
     pub name: String,
     pub root: Group,
 }
@@ -18,8 +18,8 @@ where
 {
     let data_path = file.as_ref();
     let f = ffi::CString::new(data_path.to_str().unwrap()).unwrap();
-    let mut ncid: i32 = -999999i32;
-    let err: i32;
+    let mut ncid: nc_type = -999999;
+    let err: nc_type;
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
         err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
@@ -51,8 +51,8 @@ where
 {
     let data_path = file.as_ref();
     let f = ffi::CString::new(data_path.to_str().unwrap()).unwrap();
-    let mut ncid: i32 = -999999i32;
-    let err: i32;
+    let mut ncid: nc_type = -999999;
+    let err: nc_type;
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
         err = nc_open(f.as_ptr(), NC_WRITE, &mut ncid);
@@ -83,8 +83,8 @@ where
 {
     let data_path = file.as_ref();
     let f = ffi::CString::new(data_path.to_str().unwrap()).unwrap();
-    let mut ncid: i32 = -999999i32;
-    let err: i32;
+    let mut ncid: nc_type = -999999;
+    let err: nc_type;
     unsafe {
         let _g = libnetcdf_lock.lock().unwrap();
         err = nc_create(f.as_ptr(), NC_NETCDF4, &mut ncid);

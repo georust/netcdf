@@ -1,13 +1,13 @@
-use std::ffi;
-use std::collections::HashMap;
 use netcdf_sys::*;
+use std::collections::HashMap;
+use std::ffi;
 use string_from_c_str;
 
 #[derive(Clone)]
 pub struct Dimension {
-    pub name : String,
-    pub len: u64,
-    pub id: i32,
+    pub name: String,
+    pub len: usize,
+    pub id: nc_type,
 }
 
 pub fn init_dimensions(dims: &mut HashMap<String, Dimension>, grp_id: i32) {
@@ -22,19 +22,23 @@ pub fn init_dimensions(dims: &mut HashMap<String, Dimension>, grp_id: i32) {
     // read each dim name and length
     for i_dim in 0..ndims {
         let mut buf_vec = vec![0i8; (NC_MAX_NAME + 1) as usize];
-        let mut dimlen : u64 = 0u64;
+        let mut dimlen: usize = 0;
         let c_str: &ffi::CStr;
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
-            let buf_ptr : *mut i8 = buf_vec.as_mut_ptr();
+            let buf_ptr: *mut i8 = buf_vec.as_mut_ptr();
             let err = nc_inq_dim(grp_id, i_dim, buf_ptr, &mut dimlen);
             assert_eq!(err, NC_NOERR);
             c_str = ffi::CStr::from_ptr(buf_ptr);
         }
         let str_buf: String = string_from_c_str(c_str);
-        dims.insert(str_buf.clone(),
-                      Dimension{name: str_buf.clone(),
-                          len: dimlen,
-                          id: i_dim});
+        dims.insert(
+            str_buf.clone(),
+            Dimension {
+                name: str_buf.clone(),
+                len: dimlen as _,
+                id: i_dim,
+            },
+        );
     }
 }

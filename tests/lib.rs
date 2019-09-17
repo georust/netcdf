@@ -208,7 +208,7 @@ fn def_dims_vars_attrs() {
         assert_eq!(file.root.dimensions.get(dim2_name).unwrap().len, 20);
 
         let var_name = "varstuff_int";
-        let data: Vec<i32> = vec![42; (10 * 20)];
+        let data: Vec<i32> = vec![42; 10 * 20];
         file.root
             .add_variable(
                 var_name,
@@ -262,7 +262,7 @@ fn def_dims_vars_attrs() {
 
         // verify variable data
         let var_name = "varstuff_int";
-        let data_test: Vec<i32> = vec![42; (10 * 20)];
+        let data_test: Vec<i32> = vec![42; 10 * 20];
         let data_file: Vec<i32> = file
             .root
             .variables
@@ -730,7 +730,7 @@ fn put_single_value() {
     {
         // re-open it in append mode
         let mut file_a = netcdf::append(&f).unwrap();
-        let mut var = file_a.root.variables.get_mut(var_name).unwrap();
+        let var = file_a.root.variables.get_mut(var_name).unwrap();
         let res = var.put_value_at(100., &indices);
         assert_eq!(res, Ok(()));
         // close it (done when `file_a` goes out of scope)
@@ -764,7 +764,7 @@ fn put_values() {
     {
         // re-open it in append mode
         let mut file_a = netcdf::append(&f).unwrap();
-        let mut var = file_a.root.variables.get_mut(var_name).unwrap();
+        let var = file_a.root.variables.get_mut(var_name).unwrap();
         let res = var.put_values_at(&values, &indices, &[values.len()]);
         assert_eq!(res, Ok(()));
         // close it (done when `file_a` goes out of scope)
@@ -819,7 +819,7 @@ fn read_values_into_buffer() {
     let var = file.root.variables.get("data").unwrap();
     // pre-allocate the Array
     let mut data: Vec<i32> = Vec::with_capacity(var.len as usize);
-    var.read_values_into_buffer(&mut data);
+    var.read_values_into_buffer(&mut data).unwrap();
 
     assert_eq!(data.len(), 6 * 12);
     for x in 0..(6 * 12) {

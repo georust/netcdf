@@ -1,25 +1,21 @@
-use std::fmt;
-use std::ffi;
-use std::collections::HashMap;
 use netcdf_sys::*;
+use std::collections::HashMap;
+use std::ffi;
+use std::fmt;
 use string_from_c_str;
 use NC_ERRORS;
 
 macro_rules! get_attr_as_type {
-    ( $me:ident, $nc_type:ident, $rs_type:ty, $nc_fn:ident , $cast:ident ) 
-        =>
-    {{
+    ( $me:ident, $nc_type:ident, $rs_type:ty, $nc_fn:ident , $cast:ident ) => {{
         if (!$cast) && ($me.attrtype != $nc_type) {
             return Err("Types are not equivalent and cast==false".to_string());
         }
-        let mut err: i32;
-        let mut attlen : u64 = 0;
-        let name_copy: ffi::CString = 
-            ffi::CString::new($me.name.clone()).unwrap();
+        let mut err;
+        let mut attlen: usize = 0;
+        let name_copy: ffi::CString = ffi::CString::new($me.name.clone()).unwrap();
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
-            err = nc_inq_attlen($me.file_id, $me.var_id, name_copy.as_ptr(),
-                                    &mut attlen);
+            err = nc_inq_attlen($me.file_id, $me.var_id, name_copy.as_ptr(), &mut attlen);
         }
         if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
@@ -30,23 +26,21 @@ macro_rules! get_attr_as_type {
         let mut buf: $rs_type = 0 as $rs_type;
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
-            err = $nc_fn($me.file_id, $me.var_id, 
-                                       name_copy.as_ptr(),
-                                       &mut buf);
+            err = $nc_fn($me.file_id, $me.var_id, name_copy.as_ptr(), &mut buf);
         }
         if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());
         }
         Ok(buf)
-    }}
+    }};
 }
 
 pub struct Attribute {
-    pub name : String,
-    pub attrtype : i32,
-    pub id: i32,
-    pub var_id: i32,
-    pub file_id: i32,
+    pub name: String,
+    pub attrtype: nc_type,
+    pub id: nc_type,
+    pub var_id: nc_type,
+    pub file_id: nc_type,
 }
 
 impl Attribute {
@@ -55,27 +49,28 @@ impl Attribute {
             return Err("Types are not equivalent and cast==false".to_string());
         }
         let attr_char_str;
-        let name_copy: ffi::CString = 
-            ffi::CString::new(self.name.clone()).unwrap();
-        let mut attlen : u64 = 0;
+        let name_copy: ffi::CString = ffi::CString::new(self.name.clone()).unwrap();
+        let mut attlen: usize = 0;
         unsafe {
             let mut err;
             {
                 let _g = libnetcdf_lock.lock().unwrap();
-                err = nc_inq_attlen(self.file_id, self.var_id, name_copy.as_ptr(),
-                                        &mut attlen);
+                err = nc_inq_attlen(self.file_id, self.var_id, name_copy.as_ptr(), &mut attlen);
             }
             if err != NC_NOERR {
                 return Err(NC_ERRORS.get(&err).unwrap().clone());
             }
             // careful; netcdf does not write null terminators here
-            let mut attr_char_buf_vec = vec![0i8; (attlen+1) as usize];
+            let mut attr_char_buf_vec = vec![0i8; (attlen + 1) as usize];
             let attr_char_buf_ptr: *mut i8 = attr_char_buf_vec.as_mut_ptr();
             {
                 let _g = libnetcdf_lock.lock().unwrap();
-                err = nc_get_att_text(self.file_id, self.var_id, 
-                                            name_copy.as_ptr(),
-                                            attr_char_buf_ptr);
+                err = nc_get_att_text(
+                    self.file_id,
+                    self.var_id,
+                    name_copy.as_ptr(),
+                    attr_char_buf_ptr,
+                );
             }
             if err != NC_NOERR {
                 return Err(NC_ERRORS.get(&err).unwrap().clone());
@@ -127,16 +122,19 @@ impl fmt::Display for Attribute {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.get_char(true) {
             Ok(chars) => write!(f, "{}", chars),
-            Err(e) => write!(f, "ERROR: {}", e)
+            Err(e) => write!(f, "ERROR: {}", e),
         }
     }
 }
 
-pub fn init_attributes(attrs: &mut HashMap<String, Attribute>, 
-                   file_id: i32, 
-                   var_id: i32,
-                   natts_in: i32) { // TODO: better interface to indicate these are var attrs
-    let mut nattrs = 0i32;
+pub fn init_attributes(
+    attrs: &mut HashMap<String, Attribute>,
+    file_id: nc_type,
+    var_id: nc_type,
+    natts_in: nc_type,
+) {
+    // TODO: better interface to indicate these are var attrs
+    let mut nattrs = 0;
     if natts_in == -1 {
         // these are global attrs; have to determine number of attrs
         unsafe {
@@ -155,7 +153,7 @@ pub fn init_attributes(attrs: &mut HashMap<String, Attribute>,
         let name_c_str: &ffi::CStr;
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
-            let name_buf_ptr : *mut i8 = name_buf_vec.as_mut_ptr();
+            let name_buf_ptr: *mut i8 = name_buf_vec.as_mut_ptr();
             let err = nc_inq_attname(file_id, var_id, i_attr, name_buf_ptr);
             assert_eq!(err, NC_NOERR);
             let err = nc_inq_atttype(file_id, var_id, name_buf_ptr, &mut attr_type);
@@ -163,11 +161,15 @@ pub fn init_attributes(attrs: &mut HashMap<String, Attribute>,
             name_c_str = ffi::CStr::from_ptr(name_buf_ptr);
         }
         let name_str: String = string_from_c_str(name_c_str);
-        attrs.insert(name_str.clone(),
-                      Attribute{name: name_str.clone(),
-                          attrtype: attr_type,
-                          id: i_attr,
-                          var_id: var_id,
-                          file_id: file_id});
+        attrs.insert(
+            name_str.clone(),
+            Attribute {
+                name: name_str.clone(),
+                attrtype: attr_type,
+                id: i_attr,
+                var_id: var_id,
+                file_id: file_id,
+            },
+        );
     }
 }
