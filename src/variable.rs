@@ -468,6 +468,7 @@ impl_numeric!(
 );
 
 /// This struct defines a netCDF variable.
+#[derive(Debug)]
 pub struct Variable {
     /// The variable name
     pub name: String,

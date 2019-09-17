@@ -8,6 +8,7 @@ use string_from_c_str;
 use variable::{init_variable, init_variables, Numeric, Variable};
 use NC_ERRORS;
 
+#[derive(Debug)]
 pub struct Group {
     pub name: String,
     pub id: nc_type,

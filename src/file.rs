@@ -5,6 +5,7 @@ use std::ffi;
 use std::path;
 use NC_ERRORS;
 
+#[derive(Debug)]
 pub struct File {
     pub id: nc_type,
     pub name: String,

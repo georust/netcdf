@@ -35,6 +35,7 @@ macro_rules! get_attr_as_type {
     }};
 }
 
+#[derive(Debug)]
 pub struct Attribute {
     pub name: String,
     pub attrtype: nc_type,

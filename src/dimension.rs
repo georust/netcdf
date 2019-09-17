@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::ffi;
 use string_from_c_str;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Dimension {
     pub name: String,
     pub len: usize,
