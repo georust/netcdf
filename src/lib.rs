@@ -1,9 +1,9 @@
 //! Rust bindings for Unidata's [libnetcdf] (http://www.unidata.ucar.edu/software/netcdf/)
 //!
 //! # Examples
-//! 
+//!
 //! Read:
-//! 
+//!
 //! ```
 //! # let path_to_simple_xy = netcdf::test_file("simple_xy.nc");
 //! // Open file simple_xy.nc:
@@ -41,7 +41,7 @@
 //!     let data : Vec<i32> = vec![42; 10];
 //!     // Variable type written to file is inferred from Vec type:
 //!     file.root.add_variable(
-//!                 var_name, 
+//!                 var_name,
 //!                 &vec![dim_name.to_string()],
 //!                 &data
 //!             ).unwrap();
@@ -63,30 +63,30 @@
 //! }
 //! ```
 
-extern crate netcdf_sys;
 extern crate ndarray;
+extern crate netcdf_sys;
 
 #[macro_use]
 extern crate lazy_static;
 extern crate libc;
 
-use netcdf_sys::{libnetcdf_lock, nc_strerror};
-use std::ffi;
-use std::str;
-use std::path;
-use std::env;
-use std::fs;
+use netcdf_sys::{libnetcdf_lock, nc_strerror, nc_type};
 use std::collections::HashMap;
+use std::env;
+use std::ffi;
+use std::fs;
+use std::path;
+use std::str;
 
-pub mod file;
-pub mod variable;
 pub mod attribute;
-pub mod group;
 pub mod dimension;
+pub mod file;
+pub mod group;
+pub mod variable;
 
-pub use file::open;
-pub use file::create;
 pub use file::append;
+pub use file::create;
+pub use file::open;
 
 fn string_from_c_str(c_str: &ffi::CStr) -> String {
     // see http://stackoverflow.com/questions/24145823/rust-ffi-c-string-handling
@@ -96,11 +96,10 @@ fn string_from_c_str(c_str: &ffi::CStr) -> String {
     str_slice.to_owned()
 }
 
-
 lazy_static! {
-    pub static ref NC_ERRORS: HashMap<i32, String> = {
+    pub static ref NC_ERRORS: HashMap<nc_type, String> = {
         let mut m = HashMap::new();
-        // Invalid error codes are ok; nc_strerror will just return 
+        // Invalid error codes are ok; nc_strerror will just return
         // "Unknown Error"
         for i in -256..256 {
             let msg_cstr : &ffi::CStr;
@@ -118,8 +117,7 @@ lazy_static! {
 // Helpers for getting file paths
 pub fn test_file(f: &str) -> String {
     let mnf_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let path = path::Path::new(&mnf_dir).join(
-        "testdata").join(f);
+    let path = path::Path::new(&mnf_dir).join("testdata").join(f);
     path.to_str().unwrap().to_string()
 }
 
