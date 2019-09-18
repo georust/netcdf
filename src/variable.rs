@@ -3,11 +3,9 @@ use super::dimension::Dimension;
 use super::group::PutAttr;
 use super::utils::{string_from_c_str, NC_ERRORS};
 use super::LOCK;
-use libc;
 use ndarray::ArrayD;
 use netcdf_sys::*;
 use std::collections::HashMap;
-use std::error::Error;
 use std::ffi;
 use std::marker::Sized;
 
@@ -36,43 +34,30 @@ pub trait Numeric
 where
     Self: Sized,
 {
-    /// Returns the whole variable as Vec<Self>
-    fn from_variable(variable: &Variable) -> Result<Vec<Self>, String>;
-    /// Read the variable into a buffer and update its length.
-    fn read_variable_into_buffer(variable: &Variable, buffer: &mut Vec<Self>)
-        -> Result<(), String>;
-    /// Read a slice of a variable into a buffer and update its length.
-    fn read_slice_into_buffer(
+    /// Returns a single indexed value of the variable as Self
+    fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> Result<Self, String>;
+    /// Returns an ndarray of the variable
+    fn array_from_variable(
         variable: &Variable,
-        indices: &[usize],
-        slice_len: &[usize],
-        buffer: &mut Vec<Self>,
-    ) -> Result<(), String>;
-    /// Read a slice of a variable into a buffer with the correct length.
-    fn read_slice_into_slice(
-        variable:&Variable,
-        indices: &[usize],
-        slice_len: &[usize],
-        buffer: &mut [Self]) -> Result<(), String>;
+        indices: Option<&[usize]>,
+        slice_len: Option<&[usize]>,
+    ) -> Result<ArrayD<Self>, String>;
     /// Returns a slice of the variable as Vec<Self>
     fn slice_from_variable(
         variable: &Variable,
-        indices: &[usize],
-        slice_len: &[usize],
-    ) -> Result<Vec<Self>, String>;
-    /// Returns a single indexed value of the variable as Self
-    fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> Result<Self, String>;
+        indices: Option<&[usize]>,
+        slice_len: Option<&[usize]>,
+        values: &mut [Self],
+    ) -> Result<(), String>;
     /// Put a single value into a netCDF variable
     fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> Result<(), String>;
     /// put a SLICE of values into a netCDF variable at the given index
     fn put_values_at(
         variable: &mut Variable,
-        indices: &[usize],
-        slice_len: &[usize],
+        indices: Option<&[usize]>,
+        slice_len: Option<&[usize]>,
         values: &[Self],
     ) -> Result<(), String>;
-    /// Returns `self` as a C (void *) pointer
-    fn as_void_ptr(&self) -> *const libc::c_void;
 }
 
 // This macro implements the trait Numeric for the type "sized_type".
@@ -90,47 +75,6 @@ macro_rules! impl_numeric {
         $nc_put_var1_type: ident,
         $nc_put_vara_type: ident) => {
         impl Numeric for $sized_type {
-            // fetch ALL values from variable using `$nc_get_var`
-            fn from_variable(variable: &Variable) -> Result<Vec<$sized_type>, String> {
-                let mut buf: Vec<$sized_type> = Vec::with_capacity(variable.len as usize);
-                let err: nc_type;
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
-                    buf.set_len(variable.len as usize);
-                    err = $nc_get_var(variable.grp_id, variable.id, buf.as_mut_ptr());
-                }
-                if err != NC_NOERR {
-                    return Err(NC_ERRORS.get(&err).unwrap().clone());
-                }
-                Ok(buf)
-            }
-
-            // Read all values from variable using `$nc_get_var` into a pre-allocated buffer
-            fn read_variable_into_buffer(
-                variable: &Variable,
-                buffer: &mut Vec<$sized_type>,
-            ) -> Result<(), String> {
-                // check buffer capacity
-                if buffer.capacity() < variable.len as usize {
-                    return Err(format!(
-                        "Buffer is not big enough. (size {} needed)",
-                        variable.len
-                    ));
-                }
-                let err: nc_type;
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
-                    // update the vector element count
-                    buffer.set_len(variable.len as usize);
-                    // fill the buffer
-                    err = $nc_get_var(variable.grp_id, variable.id, buffer.as_mut_ptr());
-                }
-                if err != NC_NOERR {
-                    return Err(NC_ERRORS.get(&err).unwrap().clone());
-                }
-                Ok(())
-            }
-
             // fetch ONE value from variable using `$nc_get_var1`
             fn single_value_from_variable(
                 variable: &Variable,
@@ -154,7 +98,6 @@ macro_rules! impl_numeric {
                 let indices_ptr = indices.as_ptr();
                 unsafe {
                     let _g = LOCK.lock().unwrap();
-                    //fn nc_get_var1(ncid: libc::c_int, varid: libc::c_int, indexp: *const size_t, ip: *mut libc::c_void)
                     err = $nc_get_var1_type(variable.grp_id, variable.id, indices_ptr, &mut buff);
                 }
                 if err != NC_NOERR {
@@ -163,25 +106,73 @@ macro_rules! impl_numeric {
                 Ok(buff)
             }
 
-            // fetch a SLICE of values from variable using `$nc_get_vara`
+            fn array_from_variable(
+                variable: &Variable,
+                indices: Option<&[usize]>,
+                slice_len: Option<&[usize]>,
+            ) -> Result<ArrayD<$sized_type>, String> {
+                let _slice_len: Vec<_>;
+                let slice_len = match slice_len {
+                    Some(x) => x,
+                    None => {
+                        _slice_len = variable.dimensions.iter().map(|x| x.len).collect();
+                        &_slice_len
+                    }
+                };
+
+                let mut values: ArrayD<$sized_type> = unsafe { ArrayD::uninitialized(slice_len) };
+
+                <$sized_type>::slice_from_variable(
+                    variable,
+                    indices,
+                    Some(slice_len),
+                    values
+                        .as_slice_mut()
+                        .ok_or_else(|| "Values is emtpy".to_string())?,
+                )?;
+
+                Ok(values)
+            }
+
             fn slice_from_variable(
                 variable: &Variable,
-                indices: &[usize],
-                slice_len: &[usize],
-            ) -> Result<Vec<$sized_type>, String> {
-                // Check the length of `indices`
-                if indices.len() != variable.dimensions.len() {
-                    return Err(
-                        "`indices` must has the same length as the variable dimensions".into(),
-                    );
-                }
-                if indices.len() != slice_len.len() {
-                    return Err(
-                        "`slice` must has the same length as the variable dimensions".into(),
-                    );
-                }
-                let mut values: Vec<$sized_type>;
-                let mut values_len: usize = 1;
+                indices: Option<&[usize]>,
+                slice_len: Option<&[usize]>,
+                values: &mut [Self],
+            ) -> Result<(), String> {
+                let _indices: Vec<_>;
+                let indices = match indices {
+                    Some(x) => {
+                        if x.len() != variable.dimensions.len() {
+                            return Err(
+                                "`indices` must has the same length as the variable dimensions"
+                                    .into(),
+                            );
+                        };
+                        x
+                    }
+                    None => {
+                        _indices = variable.dimensions.iter().map(|_| 0).collect();
+                        &_indices
+                    }
+                };
+                let _slice_len: Vec<_>;
+                let slice_len = match slice_len {
+                    Some(x) => {
+                        if x.len() != variable.dimensions.len() {
+                            return Err(
+                                "`slice_len` must have the same length as the variable dimsensions"
+                                    .into(),
+                            );
+                        }
+                        x
+                    }
+                    None => {
+                        _slice_len = variable.dimensions.iter().map(|x| x.len).collect();
+                        &_slice_len
+                    }
+                };
+
                 for i in 0..indices.len() {
                     if indices[i] >= variable.dimensions[i].len {
                         return Err("requested index is bigger than the dimension length".into());
@@ -190,147 +181,25 @@ macro_rules! impl_numeric {
                         return Err("requested slice is bigger than the dimension length".into());
                     }
                     // Compute the full size of the request values
-                    if slice_len[i] > 0 {
-                        values_len *= slice_len[i];
-                    } else {
+                    if slice_len[i] == 0 {
                         return Err("Each slice element must be superior than 0".into());
                     }
+                }
+
+                if slice_len.iter().fold(1, |acc, x| acc * x) > values.len() {
+                    return Err("Number of elements exceeds space in buffer".into());
                 }
 
                 let err: nc_type;
                 unsafe {
                     let _g = LOCK.lock().unwrap();
 
-                    values = Vec::with_capacity(values_len);
-                    values.set_len(values_len);
-                    //let buff_ptr = values.as_mut_ptr() as *mut _ as *mut libc::c_void;
-                    //err = nc_get_vara(
                     err = $nc_get_vara_type(
                         variable.grp_id,
                         variable.id,
                         indices.as_ptr(),
                         slice_len.as_ptr(),
                         values.as_mut_ptr(),
-                    );
-                }
-                if err != NC_NOERR {
-                    return Err(NC_ERRORS.get(&err).unwrap().clone());
-                }
-                Ok(values)
-            }
-
-            // read a SLICE of values from variable using `$nc_get_vara` into `buffer`
-            fn read_slice_into_buffer(
-                variable: &Variable,
-                indices: &[usize],
-                slice_len: &[usize],
-                buffer: &mut Vec<$sized_type>,
-            ) -> Result<(), String> {
-                // Check the length of `indices`
-                if indices.len() != variable.dimensions.len() {
-                    return Err(
-                        "`indices` must has the same length as the variable dimensions".into(),
-                    );
-                }
-                if indices.len() != slice_len.len() {
-                    return Err(
-                        "`slice` must has the same length as the variable dimensions".into(),
-                    );
-                }
-                let mut values_len: usize = 1;
-                for i in 0..indices.len() {
-                    if indices[i] >= variable.dimensions[i].len {
-                        return Err("requested index is bigger than the dimension length".into());
-                    }
-                    if (indices[i] + slice_len[i]) > variable.dimensions[i].len {
-                        return Err("requested slice is bigger than the dimension length".into());
-                    }
-                    // Compute the full size of the request values
-                    if slice_len[i] > 0 {
-                        values_len *= slice_len[i];
-                    } else {
-                        return Err("Each slice element must be superior than 0".into());
-                    }
-                }
-                // check buffer capacity
-                if buffer.capacity() < values_len {
-                    return Err(format!(
-                        "Buffer is not big enough. (size {} needed)",
-                        values_len
-                    ));
-                }
-
-                let err: nc_type;
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
-                    // update the vector element count
-                    buffer.set_len(values_len as usize);
-                    // read values into the buffer
-                    err = $nc_get_vara_type(
-                        variable.grp_id,
-                        variable.id,
-                        indices.as_ptr(),
-                        slice_len.as_ptr(),
-                        buffer.as_mut_ptr(),
-                    );
-                }
-                if err != NC_NOERR {
-                    return Err(NC_ERRORS.get(&err).unwrap().clone());
-                }
-                Ok(())
-            }
-
-            fn read_slice_into_slice(
-                variable: &Variable,
-                indices: &[usize],
-                slice_len: &[usize],
-                buffer: &mut [Self],
-            ) -> Result<(), String> {
-                // Check the length of `indices`
-                if indices.len() != variable.dimensions.len() {
-                    return Err(
-                        "`indices` must has the same length as the variable dimensions".into(),
-                    );
-                }
-                if indices.len() != slice_len.len() {
-                    return Err(
-                        "`slice` must has the same length as the variable dimensions".into(),
-                    );
-                }
-                let mut values_len: usize = 1;
-                for i in 0..indices.len() {
-                    if indices[i] >= variable.dimensions[i].len {
-                        return Err("requested index is bigger than the dimension length".into());
-                    }
-                    if (indices[i] + slice_len[i]) > variable.dimensions[i].len {
-                        return Err("requested slice is bigger than the dimension length".into());
-                    }
-                    // Compute the full size of the request values
-                    if slice_len[i] > 0 {
-                        values_len *= slice_len[i];
-                    } else {
-                        return Err("Each slice element must be superior than 0".into());
-                    }
-                }
-                // check buffer capacity
-                if buffer.len() != values_len {
-                    return Err(format!(
-                        "Buffer is not appropriately sized. (size {} needed, found {})",
-                        values_len,
-                        buffer.len()
-                    ));
-                }
-
-                let err: nc_type;
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
-                    // read values into the buffer
-                    err = $nc_get_vara_type(
-                        variable.grp_id,
-                        variable.id,
-                        indices.as_ptr(),
-                        slice_len.as_ptr(),
-                        buffer.as_mut_ptr(),
                     );
                 }
                 if err != NC_NOERR {
@@ -372,15 +241,36 @@ macro_rules! impl_numeric {
             // put a SLICE of values into a netCDF variable at the given index
             fn put_values_at(
                 variable: &mut Variable,
-                indices: &[usize],
-                slice_len: &[usize],
+                indices: Option<&[usize]>,
+                slice_len: Option<&[usize]>,
                 values: &[Self],
             ) -> Result<(), String> {
-                if indices.len() != slice_len.len() {
-                    return Err(
-                        "`slice` must has the same length as the variable dimensions".into(),
-                    );
-                }
+                let _indices: Vec<_>;
+                let indices = match indices {
+                    Some(x) => {
+                        if x.len() != variable.dimensions.len() {
+                            return Err(
+                                "`slice` must has the same length as the variable dimensions"
+                                    .into(),
+                            );
+                        };
+                        x
+                    }
+                    None => {
+                        _indices = variable.dimensions.iter().map(|_| 0).collect();
+                        &_indices
+                    }
+                };
+
+                let _slice_len: Vec<_>;
+                let slice_len = match slice_len {
+                    Some(x) => x,
+                    None => {
+                        _slice_len = variable.dimensions.iter().map(|x| x.len).collect();
+                        &_slice_len
+                    }
+                };
+
                 let mut values_len = 0;
                 for i in 0..indices.len() {
                     if indices[i] >= variable.dimensions[i].len {
@@ -415,10 +305,6 @@ macro_rules! impl_numeric {
                 }
 
                 Ok(())
-            }
-
-            fn as_void_ptr(&self) -> *const libc::c_void {
-                self as *const _ as *const libc::c_void
             }
         }
     };
@@ -585,88 +471,34 @@ impl Variable {
         Ok(())
     }
 
-    /// Fetchs variable values, and cast them if needed.
-    ///
-    /// ```
-    /// // let values: Vec<f64> = some_variable.values().unwrap();
-    /// ```
-    ///
-    pub fn values<T: Numeric>(&self) -> Result<Vec<T>, String> {
-        T::from_variable(self)
-    }
-
-    /// Read a slice of a variable into a buffer,
-    /// the buffer must have a capacity at least equal as the number of elements of the slice.
-    /// The buffer length (not its capacity) will be updated.
-    pub fn read_values_into_buffer<T: Numeric>(&self, buffer: &mut Vec<T>) -> Result<(), String> {
-        T::read_variable_into_buffer(self, buffer)
-    }
-
-    ///  Fetchs one specific value at specific indices
+    ///  Fetches one specific value at specific indices
     ///  indices must has the same length as self.dimensions.
     pub fn value_at<T: Numeric>(&self, indices: &[usize]) -> Result<T, String> {
         T::single_value_from_variable(self, indices)
     }
 
-    /// Read a slice of a variable into a buffer:
-    ///
-    /// * the 'buffer' must have a capacity at least equal as the product of all elements in 'slice'.
-    /// * 'indices' must has the same length as self.dimensions.
-    /// * all 'slice' elements must be > 0.
-    ///
-    /// The buffer length (not its capacity) will be updated.
-    pub fn read_slice_into_buffer<T: Numeric>(
+    /// Fetches variable
+    pub fn values<'a, T: Numeric, O, P>(&self, indices: O, size_len: P) -> Result<ArrayD<T>, String>
+    where
+        O: Into<Option<&'a [usize]>>,
+        P: Into<Option<&'a [usize]>>,
+    {
+        T::array_from_variable(self, indices.into(), size_len.into())
+    }
+
+    /// Fetches variable into slice
+    /// buffer must be able to hold all the requested elements
+    pub fn values_to<'a, T: Numeric, O, P>(
         &self,
-        indices: &[usize],
-        slice_len: &[usize],
-        buffer: &mut Vec<T>,
-    ) -> Result<(), String> {
-        T::read_slice_into_buffer(self, indices, slice_len, buffer)
-    }
-
-    /// Read a slice of a variable into a buffer:
-    ///
-    /// * the 'buffer' must have the same length as the request length
-    /// * indices and slice_len must have the same length as the variable
-    pub fn read_into_slice<T: Numeric>(&self, indices: &[usize], slice_len: &[usize], buffer: &mut [T]) -> Result<(), String> {
-        T::read_slice_into_slice(self, indices, slice_len, buffer)
-    }
-
-    /// Fetchs a slice of values
-    /// indices must has the same length as self.dimensions.
-    /// All slice elements must be > 0.
-    pub fn values_at<T: Numeric>(
-        &self,
-        indices: &[usize],
-        slice_len: &[usize],
-    ) -> Result<Vec<T>, String> {
-        T::slice_from_variable(self, indices, slice_len)
-    }
-
-    /// Fetchs variable values as a ndarray.
-    ///
-    /// ```
-    /// // Each values will be implicitly casted to a f64 if needed
-    /// // let values: ArrayD<f64> = some_variable.as_array().unwrap();
-    /// ```
-    ///
-    pub fn as_array<T: Numeric>(&self) -> Result<ArrayD<T>, Box<dyn Error>> {
-        let mut dims: Vec<usize> = Vec::new();
-        for dim in &self.dimensions {
-            dims.push(dim.len as usize);
-        }
-        let values = self.values()?;
-        Ok(ArrayD::<T>::from_shape_vec(dims, values)?)
-    }
-
-    /// Fetchs variable slice as a ndarray.
-    pub fn array_at<T: Numeric>(
-        &self,
-        indices: &[usize],
-        slice_len: &[usize],
-    ) -> Result<ArrayD<T>, Box<dyn Error>> {
-        let values = self.values_at(indices, slice_len)?;
-        Ok(ArrayD::<T>::from_shape_vec(slice_len, values)?)
+        indices: O,
+        size_len: P,
+        buffer: &mut [T],
+    ) -> Result<(), String>
+    where
+        O: Into<Option<&'a [usize]>>,
+        P: Into<Option<&'a [usize]>>,
+    {
+        T::slice_from_variable(self, indices.into(), size_len.into(), buffer)
     }
 
     /// Put a single value at `indices`
@@ -675,13 +507,17 @@ impl Variable {
     }
 
     /// Put a slice of values at `indices`
-    pub fn put_values_at<T: Numeric>(
+    pub fn put_values_at<'a, T: Numeric, O, P>(
         &mut self,
         values: &[T],
-        indices: &[usize],
-        slice_len: &[usize],
-    ) -> Result<(), String> {
-        T::put_values_at(self, indices, slice_len, values)
+        indices: O,
+        slice_len: P,
+    ) -> Result<(), String>
+    where
+        O: Into<Option<&'a [usize]>>,
+        P: Into<Option<&'a [usize]>>,
+    {
+        T::put_values_at(self, indices.into(), slice_len.into(), values)
     }
 
     /// Set a Fill Value
@@ -689,12 +525,7 @@ impl Variable {
         let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
-            err = nc_def_var_fill(
-                self.grp_id,
-                self.id,
-                0 as libc::c_int,
-                fill_value.as_void_ptr(),
-            );
+            err = nc_def_var_fill(self.grp_id, self.id, 0, &fill_value as *const T as *const _);
         }
         if err != NC_NOERR {
             return Err(NC_ERRORS.get(&err).unwrap().clone());

@@ -106,15 +106,19 @@ fn implicit_cast() {
     assert_eq!(f, file.name);
 
     let var = file.root.variables.get("data").unwrap();
-    let data: Vec<i32> = var.values().unwrap();
+    let data: ArrayD<i32> = var.values(None, None).unwrap();
 
     assert_eq!(data.len(), 6 * 12);
-    for x in 0..(6 * 12) {
-        assert_eq!(data[x], x as i32);
+    for y in 0..6 {
+        for x in 0..12 {
+            assert_eq!(data[[y, x]], (12 * y + x) as i32);
+        }
     }
 
     // do the same thing but cast to float
-    let data: Vec<f32> = var.values().unwrap();
+    let data: ArrayD<f32> = var.values(None, None).unwrap();
+
+    let data = data.as_slice().unwrap();
 
     assert_eq!(data.len(), 6 * 12);
     for x in 0..(6 * 12) {
@@ -657,35 +661,8 @@ fn fetch_ndarray() {
     let file = netcdf::File::open(&f).unwrap();
     assert_eq!(f, file.name);
     let pres = file.root.variables.get("pressure").unwrap();
-    let values_array: ArrayD<f64> = pres.as_array().unwrap();
+    let values_array: ArrayD<f64> = pres.values(None, None).unwrap();
     assert_eq!(values_array.shape(), &[2, 2, 6, 12]);
-}
-
-#[test]
-// assert slice fetching
-fn fetch_slice() {
-    let f = test_file("simple_xy.nc");
-    let file = netcdf::File::open(&f).unwrap();
-    assert_eq!(f, file.name);
-    let pres = file.root.variables.get("data").unwrap();
-    let values: Vec<i32> = pres.values_at(&[0, 0], &[6, 3]).unwrap();
-    let expected_values: [i32; 18] = [
-        0, 1, 2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62,
-    ];
-    for i in 0..values.len() {
-        assert_eq!(expected_values[i], values[i]);
-    }
-}
-
-#[test]
-// assert slice fetching
-fn fetch_slice_as_ndarray() {
-    let f = test_file("simple_xy.nc");
-    let file = netcdf::File::open(&f).unwrap();
-    assert_eq!(f, file.name);
-    let pres = file.root.variables.get("data").unwrap();
-    let values_array: ArrayD<i32> = pres.array_at(&[0, 0], &[6, 3]).unwrap();
-    assert_eq!(values_array.shape(), &[6, 3]);
 }
 
 #[test]
@@ -775,13 +752,14 @@ fn put_values() {
             .unwrap();
         // close it (done when `file_w` goes out of scope)
     }
-    let indices: [usize; 1] = [1];
-    let values: [f32; 2] = [100., 200.];
+    let indices: &[usize] = &[1];
+    let values: &[f32] = &[100., 200.];
+    let len: &[usize] = &[values.len()];
     {
         // re-open it in append mode
         let mut file_a = netcdf::append(&f).unwrap();
         let var = file_a.root.variables.get_mut(var_name).unwrap();
-        let res = var.put_values_at(&values, &indices, &[values.len()]);
+        let res = var.put_values_at(values, indices, len);
         assert_eq!(res, Ok(()));
         // close it (done when `file_a` goes out of scope)
     }
@@ -790,9 +768,10 @@ fn put_values() {
     let file = netcdf::File::open(&f).unwrap();
     let var = file.root.variables.get(var_name).unwrap();
     assert_eq!(
-        var.values_at::<f32>(&indices, &[values.len()])
+        var.values::<f32, _, _>(indices, len)
             .unwrap()
-            .as_slice(),
+            .as_slice()
+            .unwrap(),
         values
     );
 }
@@ -828,18 +807,40 @@ fn set_fill_value() {
 }
 
 #[test]
-/// Test reading variable into a buffer
-fn read_values_into_buffer() {
+/// Test reading a slice of a variable into a buffer
+fn read_slice_into_buffer() {
     let f = test_file("simple_xy.nc");
     let file = netcdf::File::open(&f).unwrap();
-    let var = file.root.variables.get("data").unwrap();
+    let pres = file.root.variables.get("data").unwrap();
     // pre-allocate the Array
-    let mut data: Vec<i32> = Vec::with_capacity(var.len as usize);
-    var.read_values_into_buffer(&mut data).unwrap();
+    let mut values: Vec<i32> = vec![0; 6 * 3];
+    let ind: &[_] = &[0, 0];
+    let len: &[_] = &[6, 3];
+    pres.values_to(ind, len, &mut values).unwrap();
+    let expected_values: [i32; 18] = [
+        0, 1, 2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62,
+    ];
+    for i in 0..values.len() {
+        assert_eq!(expected_values[i], values[i]);
+    }
+}
 
-    assert_eq!(data.len(), 6 * 12);
-    for x in 0..(6 * 12) {
-        assert_eq!(data[x], x as i32);
+#[test]
+/// Test reading by using indices
+fn read_slice_into_buffer_indices() {
+    let f = test_file("simple_xy.nc");
+    let file = netcdf::File::open(&f).unwrap();
+    let pres = file.root.variables.get("data").unwrap();
+    // pre-allocate the Array
+    let mut values: Vec<i32> = vec![0; 6 * 3];
+    let ind: &[_] = &[0, 0];
+    let len: &[_] = &[6, 3];
+    pres.values_to(ind, len, &mut values).unwrap();
+    let expected_values: [i32; 18] = [
+        0, 1, 2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62,
+    ];
+    for i in 0..values.len() {
+        assert_eq!(expected_values[i], values[i]);
     }
 }
 
@@ -850,22 +851,4 @@ fn use_path_to_open() {
     let path: &std::path::Path = &std::path::Path::new(&f);
 
     let _file = netcdf::File::open(path).unwrap();
-}
-
-#[test]
-/// Test reading a slice of a variable into a buffer
-fn read_slice_into_buffer() {
-    let f = test_file("simple_xy.nc");
-    let file = netcdf::File::open(&f).unwrap();
-    let pres = file.root.variables.get("data").unwrap();
-    // pre-allocate the Array
-    let mut values: Vec<i32> = Vec::with_capacity(6 * 3);
-    pres.read_slice_into_buffer(&[0, 0], &[6, 3], &mut values)
-        .unwrap();
-    let expected_values: [i32; 18] = [
-        0, 1, 2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62,
-    ];
-    for i in 0..values.len() {
-        assert_eq!(expected_values[i], values[i]);
-    }
 }

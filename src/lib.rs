@@ -17,12 +17,10 @@
 //!
 //! // You can also use values() to read the variable, data will be implicitly casted
 //! // if needed
-//! let data : Vec<i32> = var.values().unwrap();
+//! let data  = var.values::<i32, _, _>(None, None).unwrap();
 //!
-//! // All variable data is read into 1-dimensional Vec.
-//! for x in 0..(6*12) {
-//!     assert_eq!(data[x], x as i32);
-//! }
+//! // All variable data is read into an ndarray
+//! println!("{}", data);
 //! ```
 //!
 //! Write:
@@ -54,7 +52,9 @@
 //!
 //! let data : Vec<i32> = vec![100; 10];
 //! // write 5 first elements of the vector `data` into `var` starting at index 2;
-//! var.put_values_at(&data, &[2], &[5]);
+//! let start : &[_] = &[2];
+//! let ind : &[_] = &[5];
+//! var.put_values_at(&data, start, ind);
 //! // Change the first value of `var` into '999'
 //! var.put_value_at(999 as f32, &[0]);
 //! ```
