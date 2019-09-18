@@ -32,49 +32,45 @@ macro_rules! get_var_as_type {
 
 /// This trait allow an implicit cast when fetching
 /// a netCDF variable
-pub trait Numeric {
+pub trait Numeric
+where
+    Self: Sized,
+{
     /// Returns the whole variable as Vec<Self>
-    fn from_variable(variable: &Variable) -> Result<Vec<Self>, String>
-    where
-        Self: Sized;
+    fn from_variable(variable: &Variable) -> Result<Vec<Self>, String>;
     /// Read the variable into a buffer and update its length.
-    fn read_variable_into_buffer(variable: &Variable, buffer: &mut Vec<Self>) -> Result<(), String>
-    where
-        Self: Sized;
+    fn read_variable_into_buffer(variable: &Variable, buffer: &mut Vec<Self>)
+        -> Result<(), String>;
     /// Read a slice of a variable into a buffer and update its length.
     fn read_slice_into_buffer(
         variable: &Variable,
         indices: &[usize],
         slice_len: &[usize],
         buffer: &mut Vec<Self>,
-    ) -> Result<(), String>
-    where
-        Self: Sized;
+    ) -> Result<(), String>;
+    /// Read a slice of a variable into a buffer with the correct length.
+    fn read_slice_into_slice(
+        variable:&Variable,
+        indices: &[usize],
+        slice_len: &[usize],
+        buffer: &mut [Self]) -> Result<(), String>;
     /// Returns a slice of the variable as Vec<Self>
     fn slice_from_variable(
         variable: &Variable,
         indices: &[usize],
         slice_len: &[usize],
-    ) -> Result<Vec<Self>, String>
-    where
-        Self: Sized;
+    ) -> Result<Vec<Self>, String>;
     /// Returns a single indexed value of the variable as Self
-    fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> Result<Self, String>
-    where
-        Self: Sized;
+    fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> Result<Self, String>;
     /// Put a single value into a netCDF variable
-    fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> Result<(), String>
-    where
-        Self: Sized;
+    fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> Result<(), String>;
     /// put a SLICE of values into a netCDF variable at the given index
     fn put_values_at(
         variable: &mut Variable,
         indices: &[usize],
         slice_len: &[usize],
         values: &[Self],
-    ) -> Result<(), String>
-    where
-        Self: Sized;
+    ) -> Result<(), String>;
     /// Returns `self` as a C (void *) pointer
     fn as_void_ptr(&self) -> *const libc::c_void;
 }
@@ -283,6 +279,66 @@ macro_rules! impl_numeric {
                 }
                 Ok(())
             }
+
+            fn read_slice_into_slice(
+                variable: &Variable,
+                indices: &[usize],
+                slice_len: &[usize],
+                buffer: &mut [Self],
+            ) -> Result<(), String> {
+                // Check the length of `indices`
+                if indices.len() != variable.dimensions.len() {
+                    return Err(
+                        "`indices` must has the same length as the variable dimensions".into(),
+                    );
+                }
+                if indices.len() != slice_len.len() {
+                    return Err(
+                        "`slice` must has the same length as the variable dimensions".into(),
+                    );
+                }
+                let mut values_len: usize = 1;
+                for i in 0..indices.len() {
+                    if indices[i] >= variable.dimensions[i].len {
+                        return Err("requested index is bigger than the dimension length".into());
+                    }
+                    if (indices[i] + slice_len[i]) > variable.dimensions[i].len {
+                        return Err("requested slice is bigger than the dimension length".into());
+                    }
+                    // Compute the full size of the request values
+                    if slice_len[i] > 0 {
+                        values_len *= slice_len[i];
+                    } else {
+                        return Err("Each slice element must be superior than 0".into());
+                    }
+                }
+                // check buffer capacity
+                if buffer.len() != values_len {
+                    return Err(format!(
+                        "Buffer is not appropriately sized. (size {} needed, found {})",
+                        values_len,
+                        buffer.len()
+                    ));
+                }
+
+                let err: nc_type;
+                unsafe {
+                    let _g = LOCK.lock().unwrap();
+                    // read values into the buffer
+                    err = $nc_get_vara_type(
+                        variable.grp_id,
+                        variable.id,
+                        indices.as_ptr(),
+                        slice_len.as_ptr(),
+                        buffer.as_mut_ptr(),
+                    );
+                }
+                if err != NC_NOERR {
+                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                }
+                Ok(())
+            }
+
             // put a SINGLE value into a netCDF variable at the given index
             fn put_value_at(
                 variable: &mut Variable,
@@ -566,6 +622,14 @@ impl Variable {
         buffer: &mut Vec<T>,
     ) -> Result<(), String> {
         T::read_slice_into_buffer(self, indices, slice_len, buffer)
+    }
+
+    /// Read a slice of a variable into a buffer:
+    ///
+    /// * the 'buffer' must have the same length as the request length
+    /// * indices and slice_len must have the same length as the variable
+    pub fn read_into_slice<T: Numeric>(&self, indices: &[usize], slice_len: &[usize], buffer: &mut [T]) -> Result<(), String> {
+        T::read_slice_into_slice(self, indices, slice_len, buffer)
     }
 
     /// Fetchs a slice of values
