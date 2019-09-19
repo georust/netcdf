@@ -1,8 +1,8 @@
+use super::attribute::AnyValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
 use super::variable::{Numeric, Variable};
-use super::attribute::PutAttr;
 use super::LOCK;
 use netcdf_sys::*;
 use std::collections::HashMap;
@@ -74,6 +74,7 @@ macro_rules! impl_putvar {
         }
     };
 }
+impl_putvar!(u8, NC_CHAR, nc_put_var_uchar);
 impl_putvar!(i8, NC_BYTE, nc_put_var_schar);
 impl_putvar!(i16, NC_SHORT, nc_put_var_short);
 impl_putvar!(u16, NC_USHORT, nc_put_var_ushort);
@@ -84,19 +85,13 @@ impl_putvar!(u64, NC_UINT64, nc_put_var_ulonglong);
 impl_putvar!(f32, NC_FLOAT, nc_put_var_float);
 impl_putvar!(f64, NC_DOUBLE, nc_put_var_double);
 
-
 impl Group {
-    pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) -> error::Result<()> {
-        val.put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name)?;
-        self.attributes.insert(
-            name.to_string().clone(),
-            Attribute {
-                name: name.to_string(),
-                attrtype: val.get_nc_type(),
-                ncid: self.grpid.unwrap_or(self.ncid),
-                varid: NC_GLOBAL,
-            },
-        );
+    pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<()>
+    where
+        T: Into<AnyValue>,
+    {
+        let att = Attribute::put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name, val.into())?;
+        self.attributes.insert(name.to_string().clone(), att);
         Ok(())
     }
 
@@ -105,8 +100,10 @@ impl Group {
             return Err(format!("Dimension {} already exists", name).into());
         }
 
-        self.dimensions
-            .insert(name.into(), Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?);
+        self.dimensions.insert(
+            name.into(),
+            Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?,
+        );
 
         Ok(self.dimensions.get_mut(name).unwrap())
     }

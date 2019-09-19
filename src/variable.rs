@@ -1,7 +1,7 @@
+use super::attribute::AnyValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
-use super::attribute::PutAttr;
 use super::LOCK;
 use ndarray::ArrayD;
 use netcdf_sys::*;
@@ -455,17 +455,12 @@ impl Variable {
         })
     }
 
-    pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) -> error::Result<()> {
-        val.put(self.ncid, self.varid, name)?;
-        self.attributes.insert(
-            name.to_string().clone(),
-            Attribute {
-                name: name.to_string().clone(),
-                attrtype: val.get_nc_type(),
-                ncid: self.ncid,
-                varid: self.varid,
-            },
-        );
+    pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<()>
+    where
+        T: Into<AnyValue>,
+    {
+        let att = Attribute::put(self.ncid, self.varid, name, val.into())?;
+        self.attributes.insert(name.to_string().clone(), att);
         Ok(())
     }
 
@@ -515,7 +510,12 @@ impl Variable {
         let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
-            err = nc_def_var_fill(self.ncid, self.varid, 0, &fill_value as *const T as *const _);
+            err = nc_def_var_fill(
+                self.ncid,
+                self.varid,
+                0,
+                &fill_value as *const T as *const _,
+            );
         }
         if err != NC_NOERR {
             return Err(err.into());
