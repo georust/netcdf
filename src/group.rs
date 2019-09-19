@@ -2,15 +2,16 @@ use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
 use super::variable::{Numeric, Variable};
+use super::attribute::PutAttr;
 use super::LOCK;
 use netcdf_sys::*;
 use std::collections::HashMap;
-use std::ffi;
 
 #[derive(Debug)]
 pub struct Group {
     pub(crate) name: String,
-    pub(crate) id: nc_type,
+    pub(crate) ncid: nc_type,
+    pub(crate) grpid: Option<nc_type>,
     pub(crate) variables: HashMap<String, Variable>,
     pub(crate) attributes: HashMap<String, Attribute>,
     pub(crate) dimensions: HashMap<String, Dimension>,
@@ -83,84 +84,17 @@ impl_putvar!(u64, NC_UINT64, nc_put_var_ulonglong);
 impl_putvar!(f32, NC_FLOAT, nc_put_var_float);
 impl_putvar!(f64, NC_DOUBLE, nc_put_var_double);
 
-// Write support for all attribute types
-pub trait PutAttr {
-    fn get_nc_type(&self) -> nc_type;
-    fn put(&self, ncid: nc_type, varid: nc_type, name: &str) -> error::Result<()>;
-}
-
-// This macro implements the trait PutAttr for $type
-// It just avoid code repetition for all numeric types
-// (the only difference between each type beeing the
-// netCDF funtion to call and the numeric identifier
-// of the type used by the libnetCDF library)
-macro_rules! impl_putattr {
-    ($type: ty, $nc_type: ident, $nc_put_att: ident) => {
-        impl PutAttr for $type {
-            fn get_nc_type(&self) -> nc_type {
-                $nc_type
-            }
-            fn put(&self, ncid: nc_type, varid: nc_type, name: &str) -> error::Result<()> {
-                let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
-                let err;
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
-                    err = $nc_put_att(ncid, varid, name_c.as_ptr(), $nc_type, 1, self);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
-                }
-                Ok(())
-            }
-        }
-    };
-}
-impl_putattr!(i8, NC_BYTE, nc_put_att_schar);
-impl_putattr!(i16, NC_SHORT, nc_put_att_short);
-impl_putattr!(u16, NC_USHORT, nc_put_att_ushort);
-impl_putattr!(i32, NC_INT, nc_put_att_int);
-impl_putattr!(u32, NC_UINT, nc_put_att_uint);
-impl_putattr!(i64, NC_INT64, nc_put_att_longlong);
-impl_putattr!(u64, NC_UINT64, nc_put_att_ulonglong);
-impl_putattr!(f32, NC_FLOAT, nc_put_att_float);
-impl_putattr!(f64, NC_DOUBLE, nc_put_att_double);
-
-impl PutAttr for String {
-    fn get_nc_type(&self) -> nc_type {
-        NC_CHAR
-    }
-    fn put(&self, ncid: nc_type, varid: nc_type, name: &str) -> error::Result<()> {
-        let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
-        let attr_c: ffi::CString = ffi::CString::new(self.clone()).unwrap();
-        let err;
-        unsafe {
-            let _g = LOCK.lock().unwrap();
-            err = nc_put_att_text(
-                ncid,
-                varid,
-                name_c.as_ptr(),
-                attr_c.to_bytes().len(),
-                attr_c.as_ptr(),
-            );
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
-        }
-        Ok(())
-    }
-}
 
 impl Group {
     pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) -> error::Result<()> {
-        val.put(self.id, NC_GLOBAL, name)?;
+        val.put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name)?;
         self.attributes.insert(
             name.to_string().clone(),
             Attribute {
-                name: name.to_string().clone(),
+                name: name.to_string(),
                 attrtype: val.get_nc_type(),
-                id: 0, // XXX Should Attribute even keep track of an id?
-                var_id: NC_GLOBAL,
-                file_id: self.id,
+                ncid: self.grpid.unwrap_or(self.ncid),
+                varid: NC_GLOBAL,
             },
         );
         Ok(())
@@ -172,7 +106,7 @@ impl Group {
         }
 
         self.dimensions
-            .insert(name.into(), Dimension::new(self.id, name, len)?);
+            .insert(name.into(), Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?);
 
         Ok(self.dimensions.get_mut(name).unwrap())
     }
@@ -203,7 +137,7 @@ impl Group {
         }
 
         let d = d.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-        let var = Variable::new(self.id, name, &d, nctype)?;
+        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, &d, nctype)?;
 
         self.variables.insert(name.into(), var);
 

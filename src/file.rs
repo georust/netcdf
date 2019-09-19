@@ -8,7 +8,7 @@ use std::path;
 
 #[derive(Debug)]
 pub struct File {
-    pub(crate) id: nc_type,
+    pub(crate) ncid: nc_type,
     pub(crate) name: String,
     pub(crate) root: Group,
 }
@@ -47,7 +47,8 @@ impl File {
 
         let root = Group {
             name: "".into(),
-            id: NC_GLOBAL,
+            ncid: ncid,
+            grpid: None,
             variables: HashMap::new(),
             attributes: HashMap::new(),
             dimensions: HashMap::new(),
@@ -55,7 +56,7 @@ impl File {
         };
 
         Ok(File {
-            id: ncid,
+            ncid: ncid,
             name: data_path.to_string_lossy().into_owned(),
             root: root,
         })
@@ -79,14 +80,15 @@ impl File {
         }
         let mut root = Group {
             name: "root".to_string(),
-            id: ncid,
+            ncid: ncid,
+            grpid: None,
             variables: HashMap::new(),
             attributes: HashMap::new(),
             dimensions: HashMap::new(),
             sub_groups: HashMap::new(),
         };
         Ok(File {
-            id: ncid,
+            ncid: ncid,
             name: data_path.to_string_lossy().into_owned(),
             root: root,
         })
@@ -109,14 +111,15 @@ impl File {
         }
         let root = Group {
             name: "root".to_string(),
-            id: ncid,
+            ncid: ncid,
+            grpid: None,
             variables: HashMap::new(),
             attributes: HashMap::new(),
             dimensions: HashMap::new(),
             sub_groups: HashMap::new(),
         };
         Ok(File {
-            id: ncid,
+            ncid: ncid,
             name: data_path.to_string_lossy().into_owned(),
             root: root,
         })
@@ -127,7 +130,7 @@ impl Drop for File {
     fn drop(&mut self) {
         unsafe {
             let _g = LOCK.lock().unwrap();
-            let err = nc_close(self.id);
+            let err = nc_close(self.ncid);
             assert_eq!(err, NC_NOERR);
         }
     }

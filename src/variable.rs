@@ -1,7 +1,7 @@
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
-use super::group::PutAttr;
+use super::attribute::PutAttr;
 use super::LOCK;
 use ndarray::ArrayD;
 use netcdf_sys::*;
@@ -17,8 +17,8 @@ pub struct Variable {
     pub(crate) dimensions: Vec<Dimension>,
     /// the netcdf variable type identifier (from netcdf-sys)
     pub(crate) vartype: nc_type,
-    pub(crate) grp_id: nc_type,
-    pub(crate) id: nc_type,
+    pub(crate) ncid: nc_type,
+    pub(crate) varid: nc_type,
 }
 
 impl Variable {
@@ -106,7 +106,7 @@ macro_rules! impl_numeric {
                 let indices_ptr = indices.as_ptr();
                 unsafe {
                     let _g = LOCK.lock().unwrap();
-                    err = $nc_get_var1_type(variable.grp_id, variable.id, indices_ptr, &mut buff);
+                    err = $nc_get_var1_type(variable.ncid, variable.varid, indices_ptr, &mut buff);
                 }
                 if err != NC_NOERR {
                     return Err(err.into());
@@ -203,8 +203,8 @@ macro_rules! impl_numeric {
                     let _g = LOCK.lock().unwrap();
 
                     err = $nc_get_vara_type(
-                        variable.grp_id,
-                        variable.id,
+                        variable.ncid,
+                        variable.varid,
                         indices.as_ptr(),
                         slice_len.as_ptr(),
                         values.as_mut_ptr(),
@@ -237,7 +237,7 @@ macro_rules! impl_numeric {
                 let indices_ptr = indices.as_ptr();
                 unsafe {
                     let _g = LOCK.lock().unwrap();
-                    err = $nc_put_var1_type(variable.grp_id, variable.id, indices_ptr, &value);
+                    err = $nc_put_var1_type(variable.ncid, variable.varid, indices_ptr, &value);
                 }
                 if err != NC_NOERR {
                     return Err(err.into());
@@ -301,8 +301,8 @@ macro_rules! impl_numeric {
                 unsafe {
                     let _g = LOCK.lock().unwrap();
                     err = $nc_put_vara_type(
-                        variable.grp_id,
-                        variable.id,
+                        variable.ncid,
+                        variable.varid,
                         indices.as_ptr(),
                         slice_len.as_ptr(),
                         values.as_ptr(),
@@ -450,21 +450,20 @@ impl Variable {
             attributes: HashMap::new(),
             dimensions: dims.iter().map(|x| (**x).clone()).collect(),
             vartype,
-            grp_id: grp_id,
-            id: id,
+            ncid: grp_id,
+            varid: id,
         })
     }
 
     pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) -> error::Result<()> {
-        val.put(self.grp_id, self.id, name)?;
+        val.put(self.ncid, self.varid, name)?;
         self.attributes.insert(
             name.to_string().clone(),
             Attribute {
                 name: name.to_string().clone(),
                 attrtype: val.get_nc_type(),
-                id: 0, // XXX Should Attribute even keep track of an id?
-                var_id: self.id,
-                file_id: self.grp_id,
+                ncid: self.ncid,
+                varid: self.varid,
             },
         );
         Ok(())
@@ -516,7 +515,7 @@ impl Variable {
         let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
-            err = nc_def_var_fill(self.grp_id, self.id, 0, &fill_value as *const T as *const _);
+            err = nc_def_var_fill(self.ncid, self.varid, 0, &fill_value as *const T as *const _);
         }
         if err != NC_NOERR {
             return Err(err.into());

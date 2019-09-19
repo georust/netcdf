@@ -4,6 +4,16 @@ use netcdf_sys::*;
 use std::ffi::{CStr, CString};
 use std::fmt;
 
+#[derive(Debug)]
+pub struct Attribute {
+    pub(crate) name: String,
+    pub(crate) attrtype: nc_type,
+    /// Group or file this attribute is in
+    pub(crate) ncid: nc_type,
+    /// Variable/global this id is connected to
+    pub(crate) varid: nc_type,
+}
+
 macro_rules! get_attr_as_type {
     ( $me:ident, $nc_type:ident, $rs_type:ty, $nc_fn:ident , $cast:ident ) => {{
         if (!$cast) && ($me.attrtype != $nc_type) {
@@ -14,7 +24,7 @@ macro_rules! get_attr_as_type {
         let name_copy: CString = CString::new($me.name.clone()).unwrap();
         unsafe {
             let _g = LOCK.lock().unwrap();
-            err = nc_inq_attlen($me.file_id, $me.var_id, name_copy.as_ptr(), &mut attlen);
+            err = nc_inq_attlen($me.ncid, $me.varid, name_copy.as_ptr(), &mut attlen);
         }
         if err != NC_NOERR {
             return Err(err.into());
@@ -25,22 +35,13 @@ macro_rules! get_attr_as_type {
         let mut buf: $rs_type = 0 as $rs_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
-            err = $nc_fn($me.file_id, $me.var_id, name_copy.as_ptr(), &mut buf);
+            err = $nc_fn($me.ncid, $me.varid, name_copy.as_ptr(), &mut buf);
         }
         if err != NC_NOERR {
             return Err(err.into());
         }
         Ok(buf)
     }};
-}
-
-#[derive(Debug)]
-pub struct Attribute {
-    pub(crate) name: String,
-    pub(crate) attrtype: nc_type,
-    pub(crate) id: nc_type,
-    pub(crate) var_id: nc_type,
-    pub(crate) file_id: nc_type,
 }
 
 impl Attribute {
@@ -64,7 +65,7 @@ impl Attribute {
             let mut err;
             {
                 let _g = LOCK.lock().unwrap();
-                err = nc_inq_attlen(self.file_id, self.var_id, name_copy.as_ptr(), &mut attlen);
+                err = nc_inq_attlen(self.ncid, self.varid, name_copy.as_ptr(), &mut attlen);
             }
             if err != NC_NOERR {
                 return Err(err.into());
@@ -75,8 +76,8 @@ impl Attribute {
             {
                 let _g = LOCK.lock().unwrap();
                 err = nc_get_att_text(
-                    self.file_id,
-                    self.var_id,
+                    self.ncid,
+                    self.varid,
                     name_copy.as_ptr(),
                     attr_char_buf_ptr,
                 );
@@ -133,5 +134,73 @@ impl fmt::Display for Attribute {
             Ok(chars) => write!(f, "{}", chars),
             Err(e) => write!(f, "ERROR: {}", e),
         }
+    }
+}
+
+// Write support for all attribute types
+pub trait PutAttr {
+    fn get_nc_type(&self) -> nc_type;
+    fn put(&self, ncid: nc_type, varid: nc_type, name: &str) -> error::Result<()>;
+}
+
+// This macro implements the trait PutAttr for $type
+// It just avoid code repetition for all numeric types
+// (the only difference between each type beeing the
+// netCDF funtion to call and the numeric identifier
+// of the type used by the libnetCDF library)
+macro_rules! impl_putattr {
+    ($type: ty, $nc_type: ident, $nc_put_att: ident) => {
+        impl PutAttr for $type {
+            fn get_nc_type(&self) -> nc_type {
+                $nc_type
+            }
+            fn put(&self, ncid: nc_type, varid: nc_type, name: &str) -> error::Result<()> {
+                let name_c: CString = CString::new(name.clone()).unwrap();
+                let err;
+                unsafe {
+                    let _g = LOCK.lock().unwrap();
+                    err = $nc_put_att(ncid, varid, name_c.as_ptr(), $nc_type, 1, self);
+                }
+                if err != NC_NOERR {
+                    return Err(err.into());
+                }
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_putattr!(i8, NC_BYTE, nc_put_att_schar);
+impl_putattr!(i16, NC_SHORT, nc_put_att_short);
+impl_putattr!(u16, NC_USHORT, nc_put_att_ushort);
+impl_putattr!(i32, NC_INT, nc_put_att_int);
+impl_putattr!(u32, NC_UINT, nc_put_att_uint);
+impl_putattr!(i64, NC_INT64, nc_put_att_longlong);
+impl_putattr!(u64, NC_UINT64, nc_put_att_ulonglong);
+impl_putattr!(f32, NC_FLOAT, nc_put_att_float);
+impl_putattr!(f64, NC_DOUBLE, nc_put_att_double);
+
+impl PutAttr for str {
+    fn get_nc_type(&self) -> nc_type {
+        NC_CHAR
+    }
+    fn put(&self, ncid: nc_type, varid: nc_type, name: &str) -> error::Result<()> {
+        let name_c: CString = CString::new(name).unwrap();
+        let attr_c: CString = CString::new(self).unwrap();
+        let err;
+        unsafe {
+            let _g = LOCK.lock().unwrap();
+            err = nc_put_att_text(
+                ncid,
+                varid,
+                name_c.as_ptr(),
+                attr_c.to_bytes().len(),
+                attr_c.as_ptr(),
+            );
+        }
+        if err != NC_NOERR {
+            return Err(err.into());
+        }
+        Ok(())
     }
 }
