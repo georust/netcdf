@@ -1,31 +1,42 @@
-use super::attribute::{init_attributes, Attribute};
+use super::attribute::Attribute;
 use super::dimension::Dimension;
+use super::error;
 use super::group::PutAttr;
-use super::utils::{string_from_c_str, NC_ERRORS};
 use super::LOCK;
 use ndarray::ArrayD;
 use netcdf_sys::*;
 use std::collections::HashMap;
-use std::ffi;
 use std::marker::Sized;
 
-macro_rules! get_var_as_type {
-    ( $me:ident, $nc_type:ident, $vec_type:ty, $nc_fn:ident , $cast:ident ) => {{
-        if (!$cast) && ($me.vartype != $nc_type) {
-            return Err("Types are not equivalent and cast==false".to_string());
-        }
-        let mut buf: Vec<$vec_type> = Vec::with_capacity($me.len as usize);
-        let err: nc_type;
-        unsafe {
-            let _g = LOCK.lock().unwrap();
-            buf.set_len($me.len as usize);
-            err = $nc_fn($me.grp_id, $me.id, buf.as_mut_ptr());
-        }
-        if err != NC_NOERR {
-            return Err(NC_ERRORS.get(&err).unwrap().clone());
-        }
-        Ok(buf)
-    }};
+/// This struct defines a netCDF variable.
+#[derive(Debug)]
+pub struct Variable {
+    /// The variable name
+    pub(crate) name: String,
+    pub(crate) attributes: HashMap<String, Attribute>,
+    pub(crate) dimensions: Vec<Dimension>,
+    /// the netcdf variable type identifier (from netcdf-sys)
+    pub(crate) vartype: nc_type,
+    pub(crate) grp_id: nc_type,
+    pub(crate) id: nc_type,
+}
+
+impl Variable {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn attributes(&self) -> &HashMap<String, Attribute> {
+        &self.attributes
+    }
+
+    pub fn dimensions(&self) -> &[Dimension] {
+        &self.dimensions
+    }
+
+    pub fn vartype(&self) -> nc_type {
+        self.vartype
+    }
 }
 
 /// This trait allow an implicit cast when fetching
@@ -35,29 +46,29 @@ where
     Self: Sized,
 {
     /// Returns a single indexed value of the variable as Self
-    fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> Result<Self, String>;
+    fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> error::Result<Self>;
     /// Returns an ndarray of the variable
     fn array_from_variable(
         variable: &Variable,
         indices: Option<&[usize]>,
         slice_len: Option<&[usize]>,
-    ) -> Result<ArrayD<Self>, String>;
+    ) -> error::Result<ArrayD<Self>>;
     /// Returns a slice of the variable as Vec<Self>
     fn slice_from_variable(
         variable: &Variable,
         indices: Option<&[usize]>,
         slice_len: Option<&[usize]>,
         values: &mut [Self],
-    ) -> Result<(), String>;
+    ) -> error::Result<()>;
     /// Put a single value into a netCDF variable
-    fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> Result<(), String>;
+    fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> error::Result<()>;
     /// put a SLICE of values into a netCDF variable at the given index
     fn put_values_at(
         variable: &mut Variable,
         indices: Option<&[usize]>,
         slice_len: Option<&[usize]>,
         values: &[Self],
-    ) -> Result<(), String>;
+    ) -> error::Result<()>;
 }
 
 // This macro implements the trait Numeric for the type "sized_type".
@@ -79,7 +90,7 @@ macro_rules! impl_numeric {
             fn single_value_from_variable(
                 variable: &Variable,
                 indices: &[usize],
-            ) -> Result<$sized_type, String> {
+            ) -> error::Result<$sized_type> {
                 // Check the length of `indices`
                 if indices.len() != variable.dimensions.len() {
                     return Err(
@@ -101,7 +112,7 @@ macro_rules! impl_numeric {
                     err = $nc_get_var1_type(variable.grp_id, variable.id, indices_ptr, &mut buff);
                 }
                 if err != NC_NOERR {
-                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                    return Err(err.into());
                 }
                 Ok(buff)
             }
@@ -110,7 +121,7 @@ macro_rules! impl_numeric {
                 variable: &Variable,
                 indices: Option<&[usize]>,
                 slice_len: Option<&[usize]>,
-            ) -> Result<ArrayD<$sized_type>, String> {
+            ) -> error::Result<ArrayD<$sized_type>> {
                 let _slice_len: Vec<_>;
                 let slice_len = match slice_len {
                     Some(x) => x,
@@ -128,7 +139,7 @@ macro_rules! impl_numeric {
                     Some(slice_len),
                     values
                         .as_slice_mut()
-                        .ok_or_else(|| "Values is emtpy".to_string())?,
+                        .ok_or_else(|| error::Error::Crate("Values is emtpy".to_string()))?,
                 )?;
 
                 Ok(values)
@@ -139,7 +150,7 @@ macro_rules! impl_numeric {
                 indices: Option<&[usize]>,
                 slice_len: Option<&[usize]>,
                 values: &mut [Self],
-            ) -> Result<(), String> {
+            ) -> error::Result<()> {
                 let _indices: Vec<_>;
                 let indices = match indices {
                     Some(x) => {
@@ -203,7 +214,7 @@ macro_rules! impl_numeric {
                     );
                 }
                 if err != NC_NOERR {
-                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                    return Err(err.into());
                 }
                 Ok(())
             }
@@ -213,7 +224,7 @@ macro_rules! impl_numeric {
                 variable: &mut Variable,
                 indices: &[usize],
                 value: Self,
-            ) -> Result<(), String> {
+            ) -> error::Result<()> {
                 // Check the length of `indices`
                 if indices.len() != variable.dimensions.len() {
                     return Err(
@@ -232,7 +243,7 @@ macro_rules! impl_numeric {
                     err = $nc_put_var1_type(variable.grp_id, variable.id, indices_ptr, &value);
                 }
                 if err != NC_NOERR {
-                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                    return Err(err.into());
                 }
 
                 Ok(())
@@ -244,7 +255,7 @@ macro_rules! impl_numeric {
                 indices: Option<&[usize]>,
                 slice_len: Option<&[usize]>,
                 values: &[Self],
-            ) -> Result<(), String> {
+            ) -> error::Result<()> {
                 let _indices: Vec<_>;
                 let indices = match indices {
                     Some(x) => {
@@ -301,7 +312,7 @@ macro_rules! impl_numeric {
                     );
                 }
                 if err != NC_NOERR {
-                    return Err(NC_ERRORS.get(&err).unwrap().clone());
+                    return Err(err.into());
                 }
 
                 Ok(())
@@ -409,54 +420,45 @@ impl_numeric!(
     nc_put_vara_double
 );
 
-/// This struct defines a netCDF variable.
-#[derive(Debug)]
-pub struct Variable {
-    /// The variable name
-    pub name: String,
-    pub attributes: HashMap<String, Attribute>,
-    pub dimensions: Vec<Dimension>,
-    /// the netcdf variable type identifier (from netcdf-sys)
-    pub vartype: nc_type,
-    pub id: nc_type,
-    /// total length; the product of all dim lengths
-    pub len: usize,
-    pub grp_id: nc_type,
-}
-
 impl Variable {
-    pub fn get_char(&self, cast: bool) -> Result<Vec<u8>, String> {
-        get_var_as_type!(self, NC_CHAR, u8, nc_get_var_uchar, cast)
-    }
-    pub fn get_byte(&self, cast: bool) -> Result<Vec<i8>, String> {
-        get_var_as_type!(self, NC_BYTE, i8, nc_get_var_schar, cast)
-    }
-    pub fn get_short(&self, cast: bool) -> Result<Vec<i16>, String> {
-        get_var_as_type!(self, NC_SHORT, i16, nc_get_var_short, cast)
-    }
-    pub fn get_ushort(&self, cast: bool) -> Result<Vec<u16>, String> {
-        get_var_as_type!(self, NC_USHORT, u16, nc_get_var_ushort, cast)
-    }
-    pub fn get_int(&self, cast: bool) -> Result<Vec<i32>, String> {
-        get_var_as_type!(self, NC_INT, i32, nc_get_var_int, cast)
-    }
-    pub fn get_uint(&self, cast: bool) -> Result<Vec<u32>, String> {
-        get_var_as_type!(self, NC_UINT, u32, nc_get_var_uint, cast)
-    }
-    pub fn get_int64(&self, cast: bool) -> Result<Vec<i64>, String> {
-        get_var_as_type!(self, NC_INT64, i64, nc_get_var_longlong, cast)
-    }
-    pub fn get_uint64(&self, cast: bool) -> Result<Vec<u64>, String> {
-        get_var_as_type!(self, NC_UINT64, u64, nc_get_var_ulonglong, cast)
-    }
-    pub fn get_float(&self, cast: bool) -> Result<Vec<f32>, String> {
-        get_var_as_type!(self, NC_FLOAT, f32, nc_get_var_float, cast)
-    }
-    pub fn get_double(&self, cast: bool) -> Result<Vec<f64>, String> {
-        get_var_as_type!(self, NC_DOUBLE, f64, nc_get_var_double, cast)
+    pub(crate) fn new(
+        grp_id: nc_type,
+        name: &str,
+        dims: &[&Dimension],
+        vartype: nc_type,
+    ) -> error::Result<Self> {
+        use std::ffi::CString;
+        let cname = CString::new(name).unwrap();
+
+        let dimids: Vec<nc_type> = dims.iter().map(|x| x.id).collect();
+        let mut id = 0;
+        let err;
+        unsafe {
+            let _l = LOCK.lock().unwrap();
+            err = nc_def_var(
+                grp_id,
+                cname.as_ptr(),
+                vartype,
+                dimids.len() as _,
+                dimids.as_ptr(),
+                &mut id,
+            );
+        }
+        if err != NC_NOERR {
+            return Err(err.into());
+        }
+
+        Ok(Self {
+            name: name.into(),
+            attributes: HashMap::new(),
+            dimensions: dims.iter().map(|x| (**x).clone()).collect(),
+            vartype,
+            grp_id: grp_id,
+            id: id,
+        })
     }
 
-    pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) -> Result<(), String> {
+    pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) -> error::Result<()> {
         val.put(self.grp_id, self.id, name)?;
         self.attributes.insert(
             name.to_string().clone(),
@@ -473,12 +475,12 @@ impl Variable {
 
     ///  Fetches one specific value at specific indices
     ///  indices must has the same length as self.dimensions.
-    pub fn value_at<T: Numeric>(&self, indices: &[usize]) -> Result<T, String> {
+    pub fn value_at<T: Numeric>(&self, indices: &[usize]) -> error::Result<T> {
         T::single_value_from_variable(self, indices)
     }
 
     /// Fetches variable
-    pub fn values<'a, T: Numeric, O, P>(&self, indices: O, size_len: P) -> Result<ArrayD<T>, String>
+    pub fn values<'a, T: Numeric, O, P>(&self, indices: O, size_len: P) -> error::Result<ArrayD<T>>
     where
         O: Into<Option<&'a [usize]>>,
         P: Into<Option<&'a [usize]>>,
@@ -493,7 +495,7 @@ impl Variable {
         indices: O,
         size_len: P,
         buffer: &mut [T],
-    ) -> Result<(), String>
+    ) -> error::Result<()>
     where
         O: Into<Option<&'a [usize]>>,
         P: Into<Option<&'a [usize]>>,
@@ -502,7 +504,7 @@ impl Variable {
     }
 
     /// Put a single value at `indices`
-    pub fn put_value_at<T: Numeric>(&mut self, value: T, indices: &[usize]) -> Result<(), String> {
+    pub fn put_value_at<T: Numeric>(&mut self, value: T, indices: &[usize]) -> error::Result<()> {
         T::put_value_at(self, indices, value)
     }
 
@@ -512,7 +514,7 @@ impl Variable {
         values: &[T],
         indices: O,
         slice_len: P,
-    ) -> Result<(), String>
+    ) -> error::Result<()>
     where
         O: Into<Option<&'a [usize]>>,
         P: Into<Option<&'a [usize]>>,
@@ -521,111 +523,15 @@ impl Variable {
     }
 
     /// Set a Fill Value
-    pub fn set_fill_value<T: Numeric>(&mut self, fill_value: T) -> Result<(), String> {
+    pub fn set_fill_value<T: Numeric>(&mut self, fill_value: T) -> error::Result<()> {
         let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
             err = nc_def_var_fill(self.grp_id, self.id, 0, &fill_value as *const T as *const _);
         }
         if err != NC_NOERR {
-            return Err(NC_ERRORS.get(&err).unwrap().clone());
+            return Err(err.into());
         }
-        self.update_attributes()?;
         Ok(())
     }
-
-    /// update self.attributes, (sync cached attribute and the file)
-    fn update_attributes(&mut self) -> Result<(), String> {
-        let mut natts: nc_type = 0;
-        let err: nc_type;
-        unsafe {
-            let _g = LOCK.lock().unwrap();
-            err = nc_inq_varnatts(self.grp_id, self.id, &mut natts);
-        }
-        if err != NC_NOERR {
-            return Err(NC_ERRORS.get(&err).unwrap().clone());
-        }
-        let (grp_id, var_id) = (self.grp_id, self.id);
-        self.attributes.clear();
-        init_attributes(&mut self.attributes, grp_id, var_id, natts);
-        Ok(())
-    }
-}
-
-pub fn init_variables(
-    vars: &mut HashMap<String, Variable>,
-    grp_id: nc_type,
-    grp_dims: &HashMap<String, Dimension>,
-) {
-    // determine number of vars
-    let mut nvars = 0;
-    unsafe {
-        let _g = LOCK.lock().unwrap();
-        let err = nc_inq_nvars(grp_id, &mut nvars);
-        assert_eq!(err, NC_NOERR);
-    }
-    for i_var in 0..nvars {
-        init_variable(vars, grp_id, grp_dims, i_var);
-    }
-}
-
-/// Creates and add a `Variable` Objects, from the dataset
-pub fn init_variable(
-    vars: &mut HashMap<String, Variable>,
-    grp_id: nc_type,
-    grp_dims: &HashMap<String, Dimension>,
-    varid: nc_type,
-) {
-    // read each dim name and length
-    let mut buf_vec = vec![0i8; (NC_MAX_NAME + 1) as usize];
-    let c_str: &ffi::CStr;
-    let mut var_type = 0;
-    let mut ndims = 0;
-    let mut dimids: Vec<_> = Vec::with_capacity(NC_MAX_DIMS as usize);
-    let mut natts: nc_type = 0;
-    unsafe {
-        let _g = LOCK.lock().unwrap();
-        let buf_ptr: *mut i8 = buf_vec.as_mut_ptr();
-        let err = nc_inq_var(
-            grp_id,
-            varid,
-            buf_ptr,
-            &mut var_type,
-            &mut ndims,
-            dimids.as_mut_ptr(),
-            &mut natts,
-        );
-        dimids.set_len(ndims as usize);
-        assert_eq!(err, NC_NOERR);
-        c_str = ffi::CStr::from_ptr(buf_ptr);
-    }
-    let str_buf: String = string_from_c_str(c_str);
-    let mut attr_map: HashMap<String, Attribute> = HashMap::new();
-    init_attributes(&mut attr_map, grp_id, varid, natts);
-    // var dims should always be a subset of the group dims:
-    let mut dim_vec: Vec<Dimension> = Vec::new();
-    let mut len = 1;
-    for dimid in dimids {
-        // maintaining dim order is crucial here so we can maintain
-        // rule that "last dim varies fastest" in our 1D return Vec
-        for (_, grp_dim) in grp_dims {
-            if dimid == grp_dim.id {
-                len *= grp_dim.len;
-                dim_vec.push(grp_dim.clone());
-                break;
-            }
-        }
-    }
-    vars.insert(
-        str_buf.clone(),
-        Variable {
-            name: str_buf.clone(),
-            attributes: attr_map,
-            dimensions: dim_vec,
-            vartype: var_type,
-            len: len,
-            id: varid,
-            grp_id: grp_id,
-        },
-    );
 }

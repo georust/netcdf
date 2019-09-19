@@ -60,12 +60,12 @@
 //! ```
 
 use lazy_static::lazy_static;
-use netcdf_sys::{nc_strerror, nc_type};
-use std::collections::HashMap;
+use netcdf_sys::nc_type;
 use std::sync::Mutex;
 
 pub mod attribute;
 pub mod dimension;
+pub mod error;
 pub mod file;
 pub mod group;
 pub mod variable;
@@ -76,19 +76,19 @@ pub use file::*;
 pub use group::*;
 pub use variable::*;
 
-pub fn create<P>(name: P) -> Result<File, String>
+pub fn create<P>(name: P) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
 {
     File::create(name)
 }
-pub fn append<P>(name: P) -> Result<File, String>
+pub fn append<P>(name: P) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
 {
     File::append(name)
 }
-pub fn open<P>(name: P) -> Result<File, String>
+pub fn open<P>(name: P) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
 {
@@ -96,32 +96,6 @@ where
 }
 
 lazy_static! {
+    /// Use this when accessing netcdf functions
     pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());
-}
-
-pub mod utils {
-    use super::*;
-    use std::ffi::CStr;
-
-    lazy_static! {
-        pub static ref NC_ERRORS: HashMap<nc_type, String> = {
-            use std::ffi::CStr;
-            let mut m = HashMap::new();
-            // Invalid error codes are ok; nc_strerror will just return
-            // "Unknown Error"
-            for i in -256..256 {
-                let msg_cstr : &CStr;
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
-                    let msg : *const i8 = nc_strerror(i);
-                    msg_cstr = &CStr::from_ptr(msg);
-                }
-                m.insert(i, utils::string_from_c_str(msg_cstr));
-            }
-            m
-        };
-    }
-    pub(crate) fn string_from_c_str(c_str: &CStr) -> String {
-        c_str.to_string_lossy().into_owned()
-    }
 }

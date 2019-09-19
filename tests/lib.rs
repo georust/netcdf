@@ -748,7 +748,7 @@ fn put_values() {
         file_w.root.add_dimension(dim_name, 3).unwrap();
         file_w
             .root
-            .add_variable(var_name, &vec![dim_name.into()], &vec![1., 2., 3.])
+            .add_variable(var_name, &[dim_name], &[1.0f32, 2., 3.])
             .unwrap();
         // close it (done when `file_w` goes out of scope)
     }
@@ -788,12 +788,7 @@ fn set_fill_value() {
     file_w.root.add_dimension(dim_name, 3).unwrap();
     file_w
         .root
-        .add_variable_with_fill_value(
-            var_name,
-            &vec![dim_name.into()],
-            &vec![1. as f32, 2. as f32, 3. as f32],
-            fill_value,
-        )
+        .add_variable_with_fill_value(var_name, &[dim_name], &[1.0, 2.0, 3.0], fill_value)
         .unwrap();
     let var = file_w.root.variables.get(var_name).unwrap();
     let attr = var
