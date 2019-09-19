@@ -2,15 +2,14 @@
 use ndarray::ArrayD;
 
 // Helpers for getting file paths
-pub fn test_file(f: &str) -> String {
+pub fn test_file(f: &str) -> std::path::PathBuf {
     use std::env;
     use std::path::Path;
     let mnf_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let path = Path::new(&mnf_dir).join("testdata").join(f);
-    path.to_str().unwrap().to_string()
+    Path::new(&mnf_dir).join("testdata").join(f)
 }
 
-pub fn test_file_new(f: &str) -> String {
+pub fn test_file_new(f: &str) -> std::path::PathBuf {
     use std::env;
     use std::fs;
     use std::path::Path;
@@ -18,8 +17,24 @@ pub fn test_file_new(f: &str) -> String {
     let path = Path::new(&mnf_dir).join("testout");
     let new_file = path.join(f);
     let _err = fs::create_dir(path);
-    new_file.to_str().unwrap().to_string()
+    new_file
 }
+
+#[test]
+/// Use a path to open the netcdf file
+fn use_path_to_open() {
+    let path = test_file("simple_xy.nc");
+
+    let _file = netcdf::File::open(path).unwrap();
+}
+
+#[test]
+/// Use a string to open
+fn use_string_to_open() {
+    let f: String = test_file("simple_xy.nc").to_str().unwrap().to_string();
+    let _file = netcdf::open(f).unwrap();
+}
+
 // Failure tests
 #[test]
 #[should_panic(expected = "No such file or directory")]
@@ -34,10 +49,10 @@ fn root_dims() {
     let f = test_file("simple_xy.nc");
 
     let file = netcdf::File::open(&f).unwrap();
-    assert_eq!(f, file.name);
+    assert_eq!(f.file_name().unwrap().to_str().unwrap(), file.name());
 
-    assert_eq!(file.root.dimensions.get("x").unwrap().len, 6);
-    assert_eq!(file.root.dimensions.get("y").unwrap().len, 12);
+    assert_eq!(file.root().dimensions().get("x").unwrap().len, 6);
+    assert_eq!(file.root().dimensions().get("y").unwrap().len, 12);
 }
 
 #[test]
@@ -837,13 +852,4 @@ fn read_slice_into_buffer_indices() {
     for i in 0..values.len() {
         assert_eq!(expected_values[i], values[i]);
     }
-}
-
-#[test]
-/// Use a path to open the netcdf file
-fn use_path_to_open() {
-    let f = test_file("simple_xy.nc");
-    let path: &std::path::Path = &std::path::Path::new(&f);
-
-    let _file = netcdf::File::open(path).unwrap();
 }

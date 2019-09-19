@@ -9,24 +9,38 @@ use std::ffi;
 
 #[derive(Debug)]
 pub struct Group {
-    pub name: String,
+    pub(crate) name: String,
     pub(crate) id: nc_type,
-    pub variables: HashMap<String, Variable>,
-    pub attributes: HashMap<String, Attribute>,
-    pub dimensions: HashMap<String, Dimension>,
-    pub sub_groups: HashMap<String, Group>,
+    pub(crate) variables: HashMap<String, Variable>,
+    pub(crate) attributes: HashMap<String, Attribute>,
+    pub(crate) dimensions: HashMap<String, Dimension>,
+    pub(crate) sub_groups: HashMap<String, Group>,
 }
 
-impl Default for Group {
-    fn default() -> Group {
-        Group {
-            name: "".into(),
-            id: NC_GLOBAL,
-            variables: HashMap::new(),
-            attributes: HashMap::new(),
-            dimensions: HashMap::new(),
-            sub_groups: HashMap::new(),
-        }
+impl Group {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn variables(&self) -> &HashMap<String, Variable> {
+        &self.variables
+    }
+    pub fn variable_mut(&mut self, name: &str) -> Option<&mut Variable> {
+        self.variables.get_mut(name)
+    }
+    pub fn attributes(&self) -> &HashMap<String, Attribute> {
+        &self.attributes
+    }
+    pub fn attribute_mut(&mut self, name: &str) -> Option<&mut Attribute> {
+        self.attributes.get_mut(name)
+    }
+    pub fn dimensions(&self) -> &HashMap<String, Dimension> {
+        &self.dimensions
+    }
+    pub fn sub_groups(&self) -> &HashMap<String, Group> {
+        &self.sub_groups
+    }
+    pub fn sub_groups_mut(&mut self, name: &str) -> Option<&mut Group> {
+        self.sub_groups.get_mut(name)
     }
 }
 

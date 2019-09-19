@@ -25,15 +25,12 @@ impl Variable {
     pub fn name(&self) -> &str {
         &self.name
     }
-
     pub fn attributes(&self) -> &HashMap<String, Attribute> {
         &self.attributes
     }
-
     pub fn dimensions(&self) -> &[Dimension] {
         &self.dimensions
     }
-
     pub fn vartype(&self) -> nc_type {
         self.vartype
     }
@@ -480,27 +477,23 @@ impl Variable {
     }
 
     /// Fetches variable
-    pub fn values<'a, T: Numeric, O, P>(&self, indices: O, size_len: P) -> error::Result<ArrayD<T>>
-    where
-        O: Into<Option<&'a [usize]>>,
-        P: Into<Option<&'a [usize]>>,
-    {
-        T::array_from_variable(self, indices.into(), size_len.into())
+    pub fn values<'a, T: Numeric>(
+        &self,
+        indices: Option<&[usize]>,
+        size_len: Option<&[usize]>,
+    ) -> error::Result<ArrayD<T>> {
+        T::array_from_variable(self, indices, size_len)
     }
 
     /// Fetches variable into slice
     /// buffer must be able to hold all the requested elements
-    pub fn values_to<'a, T: Numeric, O, P>(
+    pub fn values_to<'a, T: Numeric>(
         &self,
-        indices: O,
-        size_len: P,
+        indices: Option<&[usize]>,
+        size_len: Option<&[usize]>,
         buffer: &mut [T],
-    ) -> error::Result<()>
-    where
-        O: Into<Option<&'a [usize]>>,
-        P: Into<Option<&'a [usize]>>,
-    {
-        T::slice_from_variable(self, indices.into(), size_len.into(), buffer)
+    ) -> error::Result<()> {
+        T::slice_from_variable(self, indices, size_len, buffer)
     }
 
     /// Put a single value at `indices`
@@ -509,17 +502,13 @@ impl Variable {
     }
 
     /// Put a slice of values at `indices`
-    pub fn put_values_at<'a, T: Numeric, O, P>(
+    pub fn put_values_at<'a, T: Numeric>(
         &mut self,
         values: &[T],
-        indices: O,
-        slice_len: P,
-    ) -> error::Result<()>
-    where
-        O: Into<Option<&'a [usize]>>,
-        P: Into<Option<&'a [usize]>>,
-    {
-        T::put_values_at(self, indices.into(), slice_len.into(), values)
+        indices: Option<&[usize]>,
+        slice_len: Option<&[usize]>,
+    ) -> error::Result<()> {
+        T::put_values_at(self, indices, slice_len, values)
     }
 
     /// Set a Fill Value

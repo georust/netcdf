@@ -45,7 +45,14 @@ impl File {
             return Err(err.into());
         }
 
-        let root = Default::default();
+        let root = Group {
+            name: "".into(),
+            id: NC_GLOBAL,
+            variables: HashMap::new(),
+            attributes: HashMap::new(),
+            dimensions: HashMap::new(),
+            sub_groups: HashMap::new(),
+        };
 
         Ok(File {
             id: ncid,

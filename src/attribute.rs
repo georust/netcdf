@@ -36,11 +36,20 @@ macro_rules! get_attr_as_type {
 
 #[derive(Debug)]
 pub struct Attribute {
-    pub name: String,
-    pub attrtype: nc_type,
-    pub id: nc_type,
-    pub var_id: nc_type,
-    pub file_id: nc_type,
+    pub(crate) name: String,
+    pub(crate) attrtype: nc_type,
+    pub(crate) id: nc_type,
+    pub(crate) var_id: nc_type,
+    pub(crate) file_id: nc_type,
+}
+
+impl Attribute {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn attrtype(&self) -> nc_type {
+        self.attrtype
+    }
 }
 
 impl Attribute {

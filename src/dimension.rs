@@ -10,6 +10,13 @@ pub struct Dimension {
 }
 
 impl Dimension {
+    pub fn len(&self) -> usize {
+        self.len
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub(crate) fn new(grpid: nc_type, name: &str, len: usize) -> error::Result<Dimension> {
         use std::ffi::CString;
 
@@ -30,13 +37,5 @@ impl Dimension {
             len,
             id: dimid,
         })
-    }
-
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
     }
 }
