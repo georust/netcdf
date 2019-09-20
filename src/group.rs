@@ -85,6 +85,7 @@ impl_putvar!(u64, NC_UINT64, nc_put_var_ulonglong);
 impl_putvar!(f32, NC_FLOAT, nc_put_var_float);
 impl_putvar!(f64, NC_DOUBLE, nc_put_var_double);
 
+
 impl Group {
     pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<()>
     where
@@ -109,12 +110,13 @@ impl Group {
     }
 
     /// Create a Variable into the dataset, without writting any data into it.
-    pub fn add_variable(
+    pub fn add_variable<T>(
         &mut self,
         name: &str,
         dims: &[&str],
-        nctype: nc_type,
-    ) -> error::Result<&mut Variable> {
+    ) -> error::Result<&mut Variable> 
+    where T: Numeric
+    {
         if let Some(_) = self.variables.get(name) {
             return Err(format!("variable {} already exists", name).into());
         }
@@ -134,7 +136,7 @@ impl Group {
         }
 
         let d = d.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, &d, nctype)?;
+        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, &d, T::NCTYPE)?;
 
         self.variables.insert(name.into(), var);
 

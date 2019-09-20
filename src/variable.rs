@@ -42,8 +42,12 @@ pub trait Numeric
 where
     Self: Sized,
 {
+    const NCTYPE: nc_type;
     /// Returns a single indexed value of the variable as Self
-    fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> error::Result<Self>;
+    fn single_value_from_variable(
+        variable: &Variable,
+        indices: Option<&[usize]>,
+    ) -> error::Result<Self>;
     /// Returns an ndarray of the variable
     fn array_from_variable(
         variable: &Variable,
@@ -58,7 +62,7 @@ where
         values: &mut [Self],
     ) -> error::Result<()>;
     /// Put a single value into a netCDF variable
-    fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> error::Result<()>;
+    fn put_value_at(variable: &mut Variable, indices: Option<&[usize]>, value: Self) -> error::Result<()>;
     /// put a SLICE of values into a netCDF variable at the given index
     fn put_values_at(
         variable: &mut Variable,
@@ -83,22 +87,36 @@ macro_rules! impl_numeric {
         $nc_put_var1_type: ident,
         $nc_put_vara_type: ident) => {
         impl Numeric for $sized_type {
+            const NCTYPE: nc_type = $nc_type;
             // fetch ONE value from variable using `$nc_get_var1`
             fn single_value_from_variable(
                 variable: &Variable,
-                indices: &[usize],
+                indices: Option<&[usize]>,
             ) -> error::Result<$sized_type> {
                 // Check the length of `indices`
-                if indices.len() != variable.dimensions.len() {
-                    return Err(
-                        "`indices` must has the same length as the variable dimensions".into(),
-                    );
-                }
-                for i in 0..indices.len() {
-                    if indices[i] >= variable.dimensions[i].len {
-                        return Err("requested index is bigger than the dimension length".into());
+                let _indices: Vec<usize>;
+                let indices = match indices {
+                    Some(x) => {
+                        if x.len() != variable.dimensions.len() {
+                            return Err(
+                                "`indices` must has the same length as the variable dimensions"
+                                    .into(),
+                            );
+                        }
+                        for i in 0..x.len() {
+                            if x[i] >= variable.dimensions[i].len {
+                                return Err(
+                                    "requested index is bigger than the dimension length".into()
+                                );
+                            }
+                        }
+                        x
                     }
-                }
+                    None => {
+                        _indices = variable.dimensions.iter().map(|_| 0).collect();
+                        &_indices
+                    }
+                };
                 // initialize `buff` to 0
                 let mut buff: $sized_type = 0 as $sized_type;
                 let err: nc_type;
@@ -219,20 +237,30 @@ macro_rules! impl_numeric {
             // put a SINGLE value into a netCDF variable at the given index
             fn put_value_at(
                 variable: &mut Variable,
-                indices: &[usize],
+                indices: Option<&[usize]>,
                 value: Self,
             ) -> error::Result<()> {
                 // Check the length of `indices`
-                if indices.len() != variable.dimensions.len() {
+                let _indices: Vec<usize>;
+                let indices = match indices {
+                    Some(x) => {
+                if x.len() != variable.dimensions.len() {
                     return Err(
                         "`indices` must has the same length as the variable dimensions".into(),
                     );
                 }
-                for i in 0..indices.len() {
-                    if indices[i] >= variable.dimensions[i].len {
+                for i in 0..x.len() {
+                    if x[i] >= variable.dimensions[i].len {
                         return Err("requested index is bigger than the dimension length".into());
                     }
                 }
+                x
+                    },
+                    None => {
+                        _indices = variable.dimensions.iter().map(|_| 0).collect();
+                        &_indices
+                    }
+                };
                 let err: nc_type;
                 let indices_ptr = indices.as_ptr();
                 unsafe {
@@ -466,12 +494,12 @@ impl Variable {
 
     ///  Fetches one specific value at specific indices
     ///  indices must has the same length as self.dimensions.
-    pub fn value_at<T: Numeric>(&self, indices: &[usize]) -> error::Result<T> {
+    pub fn get_value<T: Numeric>(&self, indices: Option<&[usize]>) -> error::Result<T> {
         T::single_value_from_variable(self, indices)
     }
 
     /// Fetches variable
-    pub fn values<'a, T: Numeric>(
+    pub fn get_values<'a, T: Numeric>(
         &self,
         indices: Option<&[usize]>,
         size_len: Option<&[usize]>,
@@ -481,22 +509,22 @@ impl Variable {
 
     /// Fetches variable into slice
     /// buffer must be able to hold all the requested elements
-    pub fn values_to<'a, T: Numeric>(
+    pub fn get_values_to<'a, T: Numeric>(
         &self,
+        buffer: &mut [T],
         indices: Option<&[usize]>,
         size_len: Option<&[usize]>,
-        buffer: &mut [T],
     ) -> error::Result<()> {
         T::slice_from_variable(self, indices, size_len, buffer)
     }
 
     /// Put a single value at `indices`
-    pub fn put_value_at<T: Numeric>(&mut self, value: T, indices: &[usize]) -> error::Result<()> {
+    pub fn put_value<T: Numeric>(&mut self, value: T, indices: Option<&[usize]>) -> error::Result<()> {
         T::put_value_at(self, indices, value)
     }
 
     /// Put a slice of values at `indices`
-    pub fn put_values_at<'a, T: Numeric>(
+    pub fn put_values<'a, T: Numeric>(
         &mut self,
         values: &[T],
         indices: Option<&[usize]>,
