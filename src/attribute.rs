@@ -170,5 +170,5 @@ impl From<String> for AnyValue {
 #[test]
 fn conversion() {
     let x = 1.0f32;
-    let b: AnyValue = x.into();
+    let _b: AnyValue = x.into();
 }

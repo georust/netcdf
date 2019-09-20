@@ -2,7 +2,7 @@ use super::nc_type;
 use super::LOCK;
 use netcdf_sys::nc_strerror;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     Netcdf(nc_type),
     Crate(String),

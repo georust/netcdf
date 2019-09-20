@@ -78,7 +78,7 @@ impl File {
         if err != NC_NOERR {
             return Err(err.into());
         }
-        let mut root = Group {
+        let root = Group {
             name: "root".to_string(),
             ncid: ncid,
             grpid: None,

@@ -20,7 +20,6 @@ pub fn test_file_new(f: &str) -> std::path::PathBuf {
     new_file
 }
 
-/*
 #[test]
 /// Use a path to open the netcdf file
 fn use_path_to_open() {
@@ -38,11 +37,12 @@ fn use_string_to_open() {
 
 // Failure tests
 #[test]
-#[should_panic(expected = "No such file or directory")]
 fn bad_filename() {
     let f = test_file("blah_stuff.nc");
-    let _file = netcdf::File::open(&f).unwrap();
+    let res_file = netcdf::File::open(&f);
+    assert_eq!(res_file.unwrap_err(), netcdf::error::Error::Netcdf(2));
 }
+/*
 
 // Read tests
 #[test]
@@ -219,6 +219,7 @@ fn nc4_groups() {
         assert_eq!(data[x], x as i32);
     }
 }
+*/
 
 // Write tests
 #[test]
@@ -226,9 +227,10 @@ fn create() {
     let f = test_file_new("create.nc");
 
     let file = netcdf::File::create(&f).unwrap();
-    assert_eq!(f, file.name);
+    assert_eq!(f.to_string_lossy(), file.name());
 }
 
+/*
 #[test]
 fn def_dims_vars_attrs() {
     {
@@ -372,7 +374,7 @@ fn def_dims_vars_attrs() {
         );
     }
 }
-
+*/
 #[test]
 fn all_var_types() {
     // write
@@ -381,64 +383,71 @@ fn all_var_types() {
         let mut file = netcdf::File::create(&f).unwrap();
 
         let dim_name = "dim1";
-        file.root.add_dimension(dim_name, 10).unwrap();
+
+        let root = file.root_mut();
+        root.add_dimension(dim_name, 10).unwrap();
 
         // byte
-        let data: Vec<i8> = vec![42 as i8; 10];
+        let data = vec![42i8; 10];
         let var_name = "var_byte";
-        file.root
-            .add_variable(var_name, &vec![dim_name.to_string()], &data)
-            .unwrap();
+        let var = root.add_variable::<i8>(var_name, &[dim_name]).unwrap();
+        var.put_values(&data, None, None).unwrap();
+
+        let data = vec![42u8; 10];
+        let var_name = "var_char";
+        let var = root.add_variable::<u8>(var_name, &[dim_name]).unwrap();
+        var.put_values(&data, None, None).unwrap();
+
         // short
-        let data: Vec<i16> = vec![42 as i16; 10];
+        let data = vec![42i16; 10];
         let var_name = "var_short";
-        file.root
-            .add_variable(var_name, &vec![dim_name.to_string()], &data)
-            .unwrap();
+        let var = root.add_variable::<i16>(var_name, &[dim_name]).unwrap();
+        var.put_values(&data, None, None).unwrap();
+
         // ushort
-        let data: Vec<u16> = vec![42 as u16; 10];
+        let data = vec![42u16; 10];
         let var_name = "var_ushort";
-        file.root
-            .add_variable(var_name, &vec![dim_name.to_string()], &data)
-            .unwrap();
+        let var = root.add_variable::<u16>(var_name, &[dim_name]).unwrap();
+        var.put_values(&data, None, None).unwrap();
+
         // int
-        let data: Vec<i32> = vec![42 as i32; 10];
+        let data = vec![42i32; 10];
         let var_name = "var_int";
-        file.root
-            .add_variable(var_name, &vec![dim_name.to_string()], &data)
-            .unwrap();
+        let var = root.add_variable::<i32>(var_name, &[dim_name]).unwrap();
+        var.put_values(&data, None, None).unwrap();
+
         // uint
-        let data: Vec<u32> = vec![42 as u32; 10];
+        let data = vec![42u32; 10];
         let var_name = "var_uint";
-        file.root
-            .add_variable(var_name, &vec![dim_name.to_string()], &data)
-            .unwrap();
+        let var = root.add_variable::<u32>(var_name, &[dim_name]).unwrap();
+        var.put_values(&data, None, None).unwrap();
+
         // int64
-        let data: Vec<i64> = vec![42 as i64; 10];
+        let data = vec![42i64; 10];
         let var_name = "var_int64";
-        file.root
-            .add_variable(var_name, &vec![dim_name.to_string()], &data)
-            .unwrap();
+        let var = root.add_variable::<i64>(var_name, &[dim_name]).unwrap();
+        var.put_values(&data, None, None).unwrap();
+
         // uint64
-        let data: Vec<u64> = vec![42 as u64; 10];
+        let data = vec![42u64; 10];
         let var_name = "var_uint64";
-        file.root
-            .add_variable(var_name, &vec![dim_name.to_string()], &data)
-            .unwrap();
+        let var = root.add_variable::<u64>(var_name, &[dim_name]).unwrap();
+        var.put_values(&data, None, None).unwrap();
+
         // float
-        let data: Vec<f32> = vec![42.2 as f32; 10];
+        let data = vec![42.2f32; 10];
         let var_name = "var_float";
-        file.root
-            .add_variable(var_name, &vec![dim_name.to_string()], &data)
-            .unwrap();
+        let var = root.add_variable::<f32>(var_name, &[dim_name]).unwrap();
+        var.put_values(&data, None, None).unwrap();
+
         // double
-        let data: Vec<f64> = vec![42.2 as f64; 10];
+        let data = vec![42.2f64; 10];
         let var_name = "var_double";
-        file.root
-            .add_variable(var_name, &vec![dim_name.to_string()], &data)
-            .unwrap();
+        let var = root.add_variable::<f64>(var_name, &[dim_name]).unwrap();
+        var.put_values(&data, None, None).unwrap();
     }
 
+    /*
     // read
     {
         let f = test_file_new("all_var_types.nc");
@@ -543,8 +552,9 @@ fn all_var_types() {
         for i in 0..10 {
             assert_eq!(42.2 as f64, data[i]);
         }
-    }
+    }*/
 }
+/*
 
 #[test]
 fn all_attr_types() {

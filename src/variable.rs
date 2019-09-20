@@ -62,7 +62,11 @@ where
         values: &mut [Self],
     ) -> error::Result<()>;
     /// Put a single value into a netCDF variable
-    fn put_value_at(variable: &mut Variable, indices: Option<&[usize]>, value: Self) -> error::Result<()>;
+    fn put_value_at(
+        variable: &mut Variable,
+        indices: Option<&[usize]>,
+        value: Self,
+    ) -> error::Result<()>;
     /// put a SLICE of values into a netCDF variable at the given index
     fn put_values_at(
         variable: &mut Variable,
@@ -244,18 +248,21 @@ macro_rules! impl_numeric {
                 let _indices: Vec<usize>;
                 let indices = match indices {
                     Some(x) => {
-                if x.len() != variable.dimensions.len() {
-                    return Err(
-                        "`indices` must has the same length as the variable dimensions".into(),
-                    );
-                }
-                for i in 0..x.len() {
-                    if x[i] >= variable.dimensions[i].len {
-                        return Err("requested index is bigger than the dimension length".into());
+                        if x.len() != variable.dimensions.len() {
+                            return Err(
+                                "`indices` must has the same length as the variable dimensions"
+                                    .into(),
+                            );
+                        }
+                        for i in 0..x.len() {
+                            if x[i] >= variable.dimensions[i].len {
+                                return Err(
+                                    "requested index is bigger than the dimension length".into()
+                                );
+                            }
+                        }
+                        x
                     }
-                }
-                x
-                    },
                     None => {
                         _indices = variable.dimensions.iter().map(|_| 0).collect();
                         &_indices
@@ -281,6 +288,7 @@ macro_rules! impl_numeric {
                 slice_len: Option<&[usize]>,
                 values: &[Self],
             ) -> error::Result<()> {
+                println!("{:?}", values);
                 let _indices: Vec<_>;
                 let indices = match indices {
                     Some(x) => {
@@ -347,7 +355,7 @@ macro_rules! impl_numeric {
 }
 impl_numeric!(
     u8,
-    NC_CHAR,
+    NC_UBYTE,
     nc_get_var_uchar,
     nc_get_vara_uchar,
     nc_get_var1_uchar,
@@ -519,7 +527,11 @@ impl Variable {
     }
 
     /// Put a single value at `indices`
-    pub fn put_value<T: Numeric>(&mut self, value: T, indices: Option<&[usize]>) -> error::Result<()> {
+    pub fn put_value<T: Numeric>(
+        &mut self,
+        value: T,
+        indices: Option<&[usize]>,
+    ) -> error::Result<()> {
         T::put_value_at(self, indices, value)
     }
 
