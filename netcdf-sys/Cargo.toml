@@ -1,6 +1,6 @@
 [package]
 name = "netcdf-sys"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Mike Hiley <mike.hiley@ssec.wisc.edu>"]
 license = "MIT"
 description = "FFI bindings to NetCDF"
@@ -10,8 +10,5 @@ keywords = ["netcdf", "hdf", "hdf4", "hdf5", "cdm"]
 edition = "2018"
 build = "build.rs"
 
-[dependencies]
-libc = "0.2"
-
 [dev-dependencies]
-lazy_static = "1.0"
+lazy_static = "1.4"

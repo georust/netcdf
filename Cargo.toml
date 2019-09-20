@@ -1,7 +1,10 @@
 [package]
 name = "netcdf"
-version = "0.2.0"
-authors = ["Michael Hiley <mike.hiley@ssec.wisc.edu>"]
+version = "0.3.0"
+authors = [
+    "Michael Hiley <mike.hiley@ssec.wisc.edu>",
+    "Magnus Ulimoen <magnusu@met.no>"
+]
 license = "MIT OR Apache-2.0"
 description = "High-level NetCDF bindings for Rust"
 repository = "https://github.com/mhiley/rust-netcdf"
@@ -9,9 +12,12 @@ documentation = "https://github.com/mhiley/rust-netcdf"
 keywords = ["netcdf", "hdf", "hdf5", "libnetcdf", "netcdf4"]
 edition = "2018"
 
+[features]
+default = ["ndarray"]
+
 [dependencies]
-lazy_static = "1.0"
-ndarray = "0.11.0"
+lazy_static = "1.4.0"
+ndarray = { version = "0.12.*", optional = true }
 
 [dependencies.netcdf-sys]
 path = "netcdf-sys"

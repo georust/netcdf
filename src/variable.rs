@@ -3,6 +3,7 @@ use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
 use super::LOCK;
+#[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
 use netcdf_sys::*;
 use std::collections::HashMap;
@@ -48,6 +49,8 @@ where
         variable: &Variable,
         indices: Option<&[usize]>,
     ) -> error::Result<Self>;
+
+    #[cfg(feature = "ndarray")]
     /// Returns an ndarray of the variable
     fn array_from_variable(
         variable: &Variable,
@@ -136,6 +139,7 @@ macro_rules! impl_numeric {
                 Ok(buff)
             }
 
+            #[cfg(feature = "ndarray")]
             fn array_from_variable(
                 variable: &Variable,
                 indices: Option<&[usize]>,
@@ -506,6 +510,7 @@ impl Variable {
         T::single_value_from_variable(self, indices)
     }
 
+    #[cfg(feature = "ndarray")]
     /// Fetches variable
     pub fn get_values<'a, T: Numeric>(
         &self,

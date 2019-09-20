@@ -4,7 +4,7 @@
 //!
 //! Read:
 //!
-//! ```no_run
+//! ```ignore
 //! // Open file simple_xy.nc:
 //! let file = netcdf::open("simle_xy.nc").unwrap();
 //!
@@ -18,7 +18,7 @@
 //! // if needed. Pass None where you don't care about the hyperslab
 //! let data  = var.get_values::<i32>(None, None).unwrap();
 //!
-//! // All variable data is read into an ndarray
+//! // All variable data is read into an ndarray (optional feature)
 //! println!("{}", data);
 //! ```
 //!

@@ -1,4 +1,6 @@
 #![cfg(test)]
+
+#[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
 
 // Helpers for getting file paths
