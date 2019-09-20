@@ -35,7 +35,7 @@ impl File {
     {
         let data_path = file.as_ref();
         let f = CString::new(data_path.to_str().unwrap()).unwrap();
-        let mut ncid: nc_type = -999999;
+        let mut ncid: nc_type = -1;
         let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
@@ -47,7 +47,7 @@ impl File {
 
         let root = Group {
             name: "".into(),
-            ncid: ncid,
+            ncid,
             grpid: None,
             variables: HashMap::new(),
             attributes: HashMap::new(),
@@ -56,9 +56,9 @@ impl File {
         };
 
         Ok(File {
-            ncid: ncid,
+            ncid,
             name: data_path.to_string_lossy().into_owned(),
-            root: root,
+            root,
         })
     }
     /// Open a netCDF file in append mode (read/write).
@@ -69,7 +69,7 @@ impl File {
     {
         let data_path = file.as_ref();
         let f = CString::new(data_path.to_str().unwrap()).unwrap();
-        let mut ncid: nc_type = -999999;
+        let mut ncid: nc_type = -1;
         let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
@@ -80,7 +80,7 @@ impl File {
         }
         let root = Group {
             name: "root".to_string(),
-            ncid: ncid,
+            ncid,
             grpid: None,
             variables: HashMap::new(),
             attributes: HashMap::new(),
@@ -88,9 +88,9 @@ impl File {
             sub_groups: HashMap::new(),
         };
         Ok(File {
-            ncid: ncid,
+            ncid,
             name: data_path.to_string_lossy().into_owned(),
-            root: root,
+            root,
         })
     }
     /// Open a netCDF file in creation mode (write only).
@@ -100,7 +100,7 @@ impl File {
     {
         let data_path = file.as_ref();
         let f = CString::new(data_path.to_str().unwrap()).unwrap();
-        let mut ncid: nc_type = -999999;
+        let mut ncid: nc_type = -1;
         let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
@@ -111,7 +111,7 @@ impl File {
         }
         let root = Group {
             name: "root".to_string(),
-            ncid: ncid,
+            ncid,
             grpid: None,
             variables: HashMap::new(),
             attributes: HashMap::new(),
@@ -119,9 +119,9 @@ impl File {
             sub_groups: HashMap::new(),
         };
         Ok(File {
-            ncid: ncid,
+            ncid,
             name: data_path.to_string_lossy().into_owned(),
-            root: root,
+            root,
         })
     }
 }

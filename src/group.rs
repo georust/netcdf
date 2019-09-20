@@ -113,7 +113,7 @@ impl Group {
     where
         T: Numeric,
     {
-        if let Some(_) = self.variables.get(name) {
+        if self.variables.get(name).is_some() {
             return Err(format!("variable {} already exists", name).into());
         }
 
@@ -123,7 +123,7 @@ impl Group {
             .map(|x| self.dimensions.get(*x).ok_or(*x))
             .partition(Result::is_ok);
 
-        if e.len() != 0 {
+        if !e.is_empty() {
             return Err(format!(
                 "Dimensions not found: {:?}",
                 e.into_iter().map(Result::unwrap_err).collect::<Vec<_>>()

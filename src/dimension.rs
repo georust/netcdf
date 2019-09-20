@@ -9,6 +9,7 @@ pub struct Dimension {
     pub(crate) id: nc_type,
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl Dimension {
     pub fn len(&self) -> usize {
         self.len

@@ -512,7 +512,7 @@ impl Variable {
 
     #[cfg(feature = "ndarray")]
     /// Fetches variable
-    pub fn get_values<'a, T: Numeric>(
+    pub fn get_values<T: Numeric>(
         &self,
         indices: Option<&[usize]>,
         size_len: Option<&[usize]>,
@@ -522,7 +522,7 @@ impl Variable {
 
     /// Fetches variable into slice
     /// buffer must be able to hold all the requested elements
-    pub fn get_values_to<'a, T: Numeric>(
+    pub fn get_values_to<T: Numeric>(
         &self,
         buffer: &mut [T],
         indices: Option<&[usize]>,
@@ -541,7 +541,7 @@ impl Variable {
     }
 
     /// Put a slice of values at `indices`
-    pub fn put_values<'a, T: Numeric>(
+    pub fn put_values<T: Numeric>(
         &mut self,
         values: &[T],
         indices: Option<&[usize]>,

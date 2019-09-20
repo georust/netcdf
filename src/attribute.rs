@@ -98,8 +98,8 @@ impl Attribute {
 
         Ok(Attribute {
             name: name.to_string(),
-            ncid: ncid,
-            varid: varid,
+            ncid,
+                varid,
             value: Some(val),
         })
     }
