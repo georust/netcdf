@@ -575,10 +575,8 @@ fn append() {
         println!("{:?}", file_a);
         let var = &mut file_a
             .root_mut()
-            .add_variable::<i32>(
-                "some_other_variable",
-                &[dim_name],
-            ).unwrap();
+            .add_variable::<i32>("some_other_variable", &[dim_name])
+            .unwrap();
         var.put_values::<i32>(&[4, 5, 6], None, None).unwrap();
         // close it (done when `file_a` goes out of scope)
     }
@@ -588,120 +586,119 @@ fn append() {
     assert!(file.root().variables().contains_key("some_variable"));
     assert!(file.root().variables().contains_key("some_other_variable"));
 }
-/*
 
 #[test]
 // test file modification
 fn put_single_value() {
-    let f = test_file_new("append_value.nc");
+    let d = tempfile::tempdir().unwrap();
+    let f = d.path().join("append_value.nc");
     let dim_name = "some_dimension";
     let var_name = "some_variable";
     {
         // first creates a simple netCDF file
         // and create a variable called "some_variable" in it
         let mut file_w = netcdf::File::create(&f).unwrap();
-        file_w.root.add_dimension(dim_name, 3).unwrap();
-        file_w
-            .root
-            .add_variable(var_name, &vec![dim_name.into()], &vec![1., 2., 3.])
+        file_w.root_mut().add_dimension(dim_name, 3).unwrap();
+        let var = &mut file_w
+            .root_mut()
+            .add_variable::<f32>(var_name, &[dim_name])
             .unwrap();
-        // close it (done when `file_w` goes out of scope)
+        var.put_values(&[1., 2., 3.], None, None).unwrap();
     }
     let indices: [usize; 1] = [0];
     {
         // re-open it in append mode
         let mut file_a = netcdf::append(&f).unwrap();
-        let var = file_a.root.variables.get_mut(var_name).unwrap();
-        let res = var.put_value_at(100., &indices);
-        assert_eq!(res, Ok(()));
+        let var = &mut file_a.root_mut().variable_mut(var_name).unwrap();
+        var.put_value(100.0f32, Some(&indices)).unwrap();
         // close it (done when `file_a` goes out of scope)
     }
     // finally open  the file in read only mode
     // and test the values of 'some_variable'
     let file = netcdf::File::open(&f).unwrap();
-    let var = file.root.variables.get(var_name).unwrap();
-    assert_eq!(var.value_at(&indices), Ok(100.));
+    let var = &file.root().variables()[var_name];
+    assert_eq!(var.get_value(Some(&indices)), Ok(100.0));
 }
 
 #[test]
 // test file modification
 fn put_values() {
-    let f = test_file_new("append_values.nc");
+    let d = tempfile::tempdir().unwrap();
+    let f = d.path().join("append_values.nc");
     let dim_name = "some_dimension";
     let var_name = "some_variable";
     {
         // first creates a simple netCDF file
         // and create a variable called "some_variable" in it
         let mut file_w = netcdf::File::create(&f).unwrap();
-        file_w.root.add_dimension(dim_name, 3).unwrap();
-        file_w
-            .root
-            .add_variable(var_name, &[dim_name], &[1.0f32, 2., 3.])
+        file_w.root_mut().add_dimension(dim_name, 3).unwrap();
+        let var = &mut file_w
+            .root_mut()
+            .add_variable::<i32>(var_name, &[dim_name])
             .unwrap();
+        var.put_values(&[1i32, 2, 3], None, None).unwrap();
         // close it (done when `file_w` goes out of scope)
     }
-    let indices: &[usize] = &[1];
-    let values: &[f32] = &[100., 200.];
-    let len: &[usize] = &[values.len()];
+    let indices = &[1];
+    let values = &[100i32, 200];
+    let len = &[values.len()];
     {
         // re-open it in append mode
         let mut file_a = netcdf::append(&f).unwrap();
-        let var = file_a.root.variables.get_mut(var_name).unwrap();
-        let res = var.put_values_at(values, indices, len);
+        let var = &mut file_a.root_mut().variable_mut(var_name).unwrap();
+        let res = var.put_values(values, Some(indices), Some(len));
         assert_eq!(res, Ok(()));
         // close it (done when `file_a` goes out of scope)
     }
     // finally open  the file in read only mode
     // and test the values of 'some_variable'
     let file = netcdf::File::open(&f).unwrap();
-    let var = file.root.variables.get(var_name).unwrap();
-    assert_eq!(
-        var.values::<f32, _, _>(indices, len)
-            .unwrap()
-            .as_slice()
-            .unwrap(),
-        values
-    );
+    let var = &file.root().variables()[var_name];
+    let mut d = vec![0i32; 3];
+    var.get_values_to(d.as_mut_slice(), None, None).unwrap();
+    assert_eq!(d, [1, 100, 200]);
 }
 
 #[test]
+#[ignore]
 /// Test setting a fill value when creating a Variable
 fn set_fill_value() {
-    let f = test_file_new("fill_value.nc");
+    let d = tempfile::tempdir().unwrap();
+    let f = d.path().join("fill_value.nc");
     let dim_name = "some_dimension";
     let var_name = "some_variable";
     let fill_value = -2. as f32;
 
     let mut file_w = netcdf::File::create(&f).unwrap();
-    file_w.root.add_dimension(dim_name, 3).unwrap();
-    file_w
-        .root
-        .add_variable_with_fill_value(var_name, &[dim_name], &[1.0, 2.0, 3.0], fill_value)
+    file_w.root_mut().add_dimension(dim_name, 3).unwrap();
+    let var = &mut file_w
+        .root_mut()
+        .add_variable::<i8>(var_name, &[dim_name])
         .unwrap();
-    let var = file_w.root.variables.get(var_name).unwrap();
-    let attr = var
-        .attributes
-        .get("_FillValue")
-        .unwrap()
-        .get_float(false)
-        .unwrap();
+
+    var.put_values(&[1i8, 2, 3], None, None).unwrap();
+
+    let var = &file_w.root().variables()[var_name];
+    let attr = var.attributes()["_FillValue"].value();
     // compare requested fill_value and attribute _FillValue
-    assert_eq!(fill_value, attr);
+    use netcdf::attribute::AttrValue;
+    assert_eq!(AttrValue::Float(fill_value), attr);
 }
 
 #[test]
 /// Test reading a slice of a variable into a buffer
 fn read_slice_into_buffer() {
-    let f = test_file("simple_xy.nc");
+    let f = test_location().join("simple_xy.nc");
     let file = netcdf::File::open(&f).unwrap();
-    let pres = file.root.variables.get("data").unwrap();
+    let pres = &file.root().variables()["data"];
     // pre-allocate the Array
-    let mut values: Vec<i32> = vec![0; 6 * 3];
-    let ind: &[_] = &[0, 0];
-    let len: &[_] = &[6, 3];
-    pres.values_to(ind, len, &mut values).unwrap();
-    let expected_values: [i32; 18] = [
-        0, 1, 2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62,
+    let mut values = vec![0i8; 6 * 3];
+    let ind = &[0, 0];
+    let len = &[6, 3];
+    pres.get_values_to(values.as_mut_slice(), Some(ind), Some(len))
+        .unwrap();
+    let expected_values = [
+        0i8, 1, 2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62,
     ];
     for i in 0..values.len() {
         assert_eq!(expected_values[i], values[i]);
@@ -709,20 +706,14 @@ fn read_slice_into_buffer() {
 }
 
 #[test]
-/// Test reading by using indices
-fn read_slice_into_buffer_indices() {
-    let f = test_file("simple_xy.nc");
-    let file = netcdf::File::open(&f).unwrap();
-    let pres = file.root.variables.get("data").unwrap();
-    // pre-allocate the Array
-    let mut values: Vec<i32> = vec![0; 6 * 3];
-    let ind: &[_] = &[0, 0];
-    let len: &[_] = &[6, 3];
-    pres.values_to(ind, len, &mut values).unwrap();
-    let expected_values: [i32; 18] = [
-        0, 1, 2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62,
-    ];
-    for i in 0..values.len() {
-        assert_eq!(expected_values[i], values[i]);
-    }
-}*/
+#[should_panic]
+fn read_mismatched() {
+    let f = test_location().join("simple_xy.nc");
+    let file = netcdf::open(f).unwrap();
+
+    let pres = &file.root().variables()["data"];
+
+    let mut d = vec![0; 40];
+    pres.get_values_to(d.as_mut_slice(), None, Some(&[40, 1]))
+        .unwrap();
+}

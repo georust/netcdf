@@ -202,11 +202,17 @@ macro_rules! impl_numeric {
                         x
                     }
                     None => {
-                        _slice_len = variable.dimensions.iter().map(|x| x.len).collect();
+                        _slice_len = variable
+                            .dimensions
+                            .iter()
+                            .zip(indices.iter())
+                            .map(|(x, i)| (x.len).wrapping_sub(*i))
+                            .collect();
                         &_slice_len
                     }
                 };
 
+                let mut values_len = None;
                 for i in 0..indices.len() {
                     if indices[i] >= variable.dimensions[i].len {
                         return Err("requested index is bigger than the dimension length".into());
@@ -214,14 +220,14 @@ macro_rules! impl_numeric {
                     if (indices[i] + slice_len[i]) > variable.dimensions[i].len {
                         return Err("requested slice is bigger than the dimension length".into());
                     }
+                    values_len = Some(values_len.unwrap_or(1) * slice_len[i]);
                     // Compute the full size of the request values
                     if slice_len[i] == 0 {
                         return Err("Each slice element must be superior than 0".into());
                     }
                 }
-
-                if slice_len.iter().fold(1, |acc, x| acc * x) > values.len() {
-                    return Err("Number of elements exceeds space in buffer".into());
+                if values_len.is_none() || values_len.unwrap() != values.len() {
+                    return Err("number of elements in `values` doesn't match `slice_len`".into());
                 }
 
                 let err: nc_type;
@@ -313,7 +319,12 @@ macro_rules! impl_numeric {
                 let slice_len = match slice_len {
                     Some(x) => x,
                     None => {
-                        _slice_len = variable.dimensions.iter().zip(indices.iter()).map(|(x, i)| x.len - i).collect();
+                        _slice_len = variable
+                            .dimensions
+                            .iter()
+                            .zip(indices.iter())
+                            .map(|(x, i)| (x.len).wrapping_sub(*i))
+                            .collect();
                         &_slice_len
                     }
                 };
@@ -550,7 +561,11 @@ impl Variable {
     }
 
     /// Set a Fill Value
-    pub fn set_fill_value<T: Numeric>(&mut self, fill_value: T) -> error::Result<()> {
+    ///
+    /// TODO: unsafe as there is no sanity check for the variable type.
+    /// Must supply a fill_value of the same type as the variable
+    #[allow(unused_unsafe)]
+    pub unsafe fn set_fill_value<T: Numeric>(&mut self, fill_value: T) -> error::Result<()> {
         let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
