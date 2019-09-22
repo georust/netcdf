@@ -1,9 +1,8 @@
-use super::attribute::AnyValue;
+use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
 use super::variable::{Numeric, Variable};
-use super::LOCK;
 use netcdf_sys::*;
 use std::collections::HashMap;
 
@@ -45,50 +44,10 @@ impl Group {
     }
 }
 
-// Write support for all variable types
-pub trait PutVar {
-    const NCTYPE: nc_type;
-    fn put(&self, ncid: nc_type, varid: nc_type) -> error::Result<()>;
-}
-
-// This macro implements the trait PutVar for &[$type]
-// It just avoid code repetition for all numeric types
-// (the only difference between each type beeing the
-// netCDF funtion to call and the numeric identifier
-// of the type used by the libnetCDF library)
-macro_rules! impl_putvar {
-    ($type: ty, $nc_type: ident, $nc_put_var: ident) => {
-        impl PutVar for &[$type] {
-            const NCTYPE: nc_type = $nc_type;
-            fn put(&self, ncid: nc_type, varid: nc_type) -> error::Result<()> {
-                let err;
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
-                    err = $nc_put_var(ncid, varid, self.as_ptr());
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
-                }
-                Ok(())
-            }
-        }
-    };
-}
-impl_putvar!(u8, NC_CHAR, nc_put_var_uchar);
-impl_putvar!(i8, NC_BYTE, nc_put_var_schar);
-impl_putvar!(i16, NC_SHORT, nc_put_var_short);
-impl_putvar!(u16, NC_USHORT, nc_put_var_ushort);
-impl_putvar!(i32, NC_INT, nc_put_var_int);
-impl_putvar!(u32, NC_UINT, nc_put_var_uint);
-impl_putvar!(i64, NC_INT64, nc_put_var_longlong);
-impl_putvar!(u64, NC_UINT64, nc_put_var_ulonglong);
-impl_putvar!(f32, NC_FLOAT, nc_put_var_float);
-impl_putvar!(f64, NC_DOUBLE, nc_put_var_double);
-
 impl Group {
     pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<()>
     where
-        T: Into<AnyValue>,
+        T: Into<AttrValue>,
     {
         let att = Attribute::put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name, val.into())?;
         self.attributes.insert(name.to_string().clone(), att);

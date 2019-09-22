@@ -10,21 +10,172 @@ pub struct Attribute {
     pub(crate) ncid: nc_type,
     /// Variable/global this id is connected to
     pub(crate) varid: nc_type,
-    pub(crate) value: Option<AnyValue>,
+    pub(crate) value: Option<AttrValue>,
 }
 
 impl Attribute {
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn get_value(&self) -> AnyValue {
+    pub fn value(&self) -> AttrValue {
+        if let Some(x) = self.value.clone() {
+            return x;
+        }
         // This should lazy read the value when implementing reading
-        self.value.clone().unwrap()
+        let mut typ = 0;
+        let err;
+        let cname = std::ffi::CString::new(self.name.clone()).unwrap();
+        unsafe {
+            err = nc_inq_atttype(self.ncid, self.varid, cname.as_ptr(), &mut typ);
+        }
+        if err != NC_NOERR {
+            panic!(
+                "Could not read the value of the attribute {} ({})",
+                self.name, err
+            );
+        }
+        match typ {
+            NC_UBYTE => {
+                let mut value = 0;
+                let err;
+                unsafe {
+                    err = nc_get_att_uchar(self.ncid, self.varid, cname.as_ptr(), &mut value);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                AttrValue::Uchar(value)
+            }
+            NC_BYTE => {
+                let mut value = 0;
+                let err;
+                unsafe {
+                    err = nc_get_att_schar(self.ncid, self.varid, cname.as_ptr(), &mut value);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                AttrValue::Schar(value)
+            }
+            NC_SHORT => {
+                let mut value = 0;
+                let err;
+                unsafe {
+                    err = nc_get_att_short(self.ncid, self.varid, cname.as_ptr(), &mut value);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                AttrValue::Short(value)
+            }
+            NC_USHORT => {
+                let mut value = 0;
+                let err;
+                unsafe {
+                    err = nc_get_att_ushort(self.ncid, self.varid, cname.as_ptr(), &mut value);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                AttrValue::Ushort(value)
+            }
+            NC_INT => {
+                let mut value = 0;
+                let err;
+                unsafe {
+                    err = nc_get_att_int(self.ncid, self.varid, cname.as_ptr(), &mut value);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                AttrValue::Int(value)
+            }
+            NC_UINT => {
+                let mut value = 0;
+                let err;
+                unsafe {
+                    err = nc_get_att_uint(self.ncid, self.varid, cname.as_ptr(), &mut value);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                AttrValue::Uint(value)
+            }
+            NC_INT64 => {
+                let mut value = 0;
+                let err;
+                unsafe {
+                    err = nc_get_att_longlong(self.ncid, self.varid, cname.as_ptr(), &mut value);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                AttrValue::Longlong(value)
+            }
+            NC_UINT64 => {
+                let mut value = 0;
+                let err;
+                unsafe {
+                    err = nc_get_att_ulonglong(self.ncid, self.varid, cname.as_ptr(), &mut value);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                AttrValue::Ulonglong(value)
+            }
+            NC_FLOAT => {
+                let mut value = 0.0;
+                let err;
+                unsafe {
+                    err = nc_get_att_float(self.ncid, self.varid, cname.as_ptr(), &mut value);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                AttrValue::Float(value)
+            }
+            NC_DOUBLE => {
+                let mut value = 0.0;
+                let err;
+                unsafe {
+                    err = nc_get_att_double(self.ncid, self.varid, cname.as_ptr(), &mut value);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                AttrValue::Double(value)
+            }
+            NC_CHAR => {
+                let mut lentext = 0;
+                let err;
+                unsafe {
+                    err = nc_inq_attlen(self.ncid, self.varid, cname.as_ptr(), &mut lentext);
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                let mut buf = vec![0; lentext];
+                let err;
+                unsafe {
+                    err = nc_get_att_text(self.ncid, self.varid, cname.as_ptr(), buf.as_mut_ptr());
+                }
+                if err != NC_NOERR {
+                    panic!("Could not get value of attribute {} {}", self.name, err);
+                }
+                let value = buf
+                    .into_iter()
+                    .take_while(|x| *x != 0)
+                    .map(|x| x as _)
+                    .collect::<Vec<_>>();
+                AttrValue::Str(String::from_utf8(value).unwrap())
+            }
+            x => panic!("Unknown nc_type encountered: {}", x),
+        }
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum AnyValue {
+#[derive(Debug, Clone, PartialEq)]
+pub enum AttrValue {
     Uchar(u8),
     Schar(i8),
     Ushort(u16),
@@ -43,7 +194,7 @@ impl Attribute {
         ncid: nc_type,
         varid: nc_type,
         name: &str,
-        val: AnyValue,
+        val: AttrValue,
     ) -> error::Result<Attribute> {
         let cname: CString = CString::new(name).unwrap();
 
@@ -51,37 +202,37 @@ impl Attribute {
         let err;
         unsafe {
             match val {
-                AnyValue::Uchar(x) => {
-                    err = nc_put_att_uchar(ncid, varid, cname.as_ptr(), NC_CHAR, 1, &x);
+                AttrValue::Uchar(x) => {
+                    err = nc_put_att_uchar(ncid, varid, cname.as_ptr(), NC_UBYTE, 1, &x);
                 }
-                AnyValue::Schar(x) => {
+                AttrValue::Schar(x) => {
                     err = nc_put_att_schar(ncid, varid, cname.as_ptr(), NC_BYTE, 1, &x);
                 }
-                AnyValue::Ushort(x) => {
+                AttrValue::Ushort(x) => {
                     err = nc_put_att_ushort(ncid, varid, cname.as_ptr(), NC_USHORT, 1, &x);
                 }
-                AnyValue::Short(x) => {
+                AttrValue::Short(x) => {
                     err = nc_put_att_short(ncid, varid, cname.as_ptr(), NC_SHORT, 1, &x);
                 }
-                AnyValue::Uint(x) => {
+                AttrValue::Uint(x) => {
                     err = nc_put_att_uint(ncid, varid, cname.as_ptr(), NC_UINT, 1, &x);
                 }
-                AnyValue::Int(x) => {
+                AttrValue::Int(x) => {
                     err = nc_put_att_int(ncid, varid, cname.as_ptr(), NC_INT, 1, &x);
                 }
-                AnyValue::Ulonglong(x) => {
+                AttrValue::Ulonglong(x) => {
                     err = nc_put_att_ulonglong(ncid, varid, cname.as_ptr(), NC_UINT64, 1, &x);
                 }
-                AnyValue::Longlong(x) => {
+                AttrValue::Longlong(x) => {
                     err = nc_put_att_longlong(ncid, varid, cname.as_ptr(), NC_INT64, 1, &x);
                 }
-                AnyValue::Float(x) => {
+                AttrValue::Float(x) => {
                     err = nc_put_att_float(ncid, varid, cname.as_ptr(), NC_FLOAT, 1, &x);
                 }
-                AnyValue::Double(x) => {
-                    err = nc_put_att_double(ncid, varid, cname.as_ptr(), NC_FLOAT, 1, &x);
+                AttrValue::Double(x) => {
+                    err = nc_put_att_double(ncid, varid, cname.as_ptr(), NC_DOUBLE, 1, &x);
                 }
-                AnyValue::Str(ref x) => {
+                AttrValue::Str(ref x) => {
                     err = nc_put_att_text(
                         ncid,
                         varid,
@@ -99,76 +250,76 @@ impl Attribute {
         Ok(Attribute {
             name: name.to_string(),
             ncid,
-                varid,
+            varid,
             value: Some(val),
         })
     }
 }
 
 // Boring implementations
-impl From<u8> for AnyValue {
-    fn from(x: u8) -> AnyValue {
-        AnyValue::Uchar(x)
+impl From<u8> for AttrValue {
+    fn from(x: u8) -> AttrValue {
+        AttrValue::Uchar(x)
     }
 }
-impl From<i8> for AnyValue {
-    fn from(x: i8) -> AnyValue {
-        AnyValue::Schar(x)
+impl From<i8> for AttrValue {
+    fn from(x: i8) -> AttrValue {
+        AttrValue::Schar(x)
     }
 }
-impl From<u16> for AnyValue {
-    fn from(x: u16) -> AnyValue {
-        AnyValue::Ushort(x)
+impl From<u16> for AttrValue {
+    fn from(x: u16) -> AttrValue {
+        AttrValue::Ushort(x)
     }
 }
-impl From<i16> for AnyValue {
-    fn from(x: i16) -> AnyValue {
-        AnyValue::Short(x)
+impl From<i16> for AttrValue {
+    fn from(x: i16) -> AttrValue {
+        AttrValue::Short(x)
     }
 }
-impl From<u32> for AnyValue {
-    fn from(x: u32) -> AnyValue {
-        AnyValue::Uint(x)
+impl From<u32> for AttrValue {
+    fn from(x: u32) -> AttrValue {
+        AttrValue::Uint(x)
     }
 }
-impl From<i32> for AnyValue {
-    fn from(x: i32) -> AnyValue {
-        AnyValue::Int(x)
+impl From<i32> for AttrValue {
+    fn from(x: i32) -> AttrValue {
+        AttrValue::Int(x)
     }
 }
-impl From<u64> for AnyValue {
-    fn from(x: u64) -> AnyValue {
-        AnyValue::Ulonglong(x)
+impl From<u64> for AttrValue {
+    fn from(x: u64) -> AttrValue {
+        AttrValue::Ulonglong(x)
     }
 }
-impl From<i64> for AnyValue {
-    fn from(x: i64) -> AnyValue {
-        AnyValue::Longlong(x)
+impl From<i64> for AttrValue {
+    fn from(x: i64) -> AttrValue {
+        AttrValue::Longlong(x)
     }
 }
-impl From<f32> for AnyValue {
-    fn from(x: f32) -> AnyValue {
-        AnyValue::Float(x)
+impl From<f32> for AttrValue {
+    fn from(x: f32) -> AttrValue {
+        AttrValue::Float(x)
     }
 }
-impl From<f64> for AnyValue {
-    fn from(x: f64) -> AnyValue {
-        AnyValue::Double(x)
+impl From<f64> for AttrValue {
+    fn from(x: f64) -> AttrValue {
+        AttrValue::Double(x)
     }
 }
-impl From<&str> for AnyValue {
-    fn from(x: &str) -> AnyValue {
-        AnyValue::Str(x.to_string())
+impl From<&str> for AttrValue {
+    fn from(x: &str) -> AttrValue {
+        AttrValue::Str(x.to_string())
     }
 }
-impl From<String> for AnyValue {
-    fn from(x: String) -> AnyValue {
-        AnyValue::Str(x)
+impl From<String> for AttrValue {
+    fn from(x: String) -> AttrValue {
+        AttrValue::Str(x)
     }
 }
 
 #[test]
 fn conversion() {
     let x = 1.0f32;
-    let _b: AnyValue = x.into();
+    let _b: AttrValue = x.into();
 }

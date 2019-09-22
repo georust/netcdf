@@ -1,4 +1,4 @@
-use super::attribute::AnyValue;
+use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
@@ -292,7 +292,6 @@ macro_rules! impl_numeric {
                 slice_len: Option<&[usize]>,
                 values: &[Self],
             ) -> error::Result<()> {
-                println!("{:?}", values);
                 let _indices: Vec<_>;
                 let indices = match indices {
                     Some(x) => {
@@ -314,12 +313,12 @@ macro_rules! impl_numeric {
                 let slice_len = match slice_len {
                     Some(x) => x,
                     None => {
-                        _slice_len = variable.dimensions.iter().map(|x| x.len).collect();
+                        _slice_len = variable.dimensions.iter().zip(indices.iter()).map(|(x, i)| x.len - i).collect();
                         &_slice_len
                     }
                 };
 
-                let mut values_len = 0;
+                let mut values_len = None;
                 for i in 0..indices.len() {
                     if indices[i] >= variable.dimensions[i].len {
                         return Err("requested index is bigger than the dimension length".into());
@@ -331,10 +330,10 @@ macro_rules! impl_numeric {
                     if slice_len[i] == 0 {
                         return Err("Each slice element must be superior than 0".into());
                     }
-                    values_len += slice_len[i];
+                    values_len = Some(values_len.unwrap_or(1) * slice_len[i]);
                 }
-                if values_len != values.len() {
-                    return Err("number of element in `values` doesn't match `slice_len`".into());
+                if values_len.is_none() || values_len.unwrap() != values.len() {
+                    return Err("number of elements in `values` doesn't match `slice_len`".into());
                 }
 
                 let err: nc_type;
@@ -497,7 +496,7 @@ impl Variable {
 
     pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<()>
     where
-        T: Into<AnyValue>,
+        T: Into<AttrValue>,
     {
         let att = Attribute::put(self.ncid, self.varid, name, val.into())?;
         self.attributes.insert(name.to_string().clone(), att);
@@ -568,3 +567,43 @@ impl Variable {
         Ok(())
     }
 }
+
+// Write support for all variable types
+pub trait PutVar {
+    const NCTYPE: nc_type;
+    fn put(&self, ncid: nc_type, varid: nc_type) -> error::Result<()>;
+}
+
+// This macro implements the trait PutVar for &[$type]
+// It just avoid code repetition for all numeric types
+// (the only difference between each type beeing the
+// netCDF funtion to call and the numeric identifier
+// of the type used by the libnetCDF library)
+macro_rules! impl_putvar {
+    ($type: ty, $nc_type: ident, $nc_put_var: ident) => {
+        impl PutVar for &[$type] {
+            const NCTYPE: nc_type = $nc_type;
+            fn put(&self, ncid: nc_type, varid: nc_type) -> error::Result<()> {
+                let err;
+                unsafe {
+                    let _g = LOCK.lock().unwrap();
+                    err = $nc_put_var(ncid, varid, self.as_ptr());
+                }
+                if err != NC_NOERR {
+                    return Err(err.into());
+                }
+                Ok(())
+            }
+        }
+    };
+}
+impl_putvar!(u8, NC_UBYTE, nc_put_var_uchar);
+impl_putvar!(i8, NC_BYTE, nc_put_var_schar);
+impl_putvar!(i16, NC_SHORT, nc_put_var_short);
+impl_putvar!(u16, NC_USHORT, nc_put_var_ushort);
+impl_putvar!(i32, NC_INT, nc_put_var_int);
+impl_putvar!(u32, NC_UINT, nc_put_var_uint);
+impl_putvar!(i64, NC_INT64, nc_put_var_longlong);
+impl_putvar!(u64, NC_UINT64, nc_put_var_ulonglong);
+impl_putvar!(f32, NC_FLOAT, nc_put_var_float);
+impl_putvar!(f64, NC_DOUBLE, nc_put_var_double);
