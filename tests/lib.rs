@@ -82,16 +82,16 @@ fn var_as_different_types() {
     let var = &file.root().variables()["data"];
     var.get_values_to(&mut data, None, None).unwrap();
 
-    for x in 0..(6 * 12) {
-        assert_eq!(data[x], x as i32);
+    for (x, d)  in data.iter().enumerate() {
+        assert_eq!(*d, x as i32);
     }
 
     // do the same thing but cast to float
     let mut data = vec![0.0; 6 * 12];
     var.get_values_to(&mut data, None, None).unwrap();
 
-    for x in 0..(6 * 12) {
-        assert_eq!(data[x], x as f32);
+    for (x, d) in data.iter().enumerate() {
+        assert!((*d - x as f32).abs() < 1e-5);
     }
 }
 

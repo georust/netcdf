@@ -32,7 +32,7 @@ mod tests {
             .join("simple_xy.nc");
         let f = ffi::CString::new(test_data_path.to_str().unwrap()).unwrap();
 
-        let mut ncid: nc_type = -999999;
+        let mut ncid: nc_type = -999_999;
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
             let err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
@@ -51,9 +51,9 @@ mod tests {
         let f = ffi::CString::new(test_data_path.to_str().unwrap()).unwrap();
         let varname = ffi::CString::new("data").unwrap();
 
-        let mut ncid: nc_type = -999999;
-        let mut varid: nc_type = -999999;
-        let mut nvars: nc_type = -999999;
+        let mut ncid: nc_type = -999_999;
+        let mut varid: nc_type = -999_999;
+        let mut nvars: nc_type = -999_999;
         unsafe {
             let _g = libnetcdf_lock.lock().unwrap();
             let err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
@@ -77,11 +77,10 @@ mod tests {
         let f = ffi::CString::new(test_data_path.to_str().unwrap()).unwrap();
         let varname = ffi::CString::new("data").unwrap();
 
-        let mut ncid: nc_type = -999999;
-        let mut varid: nc_type = -999999;
-        let mut buf: Vec<nc_type> = Vec::with_capacity(6 * 12);
+        let mut ncid: nc_type = -999_999;
+        let mut varid: nc_type = -999_999;
+        let mut buf: Vec<nc_type> = vec![0; 6*12];
         unsafe {
-            buf.set_len(6 * 12);
 
             let _g = libnetcdf_lock.lock().unwrap();
             let err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
@@ -97,8 +96,8 @@ mod tests {
             assert_eq!(err, NC_NOERR);
         }
 
-        for x in 0..(6 * 12) {
-            assert_eq!(buf[x], x as _);
+        for (x, d) in buf.into_iter().enumerate() {
+            assert_eq!(d, x as _);
         }
     }
 }
