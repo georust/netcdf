@@ -97,6 +97,12 @@ where
     File::open(name)
 }
 
+#[cfg(feature = "memory")]
+/// Open a netcdf file from a buffer
+pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<MemFile<'a>> {
+    file::MemFile::new(name, mem)
+}
+
 lazy_static! {
     /// Use this when accessing netcdf functions
     pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());

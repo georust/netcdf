@@ -746,3 +746,26 @@ fn use_compression() {
     let v = vec![0i32; 10];
     var.put_values(&v, None, None).unwrap();
 }
+
+#[test]
+#[cfg(feature = "memory")]
+fn read_from_memory() {
+    use std::io::Read;
+    let origfile = test_location().join("simple_xy.nc");
+    let mut origfile = std::fs::File::open(origfile).unwrap();
+    let mut bytes = Vec::new();
+    origfile.read_to_end(&mut bytes).unwrap();
+
+    let file = netcdf::open_mem(None, &bytes).unwrap();
+    let x = &(*file).root().dimensions()["x"];
+    assert_eq!(x.len(), 6);
+    let y = &(*file).root().dimensions()["y"];
+    assert_eq!(y.len(), 12);
+    let mut v = vec![0i32; 6 * 12];
+    (*file).root().variables()["data"]
+        .get_values_to(&mut v, None, None)
+        .unwrap();
+    for i in 0..6 * 12 {
+        assert_eq!(v[i], i as _);
+    }
+}

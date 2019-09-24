@@ -112,6 +112,63 @@ impl File {
     }
 }
 
+#[cfg(feature = "memory")]
+/// The memory mapped file is kept in this structure to keep the
+/// lifetime of the buffer longer than the file.
+///
+/// Access the [`File`] through the traits `Deref` or `DerefMut`
+pub struct MemFile<'a> {
+    file: File,
+    _buffer: std::marker::PhantomData<&'a [u8]>,
+}
+
+#[cfg(feature = "memory")]
+impl<'a> std::ops::Deref for MemFile<'a> {
+    type Target = File;
+    fn deref(&self) -> &Self::Target {
+        &self.file
+    }
+}
+#[cfg(feature = "memory")]
+impl<'a> std::ops::DerefMut for MemFile<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.file
+    }
+}
+
+#[cfg(feature = "memory")]
+impl<'a> MemFile<'a> {
+    pub fn new(name: Option<&str>, mem: &'a [u8]) -> error::Result<Self> {
+        let cstr = std::ffi::CString::new(name.unwrap_or(" ")).unwrap();
+        let mut ncid = 0;
+        let err;
+        unsafe {
+            let _l = LOCK.lock().unwrap();
+            err = nc_open_mem(
+                cstr.as_ptr(),
+                NC_NOWRITE,
+                mem.len(),
+                mem.as_ptr() as *const u8 as *mut _,
+                &mut ncid,
+            );
+        }
+        if err != NC_NOERR {
+            return Err(err.into());
+        }
+
+        let root = parse_file(ncid)?;
+
+        Ok(Self {
+            file: File {
+                name: name.unwrap_or("").to_string(),
+                ncid,
+                root,
+            },
+            _buffer: std::marker::PhantomData,
+        })
+    }
+}
+
 impl Drop for File {
     fn drop(&mut self) {
         unsafe {

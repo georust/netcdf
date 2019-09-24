@@ -79,9 +79,8 @@ mod tests {
 
         let mut ncid: nc_type = -999_999;
         let mut varid: nc_type = -999_999;
-        let mut buf: Vec<nc_type> = vec![0; 6*12];
+        let mut buf: Vec<nc_type> = vec![0; 6 * 12];
         unsafe {
-
             let _g = libnetcdf_lock.lock().unwrap();
             let err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
             assert_eq!(err, NC_NOERR);

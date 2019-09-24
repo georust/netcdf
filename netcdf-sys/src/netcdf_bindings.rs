@@ -1660,4 +1660,12 @@ extern "C" {
     ) -> c_int;
     pub fn ncrecget(ncid: c_int, recnum: c_long, datap: *mut *mut c_void) -> c_int;
     pub fn ncrecput(ncid: c_int, recnum: c_long, datap: *const *mut c_void) -> c_int;
+    #[cfg(feature = "memio")]
+    pub fn nc_open_mem(
+        path: *const c_char,
+        omode: c_int,
+        size: usize,
+        memory: *mut c_void,
+        ncidp: *mut c_int,
+    ) -> c_int;
 }
