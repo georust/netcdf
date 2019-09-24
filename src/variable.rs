@@ -45,7 +45,7 @@ impl Variable {
         if let Some(chunks) = chunksize {
             let err;
             unsafe {
-                err = nc_def_var_chunking(self.ncid.into(), self.varid.into(), NC_CHUNKED, &chunks);
+                err = nc_def_var_chunking(self.ncid, self.varid, NC_CHUNKED, &chunks);
             }
             if err != NC_NOERR {
                 return Err(err.into());
@@ -587,25 +587,60 @@ impl Variable {
     }
 
     /// Set a Fill Value
-    ///
-    /// TODO: unsafe as there is no sanity check for the variable type.
-    /// Must supply a fill_value of the same type as the variable
-    #[allow(unused_unsafe)]
-    pub unsafe fn set_fill_value<T: Numeric>(&mut self, fill_value: T) -> error::Result<()> {
+    pub fn set_fill_value<T>(&mut self, fill_value: T) -> error::Result<()>
+    where
+        T: Numeric + Into<super::attribute::AttrValue>,
+    {
+        if T::NCTYPE != self.vartype {
+            return Err("Fill type is not equal to variable type".into());
+        }
+        let _l = LOCK.lock().unwrap();
         let err: nc_type;
         unsafe {
-            let _g = LOCK.lock().unwrap();
             err = nc_def_var_fill(
                 self.ncid,
                 self.varid,
-                0,
+                NC_FILL,
                 &fill_value as *const T as *const _,
             );
         }
         if err != NC_NOERR {
             return Err(err.into());
         }
+        let a = Attribute {
+            name: "_FillValue".into(),
+            ncid: self.ncid,
+            varid: self.varid,
+            value: Some(fill_value.into()),
+        };
+        self.attributes.insert("_FillValue".into(), a);
         Ok(())
+    }
+    /// Get the fill value of a variable
+    pub fn fill_value<T: Numeric>(&self) -> error::Result<Option<T>> {
+        if T::NCTYPE != self.vartype {
+            return Err("Fill type is not equal to variable type".into());
+        }
+        let mut location = std::mem::MaybeUninit::uninit();
+        let mut nofill: nc_type = 0;
+        let _l = LOCK.lock().unwrap();
+        let err;
+        unsafe {
+            err = nc_inq_var_fill(
+                self.ncid,
+                self.varid,
+                &mut nofill,
+                &mut location as *mut _ as *mut _,
+            );
+        }
+        if err != NC_NOERR {
+            return Err(err.into());
+        }
+        if nofill == 1 {
+            return Ok(None);
+        }
+
+        Ok(Some(unsafe { location.assume_init() }))
     }
 }
 

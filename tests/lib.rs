@@ -660,29 +660,40 @@ fn put_values() {
 }
 
 #[test]
-#[ignore]
 /// Test setting a fill value when creating a Variable
 fn set_fill_value() {
     let d = tempfile::tempdir().unwrap();
     let f = d.path().join("fill_value.nc");
     let dim_name = "some_dimension";
     let var_name = "some_variable";
-    let fill_value = -2. as f32;
+    let fill_value = -2 as i32;
 
     let mut file_w = netcdf::File::create(&f).unwrap();
     file_w.root_mut().add_dimension(dim_name, 3).unwrap();
     let var = &mut file_w
         .root_mut()
-        .add_variable::<i8>(var_name, &[dim_name])
+        .add_variable::<i32>(var_name, &[dim_name])
         .unwrap();
+    var.set_fill_value(fill_value).unwrap();
 
-    var.put_values(&[1i8, 2, 3], None, None).unwrap();
+    var.put_values(&[2, 3], Some(&[1]), None).unwrap();
+
+    let mut rvar = [0i32; 3];
+    var.get_values_to(&mut rvar, None, None).unwrap();
+
+    assert_eq!(rvar, [fill_value, 2, 3]);
 
     let var = &file_w.root().variables()[var_name];
     let attr = var.attributes()["_FillValue"].value();
     // compare requested fill_value and attribute _FillValue
     use netcdf::attribute::AttrValue;
-    assert_eq!(AttrValue::Float(fill_value), attr);
+    assert_eq!(AttrValue::Int(fill_value), attr);
+
+    let fill = var.fill_value::<i32>().unwrap();
+    assert_eq!(fill, Some(fill_value));
+
+    // Expecting an error when trying to get the wrong variable type
+    var.fill_value::<f32>().unwrap_err();
 }
 
 #[test]
