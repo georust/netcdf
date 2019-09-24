@@ -35,6 +35,32 @@ impl Variable {
     pub fn vartype(&self) -> nc_type {
         self.vartype
     }
+    /// Sets compression on the variable. Must be set before filling in data
+    pub fn compression(
+        &mut self,
+        deflate_level: nc_type,
+        chunksize: Option<usize>,
+    ) -> error::Result<()> {
+        let _l = LOCK.lock().unwrap();
+        if let Some(chunks) = chunksize {
+            let err;
+            unsafe {
+                err = nc_def_var_chunking(self.ncid.into(), self.varid.into(), NC_CHUNKED, &chunks);
+            }
+            if err != NC_NOERR {
+                return Err(err.into());
+            }
+        }
+        let err;
+        unsafe {
+            err = nc_def_var_deflate(self.ncid, self.varid, false as _, true as _, deflate_level);
+        }
+        if err != NC_NOERR {
+            return Err(err.into());
+        }
+
+        Ok(())
+    }
 }
 
 /// This trait allow an implicit cast when fetching

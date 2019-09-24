@@ -82,7 +82,7 @@ fn var_as_different_types() {
     let var = &file.root().variables()["data"];
     var.get_values_to(&mut data, None, None).unwrap();
 
-    for (x, d)  in data.iter().enumerate() {
+    for (x, d) in data.iter().enumerate() {
         assert_eq!(*d, x as i32);
     }
 
@@ -716,4 +716,22 @@ fn read_mismatched() {
     let mut d = vec![0; 40];
     pres.get_values_to(d.as_mut_slice(), None, Some(&[40, 1]))
         .unwrap();
+}
+
+#[test]
+fn use_compression() {
+    let d = tempfile::tempdir().unwrap();
+    let f = d.path().join("compressed_var.nc");
+    let mut file = netcdf::create(f).unwrap();
+
+    file.root_mut().add_dimension("x", 10).unwrap();
+
+    let var = &mut file
+        .root_mut()
+        .add_variable::<i32>("compressed", &["x"])
+        .unwrap();
+    var.compression(5, Some(5)).unwrap();
+
+    let v = vec![0i32; 10];
+    var.put_values(&v, None, None).unwrap();
 }
