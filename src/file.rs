@@ -27,6 +27,19 @@ impl File {
     }
 }
 
+impl std::ops::Deref for File {
+    type Target = Group;
+    fn deref(&self) -> &Self::Target {
+        &self.root
+    }
+}
+
+impl std::ops::DerefMut for File {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.root
+    }
+}
+
 impl File {
     /// Open a netCDF file in read only mode.
     pub fn open<P>(file: P) -> error::Result<File>

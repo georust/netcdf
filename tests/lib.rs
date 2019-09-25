@@ -48,6 +48,24 @@ fn root_dims() {
 }
 
 #[test]
+fn access_through_deref() {
+    let f = test_location().join("simple_xy.nc");
+
+    let file = netcdf::File::open(&f).unwrap();
+
+    assert_eq!(file.dimensions().get("x").unwrap().len(), 6);
+    assert_eq!(file.dimensions().get("y").unwrap().len(), 12);
+
+    let d = tempfile::tempdir().unwrap();
+    let f = d.path().join("derefmut.nc");
+    let mut file = netcdf::create(&f).unwrap();
+
+    file.add_dimension("time", 10).unwrap();
+
+    assert_eq!(file.dimensions()["time"].len(), 10);
+}
+
+#[test]
 fn global_attrs() {
     use netcdf::attribute::AttrValue;
     let f = test_location().join("patmosx_v05r03-preliminary_NOAA-19_asc_d20130630_c20140325.nc");

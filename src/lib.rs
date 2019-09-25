@@ -4,22 +4,25 @@
 //!
 //! Read:
 //!
-//! ```ignore
+//! ```no_run
 //! // Open file simple_xy.nc:
 //! let file = netcdf::open("simle_xy.nc").unwrap();
 //!
-//! // Access any variable, attribute, or dimension through simple HashMap's:
-//! let var = file.root().variables().get("data").unwrap();
+//! // Access any variable, attribute, or dimension through lookups on hashmaps
+//! let var = &file.variables()["data"];
 //!
-//! // Read variable as any NC_TYPE
+//! // Read variable as numeric types
 //! let data : i32 = var.get_value::<i32>(None).unwrap();
 //!
 //! // You can also use values() to read the variable, data will be implicitly casted
-//! // if needed. Pass None where you don't care about the hyperslab
+//! // if needed. Pass None when you don't care about the hyperslab (get all data)
+//! #[cfg(feature = "memory")]
+//! {
 //! let data  = var.get_values::<i32>(None, None).unwrap();
 //!
 //! // All variable data is read into an ndarray (optional feature)
 //! println!("{}", data);
+//! }
 //! ```
 //!
 //! Write:
@@ -29,14 +32,14 @@
 //! let mut file = netcdf::create("crabs2.nc").unwrap();
 //!
 //! let dim_name = "ncrabs";
-//! file.root_mut().add_dimension(dim_name, 10).unwrap();
+//! file.add_dimension(dim_name, 10).unwrap();
 //!
 //! let var_name = "crab_coolness_level";
 //! let data : Vec<i32> = vec![42; 10];
 //! // Variable type written to file
-//! let var = file.root_mut().add_variable::<i32>(
+//! let var = file.add_variable::<i32>(
 //!             var_name,
-//!             &vec![dim_name],
+//!             &[dim_name],
 //! ).unwrap();
 //! var.put_values(&data, None, None);
 //! ```
@@ -47,7 +50,7 @@
 //! // open it in read/write mode
 //! let mut file = netcdf::append("crabs2.nc").unwrap();
 //! // get a mutable binding of the variable "crab_coolness_level"
-//! let mut var = file.root_mut().variable_mut("crab_coolness_level").unwrap();
+//! let mut var = file.variable_mut("crab_coolness_level").unwrap();
 //!
 //! let data : Vec<i32> = vec![100; 10];
 //! // write 5 first elements of the vector `data` into `var` starting at index 2;
