@@ -12,13 +12,13 @@
 //! let var = &file.variables()["data"];
 //!
 //! // Read variable as numeric types
-//! let data : i32 = var.get_value::<i32>(None).unwrap();
+//! let data : i32 = var.value::<i32>(None).unwrap();
 //!
 //! // You can also use values() to read the variable, data will be implicitly casted
 //! // if needed. Pass None when you don't care about the hyperslab (get all data)
 //! #[cfg(feature = "memory")]
 //! {
-//! let data  = var.get_values::<i32>(None, None).unwrap();
+//! let data  = var.values::<i32>(None, None).unwrap();
 //!
 //! // All variable data is read into an ndarray (optional feature)
 //! println!("{}", data);

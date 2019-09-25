@@ -542,13 +542,13 @@ impl Variable {
 
     ///  Fetches one specific value at specific indices
     ///  indices must has the same length as self.dimensions.
-    pub fn get_value<T: Numeric>(&self, indices: Option<&[usize]>) -> error::Result<T> {
+    pub fn value<T: Numeric>(&self, indices: Option<&[usize]>) -> error::Result<T> {
         T::single_value_from_variable(self, indices)
     }
 
     #[cfg(feature = "ndarray")]
     /// Fetches variable
-    pub fn get_values<T: Numeric>(
+    pub fn values<T: Numeric>(
         &self,
         indices: Option<&[usize]>,
         size_len: Option<&[usize]>,
@@ -558,7 +558,7 @@ impl Variable {
 
     /// Fetches variable into slice
     /// buffer must be able to hold all the requested elements
-    pub fn get_values_to<T: Numeric>(
+    pub fn values_to<T: Numeric>(
         &self,
         buffer: &mut [T],
         indices: Option<&[usize]>,
