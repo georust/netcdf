@@ -787,3 +787,32 @@ fn read_from_memory() {
         assert_eq!(v[i], i as _);
     }
 }
+
+#[test]
+#[should_panic(expected = "Dimension x already exists")]
+fn add_confliciting_dimensions() {
+    let d = tempfile::tempdir().unwrap();
+
+    let mut file = netcdf::create(d.path().join("conflict_dim.nc")).unwrap();
+
+    file.add_dimension("x", 10).unwrap();
+    let e = file.add_dimension("x", 11).unwrap_err();
+    assert_eq!(file.dimensions()["x"].len(), 10);
+    panic!("{}", e);
+}
+
+#[test]
+#[should_panic(expected = "variable x already exists")]
+fn add_conflicting_variables() {
+    let d = tempfile::tempdir().unwrap();
+    let mut file = netcdf::create(d.path().join("conflict_var")).unwrap();
+
+    file.add_dimension("x", 10).unwrap();
+    file.add_dimension("y", 20).unwrap();
+
+    file.add_variable::<i32>("x", &["x"]).unwrap();
+
+    let e = file.add_variable::<f32>("x", &["y"]).unwrap_err();
+    assert_eq!(10, file.variables()["x"].dimensions()[0].len());
+    panic!("{}", e);
+}
