@@ -57,7 +57,7 @@ impl Group {
 
     pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&mut Dimension> {
         if self.dimensions.contains_key(name) {
-            return Err(format!("Dimension {} already exists", name).into());
+            return Err(error::Error::AlreadyExists("dimension".into()));
         }
 
         let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?;
@@ -84,7 +84,7 @@ impl Group {
         T: Numeric,
     {
         if self.variables.get(name).is_some() {
-            return Err(format!("variable {} already exists", name).into());
+            return Err(error::Error::AlreadyExists("variable".into()));
         }
 
         // Assert all dimensions exists, and get &[&Dimension]
@@ -104,11 +104,13 @@ impl Group {
             .partition(Result::is_ok);
 
         if !e.is_empty() {
-            return Err(format!(
-                "Dimensions not found: {:?}",
-                e.into_iter().map(Result::unwrap_err).collect::<Vec<_>>()
-            )
-            .into());
+            let mut s = String::new();
+            s.push_str("dimension(s)");
+            for x in e.into_iter() {
+                s.push(' ');
+                s.push_str(x.unwrap_err());
+            }
+            return Err(error::Error::NotFound(s));
         }
 
         let d = d.into_iter().map(Result::unwrap).collect::<Vec<_>>();

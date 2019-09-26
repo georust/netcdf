@@ -161,7 +161,7 @@ impl Attribute {
                     .collect::<Vec<_>>();
                 Ok(AttrValue::Str(String::from_utf8(value).unwrap()))
             }
-            x => Err(format!("Unknown nc_type encountered: {}", x).into()),
+            x => Err(error::Error::TypeUnknown(x)),
         }
     }
 }

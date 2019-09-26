@@ -131,16 +131,11 @@ macro_rules! impl_numeric {
                 let indices = match indices {
                     Some(x) => {
                         if x.len() != variable.dimensions.len() {
-                            return Err(
-                                "`indices` must has the same length as the variable dimensions"
-                                    .into(),
-                            );
+                            return Err(error::Error::IndexLen);
                         }
                         for i in 0..x.len() {
                             if x[i] >= variable.dimensions[i].len {
-                                return Err(
-                                    "requested index is bigger than the dimension length".into()
-                                );
+                                return Err(error::Error::IndexMismatch);
                             }
                         }
                         x
@@ -186,9 +181,7 @@ macro_rules! impl_numeric {
                     variable,
                     indices,
                     Some(slice_len),
-                    values
-                        .as_slice_mut()
-                        .ok_or_else(|| error::Error::Crate("Values is emtpy".to_string()))?,
+                    values.as_slice_mut().ok_or(error::Error::ZeroSlice)?,
                 )?;
 
                 Ok(values)
@@ -204,10 +197,7 @@ macro_rules! impl_numeric {
                 let indices = match indices {
                     Some(x) => {
                         if x.len() != variable.dimensions.len() {
-                            return Err(
-                                "`indices` must has the same length as the variable dimensions"
-                                    .into(),
-                            );
+                            return Err(error::Error::IndexLen);
                         };
                         x
                     }
@@ -220,10 +210,7 @@ macro_rules! impl_numeric {
                 let slice_len = match slice_len {
                     Some(x) => {
                         if x.len() != variable.dimensions.len() {
-                            return Err(
-                                "`slice_len` must have the same length as the variable dimsensions"
-                                    .into(),
-                            );
+                            return Err(error::Error::SliceLen);
                         }
                         x
                     }
@@ -241,19 +228,22 @@ macro_rules! impl_numeric {
                 let mut values_len = None;
                 for i in 0..indices.len() {
                     if indices[i] >= variable.dimensions[i].len {
-                        return Err("requested index is bigger than the dimension length".into());
+                        return Err(error::Error::IndexMismatch);
                     }
                     if (indices[i] + slice_len[i]) > variable.dimensions[i].len {
-                        return Err("requested slice is bigger than the dimension length".into());
+                        return Err(error::Error::SliceMismatch);
                     }
                     values_len = Some(values_len.unwrap_or(1) * slice_len[i]);
                     // Compute the full size of the request values
                     if slice_len[i] == 0 {
-                        return Err("Each slice element must be superior than 0".into());
+                        return Err(error::Error::ZeroSlice);
                     }
                 }
                 if values_len.is_none() || values_len.unwrap() != values.len() {
-                    return Err("number of elements in `values` doesn't match `slice_len`".into());
+                    return Err(error::Error::BufferLen(
+                        values.len(),
+                        values_len.unwrap_or(0),
+                    ));
                 }
 
                 let err: nc_type;
@@ -285,16 +275,11 @@ macro_rules! impl_numeric {
                 let indices = match indices {
                     Some(x) => {
                         if x.len() != variable.dimensions.len() {
-                            return Err(
-                                "`indices` must has the same length as the variable dimensions"
-                                    .into(),
-                            );
+                            return Err(error::Error::IndexLen);
                         }
                         for i in 0..x.len() {
                             if x[i] >= variable.dimensions[i].len {
-                                return Err(
-                                    "requested index is bigger than the dimension length".into()
-                                );
+                                return Err(error::Error::IndexMismatch);
                             }
                         }
                         x
@@ -328,10 +313,7 @@ macro_rules! impl_numeric {
                 let indices = match indices {
                     Some(x) => {
                         if x.len() != variable.dimensions.len() {
-                            return Err(
-                                "`slice` must has the same length as the variable dimensions"
-                                    .into(),
-                            );
+                            return Err(error::Error::IndexLen);
                         };
                         x
                     }
@@ -358,19 +340,22 @@ macro_rules! impl_numeric {
                 let mut values_len = None;
                 for i in 0..indices.len() {
                     if indices[i] >= variable.dimensions[i].len {
-                        return Err("requested index is bigger than the dimension length".into());
+                        return Err(error::Error::IndexMismatch);
                     }
                     if (indices[i] + slice_len[i]) > variable.dimensions[i].len {
-                        return Err("requested slice is bigger than the dimension length".into());
+                        return Err(error::Error::SliceMismatch);
                     }
                     // Check for empty slice
                     if slice_len[i] == 0 {
-                        return Err("Each slice element must be superior than 0".into());
+                        return Err(error::Error::ZeroSlice);
                     }
                     values_len = Some(values_len.unwrap_or(1) * slice_len[i]);
                 }
                 if values_len.is_none() || values_len.unwrap() != values.len() {
-                    return Err("number of elements in `values` doesn't match `slice_len`".into());
+                    return Err(error::Error::BufferLen(
+                        values.len(),
+                        values_len.unwrap_or(0),
+                    ));
                 }
 
                 let err: nc_type;
@@ -592,7 +577,7 @@ impl Variable {
         T: Numeric + Into<super::attribute::AttrValue>,
     {
         if T::NCTYPE != self.vartype {
-            return Err("Fill type is not equal to variable type".into());
+            return Err(error::Error::TypeMismatch);
         }
         let _l = LOCK.lock().unwrap();
         let err: nc_type;
@@ -618,7 +603,7 @@ impl Variable {
     /// Get the fill value of a variable
     pub fn fill_value<T: Numeric>(&self) -> error::Result<Option<T>> {
         if T::NCTYPE != self.vartype {
-            return Err("Fill type is not equal to variable type".into());
+            return Err(error::Error::TypeMismatch);
         }
         let mut location = std::mem::MaybeUninit::uninit();
         let mut nofill: nc_type = 0;
