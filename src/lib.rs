@@ -5,34 +5,33 @@
 //! Read:
 //!
 //! ```no_run
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Open file simple_xy.nc:
-//! let file = netcdf::open("simle_xy.nc").unwrap();
+//! let file = netcdf::open("simle_xy.nc")?;
 //!
 //! // Access any variable, attribute, or dimension through lookups on hashmaps
 //! let var = &file.variables()["data"];
 //!
 //! // Read variable as numeric types
-//! let data : i32 = var.value::<i32>(None).unwrap();
+//! let data_i32 = var.value::<i32>(None)?;
+//! let data_f32 : f32 = var.value(None)?;
 //!
 //! // You can also use values() to read the variable, data will be implicitly casted
-//! // if needed. Pass None when you don't care about the hyperslab (get all data)
-//! #[cfg(feature = "memory")]
-//! {
-//! let data  = var.values::<i32>(None, None).unwrap();
-//!
-//! // All variable data is read into an ndarray (optional feature)
-//! println!("{}", data);
-//! }
+//! // if needed. Pass (None, None) when you don't care about the hyperslab indexes (get all data)
+//! # #[cfg(feature = "ndarray")]
+//! let data = var.values::<i32>(None, None)?;
+//! # Ok(()) }
 //! ```
 //!
 //! Write:
 //!
 //! ```no_run
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Write
-//! let mut file = netcdf::create("crabs2.nc").unwrap();
+//! let mut file = netcdf::create("crabs2.nc")?;
 //!
 //! let dim_name = "ncrabs";
-//! file.add_dimension(dim_name, 10).unwrap();
+//! file.add_dimension(dim_name, 10)?;
 //!
 //! let var_name = "crab_coolness_level";
 //! let data : Vec<i32> = vec![42; 10];
@@ -40,15 +39,17 @@
 //! let var = file.add_variable::<i32>(
 //!             var_name,
 //!             &[dim_name],
-//! ).unwrap();
+//! )?;
 //! var.put_values(&data, None, None);
+//! # Ok(()) }
 //! ```
 //!
 //! Append:
 //! ```no_run
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // You can also modify a Variable inside an existing netCDF file
 //! // open it in read/write mode
-//! let mut file = netcdf::append("crabs2.nc").unwrap();
+//! let mut file = netcdf::append("crabs2.nc")?;
 //! // get a mutable binding of the variable "crab_coolness_level"
 //! let mut var = file.variable_mut("crab_coolness_level").unwrap();
 //!
@@ -57,6 +58,7 @@
 //! var.put_values(&data, Some(&[2]), Some(&[5]));
 //! // Change the first value of `var` into '999'
 //! var.put_value(999.0f32, Some(&[0]));
+//! # Ok(()) }
 //! ```
 
 use lazy_static::lazy_static;
