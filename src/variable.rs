@@ -611,7 +611,6 @@ impl Variable {
             name: "_FillValue".into(),
             ncid: self.ncid,
             varid: self.varid,
-            value: Some(fill_value.into()),
         };
         self.attributes.insert("_FillValue".into(), a);
         Ok(())

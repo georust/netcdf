@@ -277,7 +277,6 @@ fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String
             name: name.clone(),
             ncid,
             varid,
-            value: None,
         };
         attributes.insert(name, a);
     }

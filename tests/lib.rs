@@ -73,7 +73,7 @@ fn global_attrs() {
     let file = netcdf::File::open(&f).unwrap();
 
     let ch1_attr = &file.root().attributes()["CH1_DARK_COUNT"];
-    let chi = ch1_attr.value();
+    let chi = ch1_attr.value().unwrap();
     let eps = 1e-6;
     if let AttrValue::Float(x) = chi {
         assert!((x - 40.65863).abs() < eps);
@@ -82,7 +82,7 @@ fn global_attrs() {
     }
 
     let sensor_attr = &file.root().attributes()["sensor"];
-    let sensor_data = sensor_attr.value();
+    let sensor_data = sensor_attr.value().unwrap();
     if let AttrValue::Str(x) = sensor_data {
         assert_eq!("AVHRR/3", x);
     } else {
@@ -169,7 +169,7 @@ fn open_pres_temp_4d() {
 
     // test var attributes
     assert_eq!(
-        pres.attributes()["units"].value(),
+        pres.attributes()["units"].value().unwrap(),
         AttrValue::Str("hPa".to_string())
     );
 }
@@ -317,21 +317,25 @@ fn def_dims_vars_attrs() {
         use netcdf::attribute::AttrValue;
         assert_eq!(
             AttrValue::Int(3),
-            file.root().attributes()["testattr1"].value()
+            file.root().attributes()["testattr1"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Str("Global string attr".into()),
-            file.root().attributes()["testattr2"].value()
+            file.root().attributes()["testattr2"].value().unwrap()
         );
 
         // verify var attrs
         assert_eq!(
             AttrValue::Int(5),
-            file.root().variables()[var_name].attributes()["varattr1"].value()
+            file.root().variables()[var_name].attributes()["varattr1"]
+                .value()
+                .unwrap()
         );
         assert_eq!(
             AttrValue::Str("Variable string attr".into()),
-            file.root().variables()[var_name].attributes()["varattr2"].value()
+            file.root().variables()[var_name].attributes()["varattr2"]
+                .value()
+                .unwrap()
         );
     }
 }
@@ -538,51 +542,51 @@ fn all_attr_types() {
 
         assert_eq!(
             AttrValue::Uchar(3),
-            file.root().attributes()["attr_ubyte"].value()
+            file.root().attributes()["attr_ubyte"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Schar(3),
-            file.root().attributes()["attr_byte"].value()
+            file.root().attributes()["attr_byte"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Ushort(3),
-            file.root().attributes()["attr_ushort"].value()
+            file.root().attributes()["attr_ushort"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Short(3),
-            file.root().attributes()["attr_short"].value()
+            file.root().attributes()["attr_short"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Int(3),
-            file.root().attributes()["attr_int"].value()
+            file.root().attributes()["attr_int"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Uint(3),
-            file.root().attributes()["attr_uint"].value()
+            file.root().attributes()["attr_uint"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Ulonglong(3),
-            file.root().attributes()["attr_uint64"].value()
+            file.root().attributes()["attr_uint64"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Longlong(3),
-            file.root().attributes()["attr_int64"].value()
+            file.root().attributes()["attr_int64"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Float(3.2),
-            file.root().attributes()["attr_float"].value()
+            file.root().attributes()["attr_float"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Double(3.2),
-            file.root().attributes()["attr_double"].value()
+            file.root().attributes()["attr_double"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Str("Hello world!".into()),
-            file.root().attributes()["attr_text"].value()
+            file.root().attributes()["attr_text"].value().unwrap()
         );
         assert_eq!(
             AttrValue::Str(u8string.into()),
-            file.root().attributes()["attr_text_utf8"].value()
+            file.root().attributes()["attr_text_utf8"].value().unwrap()
         );
     }
 }
@@ -734,7 +738,7 @@ fn set_fill_value() {
     assert_eq!(rvar, [fill_value, 2, 3]);
 
     let var = &file_w.root().variables()[var_name];
-    let attr = var.attributes()["_FillValue"].value();
+    let attr = var.attributes()["_FillValue"].value().unwrap();
     // compare requested fill_value and attribute _FillValue
     use netcdf::attribute::AttrValue;
     assert_eq!(AttrValue::Int(fill_value), attr);

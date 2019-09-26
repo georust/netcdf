@@ -10,18 +10,13 @@ pub struct Attribute {
     pub(crate) ncid: nc_type,
     /// Variable/global this id is connected to
     pub(crate) varid: nc_type,
-    pub(crate) value: Option<AttrValue>,
 }
 
 impl Attribute {
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn value(&self) -> AttrValue {
-        if let Some(x) = self.value.clone() {
-            return x;
-        }
-        // This should lazy read the value when implementing reading
+    pub fn value(&self) -> error::Result<AttrValue> {
         let mut typ = 0;
         let err;
         let cname = std::ffi::CString::new(self.name.clone()).unwrap();
@@ -29,10 +24,7 @@ impl Attribute {
             err = nc_inq_atttype(self.ncid, self.varid, cname.as_ptr(), &mut typ);
         }
         if err != NC_NOERR {
-            panic!(
-                "Could not read the value of the attribute {} ({})",
-                self.name, err
-            );
+            return Err(err.into());
         }
         match typ {
             NC_UBYTE => {
@@ -42,9 +34,9 @@ impl Attribute {
                     err = nc_get_att_uchar(self.ncid, self.varid, cname.as_ptr(), &mut value);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
-                AttrValue::Uchar(value)
+                Ok(AttrValue::Uchar(value))
             }
             NC_BYTE => {
                 let mut value = 0;
@@ -53,9 +45,9 @@ impl Attribute {
                     err = nc_get_att_schar(self.ncid, self.varid, cname.as_ptr(), &mut value);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
-                AttrValue::Schar(value)
+                Ok(AttrValue::Schar(value))
             }
             NC_SHORT => {
                 let mut value = 0;
@@ -64,9 +56,9 @@ impl Attribute {
                     err = nc_get_att_short(self.ncid, self.varid, cname.as_ptr(), &mut value);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
-                AttrValue::Short(value)
+                Ok(AttrValue::Short(value))
             }
             NC_USHORT => {
                 let mut value = 0;
@@ -75,9 +67,9 @@ impl Attribute {
                     err = nc_get_att_ushort(self.ncid, self.varid, cname.as_ptr(), &mut value);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
-                AttrValue::Ushort(value)
+                Ok(AttrValue::Ushort(value))
             }
             NC_INT => {
                 let mut value = 0;
@@ -86,9 +78,9 @@ impl Attribute {
                     err = nc_get_att_int(self.ncid, self.varid, cname.as_ptr(), &mut value);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
-                AttrValue::Int(value)
+                Ok(AttrValue::Int(value))
             }
             NC_UINT => {
                 let mut value = 0;
@@ -97,9 +89,9 @@ impl Attribute {
                     err = nc_get_att_uint(self.ncid, self.varid, cname.as_ptr(), &mut value);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
-                AttrValue::Uint(value)
+                Ok(AttrValue::Uint(value))
             }
             NC_INT64 => {
                 let mut value = 0;
@@ -108,9 +100,9 @@ impl Attribute {
                     err = nc_get_att_longlong(self.ncid, self.varid, cname.as_ptr(), &mut value);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
-                AttrValue::Longlong(value)
+                Ok(AttrValue::Longlong(value))
             }
             NC_UINT64 => {
                 let mut value = 0;
@@ -119,9 +111,9 @@ impl Attribute {
                     err = nc_get_att_ulonglong(self.ncid, self.varid, cname.as_ptr(), &mut value);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
-                AttrValue::Ulonglong(value)
+                Ok(AttrValue::Ulonglong(value))
             }
             NC_FLOAT => {
                 let mut value = 0.0;
@@ -130,9 +122,9 @@ impl Attribute {
                     err = nc_get_att_float(self.ncid, self.varid, cname.as_ptr(), &mut value);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
-                AttrValue::Float(value)
+                Ok(AttrValue::Float(value))
             }
             NC_DOUBLE => {
                 let mut value = 0.0;
@@ -141,9 +133,9 @@ impl Attribute {
                     err = nc_get_att_double(self.ncid, self.varid, cname.as_ptr(), &mut value);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
-                AttrValue::Double(value)
+                Ok(AttrValue::Double(value))
             }
             NC_CHAR => {
                 let mut lentext = 0;
@@ -152,7 +144,7 @@ impl Attribute {
                     err = nc_inq_attlen(self.ncid, self.varid, cname.as_ptr(), &mut lentext);
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
                 let mut buf = vec![0; lentext];
                 let err;
@@ -160,16 +152,16 @@ impl Attribute {
                     err = nc_get_att_text(self.ncid, self.varid, cname.as_ptr(), buf.as_mut_ptr());
                 }
                 if err != NC_NOERR {
-                    panic!("Could not get value of attribute {} {}", self.name, err);
+                    return Err(err.into());
                 }
                 let value = buf
                     .into_iter()
                     .take_while(|x| *x != 0)
                     .map(|x| x as _)
                     .collect::<Vec<_>>();
-                AttrValue::Str(String::from_utf8(value).unwrap())
+                Ok(AttrValue::Str(String::from_utf8(value).unwrap()))
             }
-            x => panic!("Unknown nc_type encountered: {}", x),
+            x => Err(format!("Unknown nc_type encountered: {}", x).into()),
         }
     }
 }
@@ -251,7 +243,6 @@ impl Attribute {
             name: name.to_string(),
             ncid,
             varid,
-            value: Some(val),
         })
     }
 }
