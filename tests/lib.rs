@@ -175,21 +175,53 @@ fn open_pres_temp_4d() {
 }
 
 #[test]
-#[cfg(feature = "ndarray")]
-#[ignore]
 fn nc4_groups() {
     let f = test_location().join("simple_nc4.nc");
 
     let file = netcdf::File::open(&f).unwrap();
 
-    let grp1 = &file.root().sub_groups()["grp1"];
+    let grp1 = &file.groups()["grp1"];
     assert_eq!(grp1.name(), "grp1");
 
+    let mut data = vec![0i32; 6 * 12];
     let var = &grp1.variables().get("data").unwrap();
-    let data = var.values::<i32>(None, None).unwrap();
-    for x in 0..(6 * 12) {
-        assert_eq!(data.as_slice().unwrap()[x], x as i32);
+    var.values_to(&mut data, None, None).unwrap();
+    for (i, x) in data.iter().enumerate() {
+        assert_eq!(*x, i as i32);
     }
+}
+
+#[test]
+fn create_group_dimensions() {
+    let d = tempfile::tempdir().unwrap();
+    let filepath = d.path().join("create_group.nc");
+    let mut f = netcdf::File::create(filepath).unwrap();
+
+    f.add_dimension("x", 20).unwrap();
+
+    let g = &mut f.add_group("gp1").unwrap();
+
+    g.add_dimension("x", 100).unwrap();
+    g.add_variable::<u8>("y", &["x"]).unwrap();
+
+    let gg = &mut g.add_group("gp2").unwrap();
+    gg.add_variable::<i8>("y", &["x"]).unwrap();
+
+    gg.add_dimension("x", 30).unwrap();
+    gg.add_variable::<i8>("z", &["x"]).unwrap();
+
+    assert_eq!(
+        f.groups()["gp1"].variables()["y"].dimensions()[0].len(),
+        100
+    );
+    assert_eq!(
+        f.groups()["gp1"].groups()["gp2"].variables()["y"].dimensions()[0].len(),
+        100
+    );
+    assert_eq!(
+        f.groups()["gp1"].groups()["gp2"].variables()["z"].dimensions()[0].len(),
+        30
+    );
 }
 
 // Write tests
@@ -783,8 +815,8 @@ fn read_from_memory() {
     (*file).root().variables()["data"]
         .values_to(&mut v, None, None)
         .unwrap();
-    for i in 0..6 * 12 {
-        assert_eq!(v[i], i as _);
+    for (i, v) in v.iter().enumerate() {
+        assert_eq!(*v, i as _);
     }
 }
 

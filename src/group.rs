@@ -13,8 +13,9 @@ pub struct Group {
     pub(crate) grpid: Option<nc_type>,
     pub(crate) variables: HashMap<String, Variable>,
     pub(crate) attributes: HashMap<String, Attribute>,
+    pub(crate) parent_dimensions: Vec<HashMap<String, Dimension>>,
     pub(crate) dimensions: HashMap<String, Dimension>,
-    pub(crate) sub_groups: HashMap<String, Group>,
+    pub(crate) groups: HashMap<String, Group>,
 }
 
 impl Group {
@@ -36,11 +37,11 @@ impl Group {
     pub fn dimensions(&self) -> &HashMap<String, Dimension> {
         &self.dimensions
     }
-    pub fn sub_groups(&self) -> &HashMap<String, Group> {
-        &self.sub_groups
+    pub fn groups(&self) -> &HashMap<String, Group> {
+        &self.groups
     }
-    pub fn sub_groups_mut(&mut self, name: &str) -> Option<&mut Group> {
-        self.sub_groups.get_mut(name)
+    pub fn groups_mut(&mut self, name: &str) -> Option<&mut Group> {
+        self.groups.get_mut(name)
     }
 }
 
@@ -59,10 +60,20 @@ impl Group {
             return Err(format!("Dimension {} already exists", name).into());
         }
 
-        self.dimensions.insert(
-            name.into(),
-            Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?,
-        );
+        let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?;
+        self.dimensions.insert(name.into(), d.clone());
+
+        fn recursively_add_dim(depth: usize, name: &str, d: &Dimension, g: &mut Group) {
+            for (_, grp) in g.groups.iter_mut() {
+                grp.parent_dimensions[depth].insert(name.to_string(), d.clone());
+                recursively_add_dim(depth, name, d, grp);
+            }
+        }
+
+        let mydepth = self.parent_dimensions.len();
+        for (_, grp) in self.groups.iter_mut() {
+            recursively_add_dim(mydepth, name, &d, grp);
+        }
 
         Ok(self.dimensions.get_mut(name).unwrap())
     }
@@ -79,7 +90,17 @@ impl Group {
         // Assert all dimensions exists, and get &[&Dimension]
         let (d, e): (Vec<_>, Vec<_>) = dims
             .iter()
-            .map(|x| self.dimensions.get(*x).ok_or(*x))
+            .map(|name| {
+                if let Some(x) = self.dimensions.get(*name) {
+                    return Ok(x);
+                }
+                for pdim in self.parent_dimensions.iter().rev() {
+                    if let Some(x) = pdim.get(*name) {
+                        return Ok(x);
+                    }
+                }
+                Err(*name)
+            })
             .partition(Result::is_ok);
 
         if !e.is_empty() {
@@ -96,5 +117,34 @@ impl Group {
         self.variables.insert(name.into(), var);
 
         Ok(self.variables.get_mut(name).unwrap())
+    }
+
+    /// Add an empty group to the dataset
+    pub fn add_group(&mut self, name: &str) -> error::Result<&mut Group> {
+        let cstr = std::ffi::CString::new(name).unwrap();
+        let mut grpid = 0;
+        let err;
+        unsafe {
+            err = nc_def_grp(self.grpid.unwrap_or(self.ncid), cstr.as_ptr(), &mut grpid);
+        }
+        if err != NC_NOERR {
+            return Err(err.into());
+        }
+
+        let mut parent_dimensions = self.parent_dimensions.clone();
+        parent_dimensions.push(self.dimensions.clone());
+
+        let g = Group {
+            ncid: self.grpid.unwrap_or(self.ncid),
+            name: name.to_string(),
+            grpid: Some(grpid),
+            parent_dimensions,
+            attributes: Default::default(),
+            dimensions: Default::default(),
+            groups: Default::default(),
+            variables: Default::default(),
+        };
+        self.groups.insert(name.to_string(), g);
+        Ok(self.groups.get_mut(name).unwrap())
     }
 }

@@ -112,10 +112,11 @@ impl File {
             name: "root".to_string(),
             ncid,
             grpid: None,
-            variables: HashMap::new(),
-            attributes: HashMap::new(),
-            dimensions: HashMap::new(),
-            sub_groups: HashMap::new(),
+            variables: Default::default(),
+            attributes: Default::default(),
+            parent_dimensions: Default::default(),
+            dimensions: Default::default(),
+            groups: Default::default(),
         };
         Ok(File {
             ncid,
@@ -152,7 +153,7 @@ impl<'a> std::ops::DerefMut for MemFile<'a> {
 #[cfg(feature = "memory")]
 impl<'a> MemFile<'a> {
     pub fn new(name: Option<&str>, mem: &'a [u8]) -> error::Result<Self> {
-        let cstr = std::ffi::CString::new(name.unwrap_or(" ")).unwrap();
+        let cstr = std::ffi::CString::new(name.unwrap_or("/")).unwrap();
         let mut ncid = 0;
         let err;
         unsafe {
@@ -203,6 +204,9 @@ fn get_group_dimensions(ncid: nc_type) -> error::Result<HashMap<String, Dimensio
     if err != NC_NOERR {
         return Err(err.into());
     }
+    if ndims == 0 {
+        return Ok(HashMap::new());
+    }
     let mut dimids = vec![0 as nc_type; ndims as usize];
     let err;
     unsafe {
@@ -252,6 +256,9 @@ fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String
     if err != NC_NOERR {
         return Err(err.into());
     }
+    if natts == 0 {
+        return Ok(HashMap::new());
+    }
     let mut attributes = HashMap::with_capacity(natts as _);
     for i in 0..natts {
         let mut buf = [0u8; NC_MAX_NAME as usize + 1];
@@ -294,6 +301,9 @@ fn get_dimensions_of_var(ncid: nc_type, varid: nc_type) -> error::Result<Vec<Dim
     }
     if err != NC_NOERR {
         return Err(err.into());
+    }
+    if ndims == 0 {
+        return Ok(Vec::new());
     }
     let mut dimids = vec![0; ndims as usize];
     let err;
@@ -354,6 +364,9 @@ fn get_variables(ncid: nc_type) -> error::Result<HashMap<String, Variable>> {
     if err != NC_NOERR {
         return Err(err.into());
     }
+    if nvars == 0 {
+        return Ok(HashMap::new());
+    }
     let mut varids = vec![0; nvars as usize];
     let err;
     unsafe {
@@ -406,6 +419,67 @@ fn get_variables(ncid: nc_type) -> error::Result<HashMap<String, Variable>> {
     Ok(variables)
 }
 
+fn get_groups(
+    ncid: nc_type,
+    parent_dim: &[HashMap<String, Dimension>],
+) -> error::Result<HashMap<String, Group>> {
+    let err;
+    let mut ngroups = 0;
+
+    unsafe {
+        err = nc_inq_grps(ncid, &mut ngroups, std::ptr::null_mut());
+    }
+    if err != NC_NOERR {
+        return Err(err.into());
+    }
+    if ngroups == 0 {
+        return Ok(HashMap::new());
+    }
+    let err;
+    let mut grpids = vec![0; ngroups as usize];
+    unsafe {
+        err = nc_inq_grps(ncid, std::ptr::null_mut(), grpids.as_mut_ptr());
+    }
+    if err != NC_NOERR {
+        return Err(err.into());
+    }
+    let mut groups = HashMap::with_capacity(ngroups as usize);
+    for grpid in grpids.into_iter() {
+        let dimensions = get_group_dimensions(grpid)?;
+        let variables = get_variables(grpid)?;
+        let mut parent_dimensions = parent_dim.to_vec();
+        parent_dimensions.push(dimensions.clone());
+        let subgroups = get_groups(grpid, &parent_dimensions)?;
+        let attributes = get_attributes(grpid, NC_GLOBAL)?;
+
+        let mut cname = [0; NC_MAX_NAME as usize + 1];
+        let err;
+        unsafe {
+            err = nc_inq_grpname(grpid, cname.as_mut_ptr());
+        }
+        if err != NC_NOERR {
+            return Err(err.into());
+        }
+        let name = unsafe { std::ffi::CStr::from_ptr(cname.as_ptr()) }
+            .to_string_lossy()
+            .to_string();
+
+        let g = Group {
+            name: name.clone(),
+            ncid,
+            grpid: Some(grpid),
+            attributes,
+            parent_dimensions: parent_dim.to_vec(),
+            dimensions,
+            variables,
+            groups: subgroups,
+        };
+        groups.insert(name, g);
+    }
+
+    Ok(groups)
+}
+
 fn parse_file(ncid: nc_type) -> error::Result<Group> {
     let _l = LOCK.lock().unwrap();
 
@@ -415,15 +489,17 @@ fn parse_file(ncid: nc_type) -> error::Result<Group> {
 
     let variables = get_variables(ncid)?;
 
-    let sub_groups = HashMap::new();
+    // Empty parent group
+    let groups = get_groups(ncid, &[])?;
 
     Ok(Group {
         ncid,
         grpid: None,
         name: "root".into(),
+        parent_dimensions: Default::default(),
         dimensions,
         attributes,
         variables,
-        sub_groups,
+        groups,
     })
 }
