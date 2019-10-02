@@ -112,3 +112,8 @@ lazy_static! {
     /// Use this when accessing netcdf functions
     pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());
 }
+
+#[cfg(feature = "indexmap")]
+use indexmap::IndexMap as HashMap;
+#[cfg(not(feature = "indexmap"))]
+use std::collections::HashMap;

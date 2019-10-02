@@ -2,7 +2,7 @@ use super::error;
 use super::group::Group;
 use super::LOCK;
 use netcdf_sys::*;
-use std::collections::HashMap;
+use super::HashMap;
 use std::ffi::CString;
 use std::path;
 
@@ -365,7 +365,7 @@ fn get_dimensions_of_var(
         let d = Dimension {
             ncid,
             name,
-            len: len,
+            len,
             id: dimid,
         };
         dimensions.push(d);

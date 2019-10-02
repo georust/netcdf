@@ -6,7 +6,7 @@ use super::LOCK;
 #[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
 use netcdf_sys::*;
-use std::collections::HashMap;
+use super::HashMap;
 use std::marker::Sized;
 
 /// This struct defines a netCDF variable.

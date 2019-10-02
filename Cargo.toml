@@ -1,6 +1,6 @@
 [package]
 name = "netcdf"
-version = "0.3.1"
+version = "0.3.2"
 authors = [
     "Michael Hiley <mike.hiley@ssec.wisc.edu>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -19,6 +19,7 @@ memory = ["netcdf-sys/memio"]
 [dependencies]
 lazy_static = "1.4.0"
 ndarray = { version = "0.12.*", optional = true }
+indexmap = { version = "1.2.*", optional = true }
 
 [dev-dependencies]
 tempfile = "3.1.0"

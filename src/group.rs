@@ -4,7 +4,7 @@ use super::dimension::Dimension;
 use super::error;
 use super::variable::{Numeric, Variable};
 use netcdf_sys::*;
-use std::collections::HashMap;
+use super::HashMap;
 
 #[derive(Debug)]
 pub struct Group {
