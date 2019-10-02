@@ -883,7 +883,11 @@ fn unlimited_dimension_single_putting() {
 
 fn check_equal<T>(var: &netcdf::Variable, check: &[T])
 where
-    T: netcdf::variable::Numeric + std::clone::Clone + std::default::Default + std::fmt::Debug + std::cmp::PartialEq,
+    T: netcdf::variable::Numeric
+        + std::clone::Clone
+        + std::default::Default
+        + std::fmt::Debug
+        + std::cmp::PartialEq,
 {
     let mut v: Vec<T> = vec![Default::default(); check.len()];
     var.values_to(&mut v, None, None).unwrap();
@@ -905,7 +909,8 @@ fn unlimited_dimension_multi_putting() {
     let var = &mut file.add_variable::<u8>("one_unlim", &["x", "z"]).unwrap();
     var.put_values(&[0u8, 1, 2, 3], None, None).unwrap();
     check_equal(var, &[0u8, 1, 2, 3]);
-    var.put_values(&[0u8, 1, 2, 3, 4, 5, 6, 7], None, None).unwrap();
+    var.put_values(&[0u8, 1, 2, 3, 4, 5, 6, 7], None, None)
+        .unwrap();
     check_equal(var, &[0u8, 1, 2, 3, 4, 5, 6, 7]);
 
     let var = &mut file
@@ -913,14 +918,16 @@ fn unlimited_dimension_multi_putting() {
         .unwrap();
     var.put_values(&[0u8, 1, 2, 3], None, None).unwrap();
     check_equal(var, &[0u8, 1, 2, 3]);
-    var.put_values(&[0u8, 1, 2, 3, 4, 5, 6, 7], None, None).unwrap();
+    var.put_values(&[0u8, 1, 2, 3, 4, 5, 6, 7], None, None)
+        .unwrap();
     check_equal(var, &[0u8, 1, 2, 3, 4, 5, 6, 7]);
 
     let var = &mut file.add_variable::<u8>("two_unlim", &["x3", "x4"]).unwrap();
     var.set_fill_value(0u8).unwrap();
     let e = var.put_values(&[0u8, 1, 2, 3], None, None);
     assert_eq!(e.unwrap_err(), netcdf::error::Error::Ambiguous);
-    var.put_values(&[0u8, 1, 2, 3], None, Some(&[1, 4])).unwrap();
+    var.put_values(&[0u8, 1, 2, 3], None, Some(&[1, 4]))
+        .unwrap();
     check_equal(var, &[0u8, 1, 2, 3]);
     var.put_values(&[4u8, 5, 6], None, Some(&[3, 1])).unwrap();
 

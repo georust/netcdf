@@ -2,11 +2,11 @@ use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
+use super::HashMap;
 use super::LOCK;
 #[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
 use netcdf_sys::*;
-use super::HashMap;
 use std::marker::Sized;
 
 /// This struct defines a netCDF variable.

@@ -3,8 +3,8 @@ use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
 use super::variable::{Numeric, Variable};
-use netcdf_sys::*;
 use super::HashMap;
+use netcdf_sys::*;
 
 #[derive(Debug)]
 pub struct Group {
@@ -55,6 +55,7 @@ impl Group {
         Ok(())
     }
 
+    /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&mut Dimension> {
         if self.dimensions.contains_key(name) {
             return Err(error::Error::AlreadyExists("dimension".into()));
@@ -78,6 +79,7 @@ impl Group {
         Ok(self.dimensions.get_mut(name).unwrap())
     }
 
+    /// Adds a dimension with unbounded size
     pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<&mut Dimension> {
         self.add_dimension(name, 0)
     }

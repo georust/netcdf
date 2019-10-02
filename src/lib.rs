@@ -16,8 +16,8 @@
 //! let data_i32 = var.value::<i32>(None)?;
 //! let data_f32 : f32 = var.value(None)?;
 //!
-//! // You can also use values() to read the variable, data will be implicitly casted
-//! // if needed. Pass (None, None) when you don't care about the hyperslab indexes (get all data)
+//! // You can also use values() to read the variable, data will be read as the type given as type parameter (in this case T=i32)
+//! // Pass (None, None) when you don't care about the hyperslab indexes (get all data)
 //! # #[cfg(feature = "ndarray")]
 //! let data = var.values::<i32>(None, None)?;
 //! # Ok(()) }
@@ -55,7 +55,7 @@
 //!
 //! let data : Vec<i32> = vec![100; 10];
 //! // write 5 first elements of the vector `data` into `var` starting at index 2;
-//! var.put_values(&data, Some(&[2]), Some(&[5]));
+//! var.put_values(&data[..5], Some(&[2]), Some(&[5]));
 //! // Change the first value of `var` into '999'
 //! var.put_value(999.0f32, Some(&[0]));
 //! # Ok(()) }

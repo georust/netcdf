@@ -1,8 +1,8 @@
 use super::error;
 use super::group::Group;
+use super::HashMap;
 use super::LOCK;
 use netcdf_sys::*;
-use super::HashMap;
 use std::ffi::CString;
 use std::path;
 
@@ -18,10 +18,13 @@ impl File {
         &self.name
     }
 
+    /// Main entrypoint for interacting with the netcdf file. Also accesible
+    /// through the `Deref` trait on `File`
     pub fn root(&self) -> &Group {
         &self.root
     }
 
+    /// Mutable access to the root group
     pub fn root_mut(&mut self) -> &mut Group {
         &mut self.root
     }
@@ -130,7 +133,15 @@ impl File {
 /// The memory mapped file is kept in this structure to keep the
 /// lifetime of the buffer longer than the file.
 ///
-/// Access the [`File`] through the traits `Deref` or `DerefMut`
+/// Access the [`File`] through the traits `Deref` or `DerefMut`,
+/// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let buffer = &[0, 42, 1, 2];
+/// let file = &netcdf::MemFile::new(None, buffer)?;
+///
+/// let variables = file.variables();
+/// # Ok(()) }
+/// ```
 pub struct MemFile<'a> {
     file: File,
     _buffer: std::marker::PhantomData<&'a [u8]>,
@@ -152,6 +163,7 @@ impl<'a> std::ops::DerefMut for MemFile<'a> {
 
 #[cfg(feature = "memory")]
 impl<'a> MemFile<'a> {
+    /// Open a file from the given buffer
     pub fn new(name: Option<&str>, mem: &'a [u8]) -> error::Result<Self> {
         let cstr = std::ffi::CString::new(name.unwrap_or("/")).unwrap();
         let mut ncid = 0;
