@@ -856,3 +856,73 @@ fn add_conflicting_variables() {
     );
     assert_eq!(10, file.variables()["x"].dimensions()[0].len());
 }
+
+#[test]
+fn unlimited_dimension_single_putting() {
+    let d = tempfile::tempdir().unwrap();
+    let mut file = netcdf::create(d.path().join("unlim_single.nc")).unwrap();
+
+    file.add_unlimited_dimension("x").unwrap();
+    file.add_unlimited_dimension("y").unwrap();
+
+    let var = &mut file.add_variable::<u8>("var", &["x", "y"]).unwrap();
+    var.set_fill_value(0u8).unwrap();
+
+    var.put_value(1, None).unwrap();
+    assert_eq!(var.dimensions()[0].len(), 1);
+    assert_eq!(var.dimensions()[1].len(), 1);
+    var.put_value(2, Some(&[0, 1])).unwrap();
+    assert_eq!(var.dimensions()[0].len(), 1);
+    assert_eq!(var.dimensions()[1].len(), 2);
+    var.put_value(3, Some(&[2, 0])).unwrap();
+    assert_eq!(var.dimensions()[0].len(), 3);
+    assert_eq!(var.dimensions()[1].len(), 2);
+
+    check_equal(var, &[1, 2, 0, 0, 3, 0]);
+}
+
+fn check_equal<T>(var: &netcdf::Variable, check: &[T])
+where
+    T: netcdf::variable::Numeric + std::clone::Clone + std::default::Default + std::fmt::Debug + std::cmp::PartialEq,
+{
+    let mut v: Vec<T> = vec![Default::default(); check.len()];
+    var.values_to(&mut v, None, None).unwrap();
+    assert_eq!(v.as_slice(), check);
+}
+
+#[test]
+fn unlimited_dimension_multi_putting() {
+    let d = tempfile::tempdir().unwrap();
+    let mut file = netcdf::create(d.path().join("unlim_multi.nc")).unwrap();
+
+    file.add_unlimited_dimension("x").unwrap();
+    file.add_unlimited_dimension("y").unwrap();
+    file.add_dimension("z", 2).unwrap();
+    file.add_unlimited_dimension("x2").unwrap();
+    file.add_unlimited_dimension("x3").unwrap();
+    file.add_unlimited_dimension("x4").unwrap();
+
+    let var = &mut file.add_variable::<u8>("one_unlim", &["x", "z"]).unwrap();
+    var.put_values(&[0u8, 1, 2, 3], None, None).unwrap();
+    check_equal(var, &[0u8, 1, 2, 3]);
+    var.put_values(&[0u8, 1, 2, 3, 4, 5, 6, 7], None, None).unwrap();
+    check_equal(var, &[0u8, 1, 2, 3, 4, 5, 6, 7]);
+
+    let var = &mut file
+        .add_variable::<u8>("unlim_first", &["z", "x2"])
+        .unwrap();
+    var.put_values(&[0u8, 1, 2, 3], None, None).unwrap();
+    check_equal(var, &[0u8, 1, 2, 3]);
+    var.put_values(&[0u8, 1, 2, 3, 4, 5, 6, 7], None, None).unwrap();
+    check_equal(var, &[0u8, 1, 2, 3, 4, 5, 6, 7]);
+
+    let var = &mut file.add_variable::<u8>("two_unlim", &["x3", "x4"]).unwrap();
+    var.set_fill_value(0u8).unwrap();
+    let e = var.put_values(&[0u8, 1, 2, 3], None, None);
+    assert_eq!(e.unwrap_err(), netcdf::error::Error::Ambiguous);
+    var.put_values(&[0u8, 1, 2, 3], None, Some(&[1, 4])).unwrap();
+    check_equal(var, &[0u8, 1, 2, 3]);
+    var.put_values(&[4u8, 5, 6], None, Some(&[3, 1])).unwrap();
+
+    check_equal(var, &[4, 1, 2, 3, 5, 0, 0, 0, 6, 0, 0, 0]);
+}

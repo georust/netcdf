@@ -78,6 +78,10 @@ impl Group {
         Ok(self.dimensions.get_mut(name).unwrap())
     }
 
+    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<&mut Dimension> {
+        self.add_dimension(name, 0)
+    }
+
     /// Create a Variable into the dataset, without writting any data into it.
     pub fn add_variable<T>(&mut self, name: &str, dims: &[&str]) -> error::Result<&mut Variable>
     where

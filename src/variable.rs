@@ -134,7 +134,7 @@ macro_rules! impl_numeric {
                             return Err(error::Error::IndexLen);
                         }
                         for i in 0..x.len() {
-                            if x[i] >= variable.dimensions[i].len {
+                            if x[i] >= variable.dimensions[i].len() {
                                 return Err(error::Error::IndexMismatch);
                             }
                         }
@@ -170,7 +170,7 @@ macro_rules! impl_numeric {
                 let slice_len = match slice_len {
                     Some(x) => x,
                     None => {
-                        _slice_len = variable.dimensions.iter().map(|x| x.len).collect();
+                        _slice_len = variable.dimensions.iter().map(|x| x.len()).collect();
                         &_slice_len
                     }
                 };
@@ -219,7 +219,7 @@ macro_rules! impl_numeric {
                             .dimensions
                             .iter()
                             .zip(indices.iter())
-                            .map(|(x, i)| (x.len).wrapping_sub(*i))
+                            .map(|(x, i)| (x.len()).saturating_sub(*i))
                             .collect();
                         &_slice_len
                     }
@@ -227,10 +227,10 @@ macro_rules! impl_numeric {
 
                 let mut values_len = None;
                 for i in 0..indices.len() {
-                    if indices[i] >= variable.dimensions[i].len {
+                    if indices[i] >= variable.dimensions[i].len() {
                         return Err(error::Error::IndexMismatch);
                     }
-                    if (indices[i] + slice_len[i]) > variable.dimensions[i].len {
+                    if (indices[i] + slice_len[i]) > variable.dimensions[i].len() {
                         return Err(error::Error::SliceMismatch);
                     }
                     values_len = Some(values_len.unwrap_or(1) * slice_len[i]);
@@ -277,8 +277,9 @@ macro_rules! impl_numeric {
                         if x.len() != variable.dimensions.len() {
                             return Err(error::Error::IndexLen);
                         }
-                        for i in 0..x.len() {
-                            if x[i] >= variable.dimensions[i].len {
+                        // Checking indices matching the variable dims
+                        for (x, v) in x.iter().zip(&variable.dimensions) {
+                            if !v.is_unlimited() && *x >= v.len() {
                                 return Err(error::Error::IndexMismatch);
                             }
                         }
@@ -327,29 +328,63 @@ macro_rules! impl_numeric {
                 let slice_len = match slice_len {
                     Some(x) => x,
                     None => {
-                        _slice_len = variable
+                        let num_unlimited = variable
                             .dimensions
                             .iter()
-                            .zip(indices.iter())
-                            .map(|(x, i)| (x.len).wrapping_sub(*i))
-                            .collect();
-                        &_slice_len
+                            .fold(0, |acc, v| acc + v.is_unlimited() as usize);
+                        if num_unlimited == 0 {
+                            _slice_len = variable
+                                .dimensions
+                                .iter()
+                                .zip(indices.iter())
+                                .map(|(x, i)| x.len().saturating_sub(*i))
+                                .collect();
+                            &_slice_len
+                        } else if num_unlimited == 1 {
+                            let cube_length = variable.dimensions.iter().fold(1, |acc, x| {
+                                if x.is_unlimited() {
+                                    acc
+                                } else {
+                                    acc * x.len()
+                                }
+                            });
+                            let len_unlim = values.len() / cube_length;
+                            _slice_len = variable
+                                .dimensions
+                                .iter()
+                                .zip(indices.iter())
+                                .map(|(x, i)| {
+                                    if x.is_unlimited() {
+                                        len_unlim
+                                    } else {
+                                        x.len().saturating_sub(*i)
+                                    }
+                                })
+                                .collect();
+                            &_slice_len
+                        } else {
+                            return Err(error::Error::Ambiguous);
+                        }
                     }
                 };
 
                 let mut values_len = None;
-                for i in 0..indices.len() {
-                    if indices[i] >= variable.dimensions[i].len {
+                for ((i, v), s) in indices
+                    .iter()
+                    .zip(variable.dimensions.iter())
+                    .zip(slice_len.iter())
+                {
+                    if !v.is_unlimited() && *i > v.len() {
                         return Err(error::Error::IndexMismatch);
                     }
-                    if (indices[i] + slice_len[i]) > variable.dimensions[i].len {
+                    if !v.is_unlimited() && (*i + s) > v.len() {
                         return Err(error::Error::SliceMismatch);
                     }
                     // Check for empty slice
-                    if slice_len[i] == 0 {
+                    if *s == 0 {
                         return Err(error::Error::ZeroSlice);
                     }
-                    values_len = Some(values_len.unwrap_or(1) * slice_len[i]);
+                    values_len = Some(values_len.unwrap_or(1usize).saturating_mul(*s));
                 }
                 if values_len.is_none() || values_len.unwrap() != values.len() {
                     return Err(error::Error::BufferLen(
@@ -360,7 +395,7 @@ macro_rules! impl_numeric {
 
                 let err: nc_type;
                 unsafe {
-                    let _g = LOCK.lock().unwrap();
+                    let _l = LOCK.lock().unwrap();
                     err = $nc_put_vara_type(
                         variable.ncid,
                         variable.varid,

@@ -195,7 +195,10 @@ impl Drop for File {
 
 use super::dimension::Dimension;
 
-fn get_group_dimensions(ncid: nc_type) -> error::Result<HashMap<String, Dimension>> {
+fn get_group_dimensions(
+    ncid: nc_type,
+    unlimited_dims: &[nc_type],
+) -> error::Result<HashMap<String, Dimension>> {
     let mut ndims: nc_type = 0;
     let err;
     unsafe {
@@ -233,9 +236,16 @@ fn get_group_dimensions(ncid: nc_type) -> error::Result<HashMap<String, Dimensio
             .map(|x| *x as u8)
             .collect();
         let name = String::from_utf8(name).unwrap();
+
+        let len = if unlimited_dims.contains(&dimid) {
+            None
+        } else {
+            Some(unsafe { core::num::NonZeroUsize::new_unchecked(len) })
+        };
         dimensions.insert(
             name.clone(),
             Dimension {
+                ncid,
                 name,
                 len,
                 id: dimid,
@@ -284,7 +294,11 @@ fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String
     Ok(attributes)
 }
 
-fn get_dimensions_of_var(ncid: nc_type, varid: nc_type) -> error::Result<Vec<Dimension>> {
+fn get_dimensions_of_var(
+    ncid: nc_type,
+    varid: nc_type,
+    unlimited_dims: &[nc_type],
+) -> error::Result<Vec<Dimension>> {
     let mut ndims = 0;
     let err;
     unsafe {
@@ -342,9 +356,16 @@ fn get_dimensions_of_var(ncid: nc_type, varid: nc_type) -> error::Result<Vec<Dim
         .unwrap();
         let name = cstr.to_string_lossy().into_owned();
 
+        let unlimited = unlimited_dims.contains(&dimid);
+        let len = if unlimited {
+            None
+        } else {
+            Some(unsafe { core::num::NonZeroUsize::new_unchecked(dimlen) })
+        };
         let d = Dimension {
+            ncid,
             name,
-            len: dimlen,
+            len: len,
             id: dimid,
         };
         dimensions.push(d);
@@ -354,7 +375,10 @@ fn get_dimensions_of_var(ncid: nc_type, varid: nc_type) -> error::Result<Vec<Dim
 }
 
 use super::Variable;
-fn get_variables(ncid: nc_type) -> error::Result<HashMap<String, Variable>> {
+fn get_variables(
+    ncid: nc_type,
+    unlimited_dims: &[nc_type],
+) -> error::Result<HashMap<String, Variable>> {
     let err;
     let mut nvars = 0;
     unsafe {
@@ -394,7 +418,7 @@ fn get_variables(ncid: nc_type) -> error::Result<HashMap<String, Variable>> {
             return Err(err.into());
         }
         let attributes = get_attributes(ncid, varid)?;
-        let dimensions = get_dimensions_of_var(ncid, varid)?;
+        let dimensions = get_dimensions_of_var(ncid, varid, unlimited_dims)?;
 
         let cstr = std::ffi::CString::new(
             name.into_iter()
@@ -444,8 +468,9 @@ fn get_groups(
     }
     let mut groups = HashMap::with_capacity(ngroups as usize);
     for grpid in grpids.into_iter() {
-        let dimensions = get_group_dimensions(grpid)?;
-        let variables = get_variables(grpid)?;
+        let unlim_dims = get_unlimited_dimensions(grpid)?;
+        let dimensions = get_group_dimensions(grpid, &unlim_dims)?;
+        let variables = get_variables(grpid, &unlim_dims)?;
         let mut parent_dimensions = parent_dim.to_vec();
         parent_dimensions.push(dimensions.clone());
         let subgroups = get_groups(grpid, &parent_dimensions)?;
@@ -479,14 +504,35 @@ fn get_groups(
     Ok(groups)
 }
 
+fn get_unlimited_dimensions(ncid: nc_type) -> error::Result<Vec<nc_type>> {
+    let err;
+    let mut nunlim = 0;
+    unsafe {
+        err = nc_inq_unlimdims(ncid, &mut nunlim, std::ptr::null_mut());
+    }
+    if err != NC_NOERR {
+        return Err(err.into());
+    }
+    let mut uldim = vec![0; nunlim as usize];
+    let err;
+    unsafe {
+        err = nc_inq_unlimdims(ncid, std::ptr::null_mut(), uldim.as_mut_ptr());
+    }
+    if err != NC_NOERR {
+        return Err(err.into());
+    }
+    Ok(uldim)
+}
+
 fn parse_file(ncid: nc_type) -> error::Result<Group> {
     let _l = LOCK.lock().unwrap();
 
-    let dimensions = get_group_dimensions(ncid)?;
+    let unlimited_dimensions = get_unlimited_dimensions(ncid)?;
+    let dimensions = get_group_dimensions(ncid, &unlimited_dimensions)?;
 
     let attributes = get_attributes(ncid, NC_GLOBAL)?;
 
-    let variables = get_variables(ncid)?;
+    let variables = get_variables(ncid, &unlimited_dimensions)?;
 
     // Empty parent group
     let groups = get_groups(ncid, &[])?;

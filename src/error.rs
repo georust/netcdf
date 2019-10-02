@@ -28,6 +28,8 @@ pub enum Error {
     AlreadyExists(String),
     /// Could not find variable/attribute/etc
     NotFound(String),
+    /// Slice lenghts are ambigious
+    Ambiguous,
 }
 
 impl std::error::Error for Error {
@@ -87,6 +89,7 @@ impl fmt::Display for Error {
 
                 write!(f, "netcdf error({}): {}", x, msg.to_string_lossy())
             }
+            Error::Ambiguous => write!(f, "Could not find an appropriate length of the slices"),
         }
     }
 }
