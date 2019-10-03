@@ -12,11 +12,11 @@ Supported:
 * Subgroups
 * Open/Append/Create modes
 * Reading from memory (read only for now)
+* Unlimited dimensions
 
 
 Not (yet) supported:
 
-* Unlimited dimensions
 * user defined types
 * string variables
 
