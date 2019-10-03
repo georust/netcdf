@@ -133,7 +133,7 @@ impl File {
 /// The memory mapped file is kept in this structure to keep the
 /// lifetime of the buffer longer than the file.
 ///
-/// Access the [`File`] through the traits `Deref` or `DerefMut`,
+/// Access the [`File`] through the `Deref` trait,
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let buffer = &[0, 42, 1, 2];
@@ -152,12 +152,6 @@ impl<'a> std::ops::Deref for MemFile<'a> {
     type Target = File;
     fn deref(&self) -> &Self::Target {
         &self.file
-    }
-}
-#[cfg(feature = "memory")]
-impl<'a> std::ops::DerefMut for MemFile<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.file
     }
 }
 
