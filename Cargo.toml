@@ -13,7 +13,7 @@ keywords = ["netcdf", "hdf", "hdf5", "libnetcdf", "netcdf4"]
 edition = "2018"
 
 [features]
-default = ["ndarray", "memory"]
+default = ["ndarray", "indexmap"]
 memory = ["netcdf-sys/memio"]
 
 [dependencies]
