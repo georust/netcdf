@@ -22,6 +22,7 @@ pub struct Variable {
     pub(crate) varid: nc_type,
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl Variable {
     pub fn name(&self) -> &str {
         &self.name
@@ -34,6 +35,10 @@ impl Variable {
     }
     pub fn vartype(&self) -> nc_type {
         self.vartype
+    }
+    /// Get current length of the variable
+    pub fn len(&self) -> usize {
+        self.dimensions.iter().map(|d| d.len()).product()
     }
     /// Sets compression on the variable. Must be set before filling in data
     pub fn compression(

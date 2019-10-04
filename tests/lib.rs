@@ -939,3 +939,20 @@ fn unlimited_dimension_multi_putting() {
 
     assert_eq!(v, &[4, 1, 2, 3, 5, 0, 0, 0, 6, 0, 0, 0]);
 }
+
+#[test]
+fn length_of_variable() {
+    let d = tempfile::tempdir().unwrap();
+    let mut file = netcdf::create(d.path().join("variable_length.nc")).unwrap();
+
+    file.add_dimension("x", 4).unwrap();
+    file.add_dimension("y", 6).unwrap();
+    file.add_unlimited_dimension("z").unwrap();
+
+    let var = &mut file.add_variable::<f32>("x", &["x", "y"]).unwrap();
+    assert_eq!(var.len(), 4 * 6);
+
+    let var = &mut file.add_variable::<f64>("z", &["x", "z"]).unwrap();
+    var.put_value(1u8, Some(&[2, 8])).unwrap();
+    assert_eq!(var.len(), 4 * 9);
+}
