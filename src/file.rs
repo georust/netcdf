@@ -45,12 +45,8 @@ impl std::ops::DerefMut for File {
 
 impl File {
     /// Open a netCDF file in read only mode.
-    pub fn open<P>(file: P) -> error::Result<File>
-    where
-        P: AsRef<path::Path>,
-    {
-        let data_path = file.as_ref();
-        let f = CString::new(data_path.to_str().unwrap()).unwrap();
+    pub fn open(path: &path::Path) -> error::Result<File> {
+        let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         let err: nc_type;
         unsafe {
@@ -65,18 +61,14 @@ impl File {
 
         Ok(File {
             ncid,
-            name: data_path.file_name().unwrap().to_string_lossy().to_string(),
+            name: path.file_name().unwrap().to_string_lossy().to_string(),
             root,
         })
     }
     /// Open a netCDF file in append mode (read/write).
     /// The file must already exist.
-    pub fn append<P>(file: P) -> error::Result<File>
-    where
-        P: AsRef<path::Path>,
-    {
-        let data_path = file.as_ref();
-        let f = CString::new(data_path.to_str().unwrap()).unwrap();
+    pub fn append(path: &path::Path) -> error::Result<File> {
+        let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         let err: nc_type;
         unsafe {
@@ -91,17 +83,13 @@ impl File {
 
         Ok(File {
             ncid,
-            name: data_path.file_name().unwrap().to_string_lossy().to_string(),
+            name: path.file_name().unwrap().to_string_lossy().to_string(),
             root,
         })
     }
     /// Open a netCDF file in creation mode (write only).
-    pub fn create<P>(file: P) -> error::Result<File>
-    where
-        P: AsRef<path::Path>,
-    {
-        let data_path = file.as_ref();
-        let f = CString::new(data_path.to_str().unwrap()).unwrap();
+    pub fn create(path: &path::Path) -> error::Result<File> {
+        let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         let err: nc_type;
         unsafe {
@@ -123,7 +111,7 @@ impl File {
         };
         Ok(File {
             ncid,
-            name: data_path.file_name().unwrap().to_string_lossy().to_string(),
+            name: path.file_name().unwrap().to_string_lossy().to_string(),
             root,
         })
     }

@@ -83,7 +83,7 @@ pub fn create<P>(name: P) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
 {
-    File::create(name)
+    File::create(name.as_ref())
 }
 
 /// Open a netcdf file in append mode
@@ -91,7 +91,7 @@ pub fn append<P>(name: P) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
 {
-    File::append(name)
+    File::append(name.as_ref())
 }
 
 /// Open a netcdf file in read mode
@@ -99,7 +99,7 @@ pub fn open<P>(name: P) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
 {
-    File::open(name)
+    File::open(name.as_ref())
 }
 
 #[cfg(feature = "memory")]

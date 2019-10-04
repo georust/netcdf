@@ -13,7 +13,7 @@ fn test_location() -> std::path::PathBuf {
 fn use_path_to_open() {
     let path = test_location().join("simple_xy.nc");
 
-    let _file = netcdf::File::open(path).unwrap();
+    let _file = netcdf::open(path).unwrap();
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn use_string_to_open() {
 #[test]
 fn bad_filename() {
     let f = test_location().join("blah_stuff.nc");
-    let res_file = netcdf::File::open(&f);
+    let res_file = netcdf::open(&f);
     assert_eq!(res_file.unwrap_err(), netcdf::error::Error::Netcdf(2));
 }
 
@@ -195,7 +195,7 @@ fn nc4_groups() {
 fn create_group_dimensions() {
     let d = tempfile::tempdir().unwrap();
     let filepath = d.path().join("create_group.nc");
-    let mut f = netcdf::File::create(filepath).unwrap();
+    let mut f = netcdf::create(filepath).unwrap();
 
     f.add_dimension("x", 20).unwrap();
 
@@ -417,7 +417,7 @@ fn all_var_types() {
     {
         // read
         let f = d.path().join(name);
-        let file = netcdf::File::open(f).unwrap();
+        let file = netcdf::open(f).unwrap();
 
         //byte
         let mut data = vec![0i8; 10];
