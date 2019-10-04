@@ -79,13 +79,15 @@ impl File {
             root,
         })
     }
-    /// Open a netCDF file in creation mode (write only).
+    /// Open a netCDF file in creation mode.
+    ///
+    /// Will overwrite existing file if any
     pub fn create(path: &path::Path) -> error::Result<File> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         unsafe {
             let _g = LOCK.lock().unwrap();
-            error::checked(nc_create(f.as_ptr(), NC_NETCDF4 | NC_NOCLOBBER, &mut ncid))?;
+            error::checked(nc_create(f.as_ptr(), NC_NETCDF4 | NC_CLOBBER, &mut ncid))?;
         }
 
         let root = Group {

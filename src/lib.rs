@@ -79,6 +79,8 @@ pub use group::*;
 pub use variable::*;
 
 /// Open a netcdf file in create mode
+///
+/// Will overwrite exising file
 pub fn create<P>(name: P) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
