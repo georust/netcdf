@@ -956,3 +956,29 @@ fn length_of_variable() {
     var.put_value(1u8, Some(&[2, 8])).unwrap();
     assert_eq!(var.len(), 4 * 9);
 }
+
+#[test]
+fn single_length_variable() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("single_length_variable.nc");
+    let mut file = netcdf::create(path).unwrap();
+
+    let var = &mut file.add_variable::<u8>("x", &[]).unwrap();
+
+    var.put_value(3u8, None).unwrap();
+    assert_eq!(var.value(Some(&[])), Ok(3u8));
+
+    var.put_values::<u8>(&[], None, None).unwrap_err();
+    assert_eq!(var.value(None), Ok(3u8));
+
+    var.put_values::<u8>(&[2, 3], None, None).unwrap_err();
+
+    var.put_values::<u8>(&[6], None, None).unwrap();
+    assert_eq!(var.value(None), Ok(6u8));
+
+    var.put_values::<u8>(&[8], Some(&[]), Some(&[])).unwrap();
+    assert_eq!(var.value(None), Ok(8u8));
+
+    var.put_values::<u8>(&[10], Some(&[1]), None).unwrap_err();
+    assert_eq!(var.value(None), Ok(8u8));
+}
