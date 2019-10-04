@@ -124,7 +124,11 @@ impl Variable {
             }
         }
 
-        let thislen = sizelen.iter().product();
+        let thislen = sizelen.iter().fold(1usize, |acc, &x| acc.saturating_mul(x));
+        if thislen == std::usize::MAX {
+            return Err(error::Error::Overflow);
+        }
+
         if totallen != thislen {
             return Err(error::Error::BufferLen(totallen, thislen));
         }
@@ -169,11 +173,17 @@ impl Variable {
         }
 
         if let Some(pos) = unlim_pos {
-            let l = sizelen.iter().product::<usize>();
+            let l = sizelen.iter().fold(1usize, |acc, &x| acc.saturating_mul(x));
+            if l == std::usize::MAX {
+                return Err(error::Error::Overflow);
+            }
             sizelen[pos] = totallen / l;
         }
 
-        let wantedlen = sizelen.iter().product::<usize>();
+        let wantedlen = sizelen.iter().fold(1usize, |acc, &x| acc.saturating_mul(x));
+        if wantedlen == std::usize::MAX {
+            return Err(error::Error::Overflow);
+        }
         if totallen != wantedlen {
             return Err(error::Error::BufferLen(totallen, wantedlen));
         }
@@ -483,7 +493,14 @@ impl Variable {
             }
         };
         let _slice_len: Vec<usize>;
-        let full_length = self.dimensions.iter().map(|d| d.len()).product::<usize>();
+        let full_length = self
+            .dimensions
+            .iter()
+            .map(|d| d.len())
+            .fold(1usize, |acc, x| acc.saturating_mul(x));
+        if full_length == std::usize::MAX {
+            return Err(error::Error::Overflow);
+        }
         let slice_len = match slice_len {
             Some(x) => {
                 self.check_sizelen(full_length, indices, x, false)?;

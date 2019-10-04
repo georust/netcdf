@@ -30,6 +30,8 @@ pub enum Error {
     NotFound(String),
     /// Slice lenghts are ambiguous
     Ambiguous,
+    /// Overflows possible lengths
+    Overflow,
 }
 
 impl std::error::Error for Error {
@@ -90,6 +92,7 @@ impl fmt::Display for Error {
                 write!(f, "netcdf error({}): {}", x, msg.to_string_lossy())
             }
             Error::Ambiguous => write!(f, "Could not find an appropriate length of the slices"),
+            Error::Overflow => write!(f, "slice would exceed maximum size of possible buffers"),
         }
     }
 }
