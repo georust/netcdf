@@ -662,39 +662,3 @@ impl Variable {
         Ok(Some(unsafe { location.assume_init() }))
     }
 }
-
-// Write support for all variable types
-pub trait PutVar {
-    const NCTYPE: nc_type;
-    fn put(&self, ncid: nc_type, varid: nc_type) -> error::Result<()>;
-}
-
-// This macro implements the trait PutVar for &[$type]
-// It just avoid code repetition for all numeric types
-// (the only difference between each type beeing the
-// netCDF funtion to call and the numeric identifier
-// of the type used by the libnetCDF library)
-macro_rules! impl_putvar {
-    ($type: ty, $nc_type: ident, $nc_put_var: ident) => {
-        impl PutVar for &[$type] {
-            const NCTYPE: nc_type = $nc_type;
-            fn put(&self, ncid: nc_type, varid: nc_type) -> error::Result<()> {
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
-                    error::checked($nc_put_var(ncid, varid, self.as_ptr()))?;
-                }
-                Ok(())
-            }
-        }
-    };
-}
-impl_putvar!(u8, NC_UBYTE, nc_put_var_uchar);
-impl_putvar!(i8, NC_BYTE, nc_put_var_schar);
-impl_putvar!(i16, NC_SHORT, nc_put_var_short);
-impl_putvar!(u16, NC_USHORT, nc_put_var_ushort);
-impl_putvar!(i32, NC_INT, nc_put_var_int);
-impl_putvar!(u32, NC_UINT, nc_put_var_uint);
-impl_putvar!(i64, NC_INT64, nc_put_var_longlong);
-impl_putvar!(u64, NC_UINT64, nc_put_var_ulonglong);
-impl_putvar!(f32, NC_FLOAT, nc_put_var_float);
-impl_putvar!(f64, NC_DOUBLE, nc_put_var_double);
