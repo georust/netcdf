@@ -878,7 +878,10 @@ fn unlimited_dimension_single_putting() {
     assert_eq!(var.dimensions()[0].len(), 3);
     assert_eq!(var.dimensions()[1].len(), 2);
 
-    check_equal(var, &[1, 2, 0, 0, 3, 0]);
+    let mut v = vec![0; 6];
+    var.values_to(&mut v, None, Some(&[3, 2])).unwrap();
+
+    assert_eq!(v, &[1, 2, 0, 0, 3, 0]);
 }
 
 fn check_equal<T>(var: &netcdf::Variable, check: &[T])
@@ -928,8 +931,13 @@ fn unlimited_dimension_multi_putting() {
     assert_eq!(e.unwrap_err(), netcdf::error::Error::Ambiguous);
     var.put_values(&[0u8, 1, 2, 3], None, Some(&[1, 4]))
         .unwrap();
-    check_equal(var, &[0u8, 1, 2, 3]);
+    let mut v = vec![0; 4];
+    var.values_to(&mut v, None, Some(&[1, 4])).unwrap();
+    assert_eq!(v, &[0u8, 1, 2, 3]);
     var.put_values(&[4u8, 5, 6], None, Some(&[3, 1])).unwrap();
 
-    check_equal(var, &[4, 1, 2, 3, 5, 0, 0, 0, 6, 0, 0, 0]);
+    let mut v = vec![0; 4 * 3];
+    var.values_to(&mut v, None, Some(&[3, 4])).unwrap();
+
+    assert_eq!(v, &[4, 1, 2, 3, 5, 0, 0, 0, 6, 0, 0, 0]);
 }

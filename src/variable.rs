@@ -61,6 +61,130 @@ impl Variable {
 
         Ok(())
     }
+
+    /// Checks for array mismatch
+    fn check_indices(&self, indices: &[usize], putting: bool) -> error::Result<()> {
+        if indices.len() != self.dimensions.len() {
+            return Err(error::Error::IndexLen);
+        }
+
+        for (d, i) in self.dimensions.iter().zip(indices) {
+            if d.is_unlimited() && putting {
+                continue;
+            }
+            if *i > d.len() {
+                return Err(error::Error::IndexMismatch);
+            }
+        }
+
+        Ok(())
+    }
+    /// Create a default [0, 0, ..., 0] offset
+    fn default_indices(&self, putting: bool) -> error::Result<Vec<usize>> {
+        self.dimensions
+            .iter()
+            .map(|d| {
+                if d.len() > 0 || putting {
+                    Ok(0)
+                } else {
+                    Err(error::Error::IndexMismatch)
+                }
+            })
+            .collect()
+    }
+
+    /// Assumes indices is valid for this variable
+    fn check_sizelen(
+        &self,
+        totallen: usize,
+        indices: &[usize],
+        sizelen: &[usize],
+        putting: bool,
+    ) -> error::Result<()> {
+        if sizelen.len() != self.dimensions.len() {
+            return Err(error::Error::SliceLen);
+        }
+
+        for ((i, s), d) in indices.iter().zip(sizelen).zip(&self.dimensions) {
+            if *s == 0 {
+                return Err(error::Error::ZeroSlice);
+            }
+            if i + s > d.len() {
+                if !putting {
+                    return Err(error::Error::SliceMismatch);
+                }
+                if !d.is_unlimited() {
+                    return Err(error::Error::SliceMismatch);
+                }
+            }
+        }
+
+        let thislen = sizelen.iter().fold(1, |acc, x| acc * x);
+        if totallen != thislen {
+            return Err(error::Error::BufferLen(totallen, thislen));
+        }
+
+        Ok(())
+    }
+
+    /// Assumes indices is valid for this variable
+    fn default_sizelen(
+        &self,
+        totallen: usize,
+        indices: &[usize],
+        putting: bool,
+    ) -> error::Result<Vec<usize>> {
+        let num_unlims = self
+            .dimensions
+            .iter()
+            .fold(0, |acc, x| acc + x.is_unlimited() as usize);
+        if num_unlims > 1 {
+            return Err(error::Error::Ambiguous);
+        }
+
+        let mut sizelen = Vec::with_capacity(self.dimensions.len());
+
+        let mut unlim_pos = None;
+        for (pos, (&i, d)) in indices.iter().zip(&self.dimensions).enumerate() {
+            if i >= d.len() {
+                if !d.is_unlimited() {
+                    return Err(error::Error::SliceMismatch);
+                }
+                if !putting {
+                    return Err(error::Error::SliceMismatch);
+                }
+                unlim_pos = Some(pos);
+                sizelen.push(1);
+            } else {
+                if putting && d.is_unlimited() {
+                    unlim_pos = match unlim_pos {
+                        Some(_) => return Err(error::Error::Ambiguous),
+                        None => {
+                            if d.is_unlimited() {
+                                Some(pos)
+                            } else {
+                                return Err(error::Error::SliceMismatch);
+                            }
+                        }
+                    };
+                    sizelen.push(1);
+                } else {
+                    sizelen.push(d.len() - i);
+                }
+            }
+        }
+
+        if let Some(pos) = unlim_pos {
+            let l = sizelen.iter().fold(1, |acc, x| acc * x);
+            sizelen[pos] = totallen / l;
+        }
+
+        let wantedlen = sizelen.iter().fold(1, |acc, x| acc * x);
+        if totallen != wantedlen {
+            return Err(error::Error::BufferLen(totallen, wantedlen));
+        }
+        Ok(sizelen)
+    }
 }
 
 /// This trait allow an implicit cast when fetching
@@ -71,36 +195,29 @@ where
 {
     const NCTYPE: nc_type;
     /// Returns a single indexed value of the variable as Self
-    fn single_value_from_variable(
-        variable: &Variable,
-        indices: Option<&[usize]>,
-    ) -> error::Result<Self>;
+    fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> error::Result<Self>;
 
     #[cfg(feature = "ndarray")]
     /// Returns an ndarray of the variable
     fn array_from_variable(
         variable: &Variable,
-        indices: Option<&[usize]>,
-        slice_len: Option<&[usize]>,
+        indices: &[usize],
+        slice_len: &[usize],
     ) -> error::Result<ArrayD<Self>>;
     /// Returns a slice of the variable as Vec<Self>
     fn slice_from_variable(
         variable: &Variable,
-        indices: Option<&[usize]>,
-        slice_len: Option<&[usize]>,
+        indices: &[usize],
+        slice_len: &[usize],
         values: &mut [Self],
     ) -> error::Result<()>;
     /// Put a single value into a netCDF variable
-    fn put_value_at(
-        variable: &mut Variable,
-        indices: Option<&[usize]>,
-        value: Self,
-    ) -> error::Result<()>;
+    fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> error::Result<()>;
     /// put a SLICE of values into a netCDF variable at the given index
     fn put_values_at(
         variable: &mut Variable,
-        indices: Option<&[usize]>,
-        slice_len: Option<&[usize]>,
+        indices: &[usize],
+        slice_len: &[usize],
         values: &[Self],
     ) -> error::Result<()>;
 }
@@ -124,27 +241,8 @@ macro_rules! impl_numeric {
             // fetch ONE value from variable using `$nc_get_var1`
             fn single_value_from_variable(
                 variable: &Variable,
-                indices: Option<&[usize]>,
+                indices: &[usize],
             ) -> error::Result<$sized_type> {
-                // Check the length of `indices`
-                let _indices: Vec<usize>;
-                let indices = match indices {
-                    Some(x) => {
-                        if x.len() != variable.dimensions.len() {
-                            return Err(error::Error::IndexLen);
-                        }
-                        for i in 0..x.len() {
-                            if x[i] >= variable.dimensions[i].len() {
-                                return Err(error::Error::IndexMismatch);
-                            }
-                        }
-                        x
-                    }
-                    None => {
-                        _indices = variable.dimensions.iter().map(|_| 0).collect();
-                        &_indices
-                    }
-                };
                 // initialize `buff` to 0
                 let mut buff: $sized_type = 0 as $sized_type;
                 // Get a pointer to an array
@@ -164,24 +262,15 @@ macro_rules! impl_numeric {
             #[cfg(feature = "ndarray")]
             fn array_from_variable(
                 variable: &Variable,
-                indices: Option<&[usize]>,
-                slice_len: Option<&[usize]>,
+                indices: &[usize],
+                slice_len: &[usize],
             ) -> error::Result<ArrayD<$sized_type>> {
-                let _slice_len: Vec<_>;
-                let slice_len = match slice_len {
-                    Some(x) => x,
-                    None => {
-                        _slice_len = variable.dimensions.iter().map(|x| x.len()).collect();
-                        &_slice_len
-                    }
-                };
-
                 let mut values: ArrayD<$sized_type> = unsafe { ArrayD::uninitialized(slice_len) };
 
                 <$sized_type>::slice_from_variable(
                     variable,
                     indices,
-                    Some(slice_len),
+                    slice_len,
                     values.as_slice_mut().ok_or(error::Error::ZeroSlice)?,
                 )?;
 
@@ -190,63 +279,10 @@ macro_rules! impl_numeric {
 
             fn slice_from_variable(
                 variable: &Variable,
-                indices: Option<&[usize]>,
-                slice_len: Option<&[usize]>,
+                indices: &[usize],
+                slice_len: &[usize],
                 values: &mut [Self],
             ) -> error::Result<()> {
-                let _indices: Vec<_>;
-                let indices = match indices {
-                    Some(x) => {
-                        if x.len() != variable.dimensions.len() {
-                            return Err(error::Error::IndexLen);
-                        };
-                        x
-                    }
-                    None => {
-                        _indices = variable.dimensions.iter().map(|_| 0).collect();
-                        &_indices
-                    }
-                };
-                let _slice_len: Vec<_>;
-                let slice_len = match slice_len {
-                    Some(x) => {
-                        if x.len() != variable.dimensions.len() {
-                            return Err(error::Error::SliceLen);
-                        }
-                        x
-                    }
-                    None => {
-                        _slice_len = variable
-                            .dimensions
-                            .iter()
-                            .zip(indices.iter())
-                            .map(|(x, i)| (x.len()).saturating_sub(*i))
-                            .collect();
-                        &_slice_len
-                    }
-                };
-
-                let mut values_len = None;
-                for i in 0..indices.len() {
-                    if indices[i] >= variable.dimensions[i].len() {
-                        return Err(error::Error::IndexMismatch);
-                    }
-                    if (indices[i] + slice_len[i]) > variable.dimensions[i].len() {
-                        return Err(error::Error::SliceMismatch);
-                    }
-                    values_len = Some(values_len.unwrap_or(1) * slice_len[i]);
-                    // Compute the full size of the request values
-                    if slice_len[i] == 0 {
-                        return Err(error::Error::ZeroSlice);
-                    }
-                }
-                if values_len.is_none() || values_len.unwrap() != values.len() {
-                    return Err(error::Error::BufferLen(
-                        values.len(),
-                        values_len.unwrap_or(0),
-                    ));
-                }
-
                 unsafe {
                     let _g = LOCK.lock().unwrap();
 
@@ -256,142 +292,34 @@ macro_rules! impl_numeric {
                         indices.as_ptr(),
                         slice_len.as_ptr(),
                         values.as_mut_ptr(),
-                    ))?;
+                    ))
                 }
-
-                Ok(())
             }
 
             // put a SINGLE value into a netCDF variable at the given index
             fn put_value_at(
                 variable: &mut Variable,
-                indices: Option<&[usize]>,
+                indices: &[usize],
                 value: Self,
             ) -> error::Result<()> {
-                // Check the length of `indices`
-                let _indices: Vec<usize>;
-                let indices = match indices {
-                    Some(x) => {
-                        if x.len() != variable.dimensions.len() {
-                            return Err(error::Error::IndexLen);
-                        }
-                        // Checking indices matching the variable dims
-                        for (x, v) in x.iter().zip(&variable.dimensions) {
-                            if !v.is_unlimited() && *x >= v.len() {
-                                return Err(error::Error::IndexMismatch);
-                            }
-                        }
-                        x
-                    }
-                    None => {
-                        _indices = variable.dimensions.iter().map(|_| 0).collect();
-                        &_indices
-                    }
-                };
-                let indices_ptr = indices.as_ptr();
                 unsafe {
                     let _g = LOCK.lock().unwrap();
                     error::checked($nc_put_var1_type(
                         variable.ncid,
                         variable.varid,
-                        indices_ptr,
+                        indices.as_ptr(),
                         &value,
-                    ))?;
+                    ))
                 }
-
-                Ok(())
             }
 
             // put a SLICE of values into a netCDF variable at the given index
             fn put_values_at(
                 variable: &mut Variable,
-                indices: Option<&[usize]>,
-                slice_len: Option<&[usize]>,
+                indices: &[usize],
+                slice_len: &[usize],
                 values: &[Self],
             ) -> error::Result<()> {
-                let _indices: Vec<_>;
-                let indices = match indices {
-                    Some(x) => {
-                        if x.len() != variable.dimensions.len() {
-                            return Err(error::Error::IndexLen);
-                        };
-                        x
-                    }
-                    None => {
-                        _indices = variable.dimensions.iter().map(|_| 0).collect();
-                        &_indices
-                    }
-                };
-
-                let _slice_len: Vec<_>;
-                let slice_len = match slice_len {
-                    Some(x) => x,
-                    None => {
-                        let num_unlimited = variable
-                            .dimensions
-                            .iter()
-                            .fold(0, |acc, v| acc + v.is_unlimited() as usize);
-                        if num_unlimited == 0 {
-                            _slice_len = variable
-                                .dimensions
-                                .iter()
-                                .zip(indices.iter())
-                                .map(|(x, i)| x.len().saturating_sub(*i))
-                                .collect();
-                            &_slice_len
-                        } else if num_unlimited == 1 {
-                            let cube_length = variable.dimensions.iter().fold(1, |acc, x| {
-                                if x.is_unlimited() {
-                                    acc
-                                } else {
-                                    acc * x.len()
-                                }
-                            });
-                            let len_unlim = values.len() / cube_length;
-                            _slice_len = variable
-                                .dimensions
-                                .iter()
-                                .zip(indices.iter())
-                                .map(|(x, i)| {
-                                    if x.is_unlimited() {
-                                        len_unlim
-                                    } else {
-                                        x.len().saturating_sub(*i)
-                                    }
-                                })
-                                .collect();
-                            &_slice_len
-                        } else {
-                            return Err(error::Error::Ambiguous);
-                        }
-                    }
-                };
-
-                let mut values_len = None;
-                for ((i, v), s) in indices
-                    .iter()
-                    .zip(variable.dimensions.iter())
-                    .zip(slice_len.iter())
-                {
-                    if !v.is_unlimited() && *i > v.len() {
-                        return Err(error::Error::IndexMismatch);
-                    }
-                    if !v.is_unlimited() && (*i + s) > v.len() {
-                        return Err(error::Error::SliceMismatch);
-                    }
-                    // Check for empty slice
-                    if *s == 0 {
-                        return Err(error::Error::ZeroSlice);
-                    }
-                    values_len = Some(values_len.unwrap_or(1usize).saturating_mul(*s));
-                }
-                if values_len.is_none() || values_len.unwrap() != values.len() {
-                    return Err(error::Error::BufferLen(
-                        values.len(),
-                        values_len.unwrap_or(0),
-                    ));
-                }
-
                 unsafe {
                     let _l = LOCK.lock().unwrap();
                     error::checked($nc_put_vara_type(
@@ -400,10 +328,8 @@ macro_rules! impl_numeric {
                         indices.as_ptr(),
                         slice_len.as_ptr(),
                         values.as_ptr(),
-                    ))?;
+                    ))
                 }
-
-                Ok(())
             }
         }
     };
@@ -554,6 +480,18 @@ impl Variable {
     ///  Fetches one specific value at specific indices
     ///  indices must has the same length as self.dimensions.
     pub fn value<T: Numeric>(&self, indices: Option<&[usize]>) -> error::Result<T> {
+        let _indices: Vec<usize>;
+        let indices = match indices {
+            Some(x) => {
+                self.check_indices(x, false)?;
+                x
+            }
+            None => {
+                _indices = self.default_indices(false)?;
+                &_indices
+            }
+        };
+
         T::single_value_from_variable(self, indices)
     }
 
@@ -564,6 +502,29 @@ impl Variable {
         indices: Option<&[usize]>,
         size_len: Option<&[usize]>,
     ) -> error::Result<ArrayD<T>> {
+        let _indices: Vec<usize>;
+        let indices = match indices {
+            Some(x) => {
+                self.check_indices(x, false)?;
+                x
+            }
+            None => {
+                _indices = self.default_indices(false)?;
+                &_indices
+            }
+        };
+        let _size_len: Vec<usize>;
+        let full_length = self.dimensions.iter().fold(1, |acc, d| acc * d.len());
+        let size_len = match size_len {
+            Some(x) => {
+                self.check_sizelen(full_length, indices, x, false)?;
+                x
+            }
+            None => {
+                _size_len = self.default_sizelen(full_length, indices, false)?;
+                &_size_len
+            }
+        };
         T::array_from_variable(self, indices, size_len)
     }
 
@@ -575,6 +536,29 @@ impl Variable {
         indices: Option<&[usize]>,
         size_len: Option<&[usize]>,
     ) -> error::Result<()> {
+        let _indices: Vec<usize>;
+        let indices = match indices {
+            Some(x) => {
+                self.check_indices(x, false)?;
+                x
+            }
+            None => {
+                _indices = self.default_indices(false)?;
+                &_indices
+            }
+        };
+        let _size_len: Vec<usize>;
+        let size_len = match size_len {
+            Some(x) => {
+                self.check_sizelen(buffer.len(), indices, x, false)?;
+                x
+            }
+            None => {
+                _size_len = self.default_sizelen(buffer.len(), indices, false)?;
+                &_size_len
+            }
+        };
+
         T::slice_from_variable(self, indices, size_len, buffer)
     }
 
@@ -584,6 +568,17 @@ impl Variable {
         value: T,
         indices: Option<&[usize]>,
     ) -> error::Result<()> {
+        let _indices: Vec<usize>;
+        let indices = match indices {
+            Some(x) => {
+                self.check_indices(x, true)?;
+                x
+            }
+            None => {
+                _indices = self.default_indices(true)?;
+                &_indices
+            }
+        };
         T::put_value_at(self, indices, value)
     }
 
@@ -594,6 +589,28 @@ impl Variable {
         indices: Option<&[usize]>,
         slice_len: Option<&[usize]>,
     ) -> error::Result<()> {
+        let _indices: Vec<usize>;
+        let indices = match indices {
+            Some(x) => {
+                self.check_indices(x, true)?;
+                x
+            }
+            None => {
+                _indices = self.default_indices(true)?;
+                &_indices
+            }
+        };
+        let _size_len: Vec<usize>;
+        let slice_len = match slice_len {
+            Some(x) => {
+                self.check_sizelen(values.len(), indices, x, true)?;
+                x
+            }
+            None => {
+                _size_len = self.default_sizelen(values.len(), indices, true)?;
+                &_size_len
+            }
+        };
         T::put_values_at(self, indices, slice_len, values)
     }
 
