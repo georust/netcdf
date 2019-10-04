@@ -214,8 +214,11 @@ fn get_group_dimensions(
     }
 
     let mut dimensions = HashMap::with_capacity(ndims as _);
+    let mut buf = [0u8; NC_MAX_NAME as usize + 1];
     for dimid in dimids.into_iter() {
-        let mut buf = [0u8; NC_MAX_NAME as usize + 1];
+        for i in buf.iter_mut() {
+            *i = 0
+        }
         let mut len = 0;
         let err;
         unsafe {
@@ -264,8 +267,11 @@ fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String
         return Ok(HashMap::new());
     }
     let mut attributes = HashMap::with_capacity(natts as _);
+    let mut buf = [0u8; NC_MAX_NAME as usize + 1];
     for i in 0..natts {
-        let mut buf = [0u8; NC_MAX_NAME as usize + 1];
+        for i in buf.iter_mut() {
+            *i = 0;
+        }
         let err = unsafe { nc_inq_attname(ncid, varid, i, buf.as_mut_ptr() as *mut _) };
 
         if err != NC_NOERR {
@@ -330,8 +336,11 @@ fn get_dimensions_of_var(
     }
 
     let mut dimensions = Vec::with_capacity(ndims as usize);
+    let mut name = [0u8; NC_MAX_NAME as usize + 1];
     for dimid in dimids.into_iter() {
-        let mut name = vec![0u8; NC_MAX_NAME as usize + 1];
+        for i in name.iter_mut() {
+            *i = 0;
+        }
         let mut dimlen = 0;
         let err;
         unsafe {
@@ -343,8 +352,9 @@ fn get_dimensions_of_var(
         }
 
         let cstr = std::ffi::CString::new(
-            name.into_iter()
-                .take_while(|x| *x != 0)
+            name.iter()
+                .take_while(|x| **x != 0)
+                .map(|x| *x)
                 .collect::<Vec<u8>>(),
         )
         .unwrap();
@@ -393,8 +403,11 @@ fn get_variables(
         return Err(err.into());
     }
     let mut variables = HashMap::with_capacity(nvars as usize);
+    let mut name = [0u8; NC_MAX_NAME as usize + 1];
     for varid in varids.into_iter() {
-        let mut name = vec![0u8; NC_MAX_NAME as usize + 1];
+        for i in name.iter_mut() {
+            *i = 0;
+        }
         let mut vartype = 0;
         let err;
         unsafe {
@@ -415,8 +428,9 @@ fn get_variables(
         let dimensions = get_dimensions_of_var(ncid, varid, unlimited_dims)?;
 
         let cstr = std::ffi::CString::new(
-            name.into_iter()
-                .take_while(|x| *x != 0)
+            name.iter()
+                .take_while(|x| **x != 0)
+                .map(|x| *x)
                 .collect::<Vec<u8>>(),
         )
         .unwrap();
@@ -461,6 +475,7 @@ fn get_groups(
         return Err(err.into());
     }
     let mut groups = HashMap::with_capacity(ngroups as usize);
+    let mut cname = [0; NC_MAX_NAME as usize + 1];
     for grpid in grpids.into_iter() {
         let unlim_dims = get_unlimited_dimensions(grpid)?;
         let dimensions = get_group_dimensions(grpid, &unlim_dims)?;
@@ -470,7 +485,9 @@ fn get_groups(
         let subgroups = get_groups(grpid, &parent_dimensions)?;
         let attributes = get_attributes(grpid, NC_GLOBAL)?;
 
-        let mut cname = [0; NC_MAX_NAME as usize + 1];
+        for i in cname.iter_mut() {
+            *i = 0;
+        }
         let err;
         unsafe {
             err = nc_inq_grpname(grpid, cname.as_mut_ptr());
