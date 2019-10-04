@@ -10,7 +10,7 @@ pub enum Error {
     Str(String),
     /// Length of the request indices is inconsistent
     IndexLen,
-    /// Length of the slice indices is insconsistent
+    /// Length of the slice indices is inconsistent
     SliceLen,
     /// Supplied the wrong length of the buffer
     BufferLen(usize, usize),
@@ -28,7 +28,7 @@ pub enum Error {
     AlreadyExists(String),
     /// Could not find variable/attribute/etc
     NotFound(String),
-    /// Slice lenghts are ambigious
+    /// Slice lenghts are ambiguous
     Ambiguous,
 }
 
