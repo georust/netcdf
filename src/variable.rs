@@ -197,22 +197,17 @@ where
     /// Returns a single indexed value of the variable as Self
     fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> error::Result<Self>;
 
-    #[cfg(feature = "ndarray")]
-    /// Returns an ndarray of the variable
-    fn array_from_variable(
+    /// Get multiple values at once
+    unsafe fn variable_to_ptr(
         variable: &Variable,
         indices: &[usize],
         slice_len: &[usize],
-    ) -> error::Result<ArrayD<Self>>;
-    /// Returns a slice of the variable as Vec<Self>
-    fn slice_from_variable(
-        variable: &Variable,
-        indices: &[usize],
-        slice_len: &[usize],
-        values: &mut [Self],
+        values: *mut Self,
     ) -> error::Result<()>;
+
     /// Put a single value into a netCDF variable
     fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> error::Result<()>;
+
     /// put a SLICE of values into a netCDF variable at the given index
     fn put_values_at(
         variable: &mut Variable,
@@ -259,41 +254,21 @@ macro_rules! impl_numeric {
                 Ok(buff)
             }
 
-            #[cfg(feature = "ndarray")]
-            fn array_from_variable(
+            unsafe fn variable_to_ptr(
                 variable: &Variable,
                 indices: &[usize],
                 slice_len: &[usize],
-            ) -> error::Result<ArrayD<$sized_type>> {
-                let mut values: ArrayD<$sized_type> = unsafe { ArrayD::uninitialized(slice_len) };
-
-                <$sized_type>::slice_from_variable(
-                    variable,
-                    indices,
-                    slice_len,
-                    values.as_slice_mut().ok_or(error::Error::ZeroSlice)?,
-                )?;
-
-                Ok(values)
-            }
-
-            fn slice_from_variable(
-                variable: &Variable,
-                indices: &[usize],
-                slice_len: &[usize],
-                values: &mut [Self],
+                values: *mut Self,
             ) -> error::Result<()> {
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
+                let _l = LOCK.lock().unwrap();
 
-                    error::checked($nc_get_vara_type(
-                        variable.ncid,
-                        variable.varid,
-                        indices.as_ptr(),
-                        slice_len.as_ptr(),
-                        values.as_mut_ptr(),
-                    ))
-                }
+                error::checked($nc_get_vara_type(
+                    variable.ncid,
+                    variable.varid,
+                    indices.as_ptr(),
+                    slice_len.as_ptr(),
+                    values,
+                ))
             }
 
             // put a SINGLE value into a netCDF variable at the given index
@@ -525,7 +500,13 @@ impl Variable {
                 &_size_len
             }
         };
-        T::array_from_variable(self, indices, size_len)
+
+        let mut values = Vec::with_capacity(full_length);
+        unsafe {
+            T::variable_to_ptr(self, indices, size_len, values.as_mut_ptr())?;
+            values.set_len(full_length);
+        }
+        Ok(ArrayD::from_shape_vec(size_len, values).unwrap())
     }
 
     /// Fetches variable into slice
@@ -559,7 +540,7 @@ impl Variable {
             }
         };
 
-        T::slice_from_variable(self, indices, size_len, buffer)
+        unsafe { T::variable_to_ptr(self, indices, size_len, buffer.as_mut_ptr()) }
     }
 
     /// Put a single value at `indices`
