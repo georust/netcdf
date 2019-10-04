@@ -469,7 +469,7 @@ impl Variable {
     pub fn values<T: Numeric>(
         &self,
         indices: Option<&[usize]>,
-        size_len: Option<&[usize]>,
+        slice_len: Option<&[usize]>,
     ) -> error::Result<ArrayD<T>> {
         let _indices: Vec<usize>;
         let indices = match indices {
@@ -482,25 +482,25 @@ impl Variable {
                 &_indices
             }
         };
-        let _size_len: Vec<usize>;
+        let _slice_len: Vec<usize>;
         let full_length = self.dimensions.iter().map(|d| d.len()).product::<usize>();
-        let size_len = match size_len {
+        let slice_len = match slice_len {
             Some(x) => {
                 self.check_sizelen(full_length, indices, x, false)?;
                 x
             }
             None => {
-                _size_len = self.default_sizelen(full_length, indices, false)?;
-                &_size_len
+                _slice_len = self.default_sizelen(full_length, indices, false)?;
+                &_slice_len
             }
         };
 
         let mut values = Vec::with_capacity(full_length);
         unsafe {
-            T::variable_to_ptr(self, indices, size_len, values.as_mut_ptr())?;
+            T::variable_to_ptr(self, indices, slice_len, values.as_mut_ptr())?;
             values.set_len(full_length);
         }
-        Ok(ArrayD::from_shape_vec(size_len, values).unwrap())
+        Ok(ArrayD::from_shape_vec(slice_len, values).unwrap())
     }
 
     /// Fetches variable into slice
@@ -509,7 +509,7 @@ impl Variable {
         &self,
         buffer: &mut [T],
         indices: Option<&[usize]>,
-        size_len: Option<&[usize]>,
+        slice_len: Option<&[usize]>,
     ) -> error::Result<()> {
         let _indices: Vec<usize>;
         let indices = match indices {
@@ -522,19 +522,19 @@ impl Variable {
                 &_indices
             }
         };
-        let _size_len: Vec<usize>;
-        let size_len = match size_len {
+        let _slice_len: Vec<usize>;
+        let slice_len = match slice_len {
             Some(x) => {
                 self.check_sizelen(buffer.len(), indices, x, false)?;
                 x
             }
             None => {
-                _size_len = self.default_sizelen(buffer.len(), indices, false)?;
-                &_size_len
+                _slice_len = self.default_sizelen(buffer.len(), indices, false)?;
+                &_slice_len
             }
         };
 
-        unsafe { T::variable_to_ptr(self, indices, size_len, buffer.as_mut_ptr()) }
+        unsafe { T::variable_to_ptr(self, indices, slice_len, buffer.as_mut_ptr()) }
     }
 
     /// Put a single value at `indices`
@@ -575,15 +575,15 @@ impl Variable {
                 &_indices
             }
         };
-        let _size_len: Vec<usize>;
+        let _slice_len: Vec<usize>;
         let slice_len = match slice_len {
             Some(x) => {
                 self.check_sizelen(values.len(), indices, x, true)?;
                 x
             }
             None => {
-                _size_len = self.default_sizelen(values.len(), indices, true)?;
-                &_size_len
+                _slice_len = self.default_sizelen(values.len(), indices, true)?;
+                &_slice_len
             }
         };
         T::put_values_at(self, indices, slice_len, values)
