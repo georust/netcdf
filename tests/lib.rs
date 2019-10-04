@@ -538,7 +538,6 @@ fn all_attr_types() {
         use netcdf::attribute::AttrValue;
         let f = d.path().join("all_attr_types.nc");
         let file = netcdf::File::open(&f).unwrap();
-        println!("{:?}", file);
 
         assert_eq!(
             AttrValue::Uchar(3),
@@ -626,7 +625,6 @@ fn append() {
         // re-open it in append mode
         // and create a variable called "some_other_variable"
         let mut file_a = netcdf::append(&f).unwrap();
-        println!("{:?}", file_a);
         let var = &mut file_a
             .root_mut()
             .add_variable::<i32>("some_other_variable", &[dim_name])

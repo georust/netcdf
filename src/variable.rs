@@ -119,7 +119,7 @@ impl Variable {
             }
         }
 
-        let thislen = sizelen.iter().fold(1, |acc, x| acc * x);
+        let thislen = sizelen.iter().product();
         if totallen != thislen {
             return Err(error::Error::BufferLen(totallen, thislen));
         }
@@ -155,31 +155,20 @@ impl Variable {
                 }
                 unlim_pos = Some(pos);
                 sizelen.push(1);
+            } else if putting && d.is_unlimited() {
+                unlim_pos = Some(pos);
+                sizelen.push(1);
             } else {
-                if putting && d.is_unlimited() {
-                    unlim_pos = match unlim_pos {
-                        Some(_) => return Err(error::Error::Ambiguous),
-                        None => {
-                            if d.is_unlimited() {
-                                Some(pos)
-                            } else {
-                                return Err(error::Error::SliceMismatch);
-                            }
-                        }
-                    };
-                    sizelen.push(1);
-                } else {
-                    sizelen.push(d.len() - i);
-                }
+                sizelen.push(d.len() - i);
             }
         }
 
         if let Some(pos) = unlim_pos {
-            let l = sizelen.iter().fold(1, |acc, x| acc * x);
+            let l = sizelen.iter().product::<usize>();
             sizelen[pos] = totallen / l;
         }
 
-        let wantedlen = sizelen.iter().fold(1, |acc, x| acc * x);
+        let wantedlen = sizelen.iter().product::<usize>();
         if totallen != wantedlen {
             return Err(error::Error::BufferLen(totallen, wantedlen));
         }
@@ -489,7 +478,7 @@ impl Variable {
             }
         };
         let _size_len: Vec<usize>;
-        let full_length = self.dimensions.iter().fold(1, |acc, d| acc * d.len());
+        let full_length = self.dimensions.iter().map(|d| d.len()).product::<usize>();
         let size_len = match size_len {
             Some(x) => {
                 self.check_sizelen(full_length, indices, x, false)?;
