@@ -131,12 +131,12 @@ impl Group {
     pub fn add_group(&mut self, name: &str) -> error::Result<&mut Group> {
         let cstr = std::ffi::CString::new(name).unwrap();
         let mut grpid = 0;
-        let err;
         unsafe {
-            err = nc_def_grp(self.grpid.unwrap_or(self.ncid), cstr.as_ptr(), &mut grpid);
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            error::checked(nc_def_grp(
+                self.grpid.unwrap_or(self.ncid),
+                cstr.as_ptr(),
+                &mut grpid,
+            ))?;
         }
 
         let mut parent_dimensions = self.parent_dimensions.clone();

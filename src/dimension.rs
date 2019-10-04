@@ -17,17 +17,14 @@ impl Dimension {
         match self.len {
             Some(x) => x.get(),
             None => {
-                let err;
                 let mut len = 0;
-                unsafe {
+                let err = unsafe {
                     let _l = LOCK.lock().unwrap();
-                    err = nc_inq_dimlen(self.ncid, self.id, &mut len);
-                }
-                if err != NC_NOERR {
-                    // Should log this...
-                    return 0;
-                }
-                len
+                    error::checked(nc_inq_dimlen(self.ncid, self.id, &mut len))
+                };
+
+                // Should log or handle this somehow...
+                err.map(|_| len).unwrap_or(0)
             }
         }
     }
@@ -45,14 +42,10 @@ impl Dimension {
 
         let mut dimid = 0;
         let cname = CString::new(name).unwrap();
-        let err;
 
         unsafe {
             let _l = LOCK.lock().unwrap();
-            err = nc_def_dim(grpid, cname.as_ptr(), len, &mut dimid);
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            error::checked(nc_def_dim(grpid, cname.as_ptr(), len, &mut dimid))?;
         }
 
         Ok(Dimension {

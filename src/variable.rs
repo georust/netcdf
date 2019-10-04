@@ -43,20 +43,20 @@ impl Variable {
     ) -> error::Result<()> {
         let _l = LOCK.lock().unwrap();
         if let Some(chunks) = chunksize {
-            let err;
             unsafe {
-                err = nc_def_var_chunking(self.ncid, self.varid, NC_CHUNKED, &chunks);
-            }
-            if err != NC_NOERR {
-                return Err(err.into());
+                error::checked(nc_def_var_chunking(
+                    self.ncid, self.varid, NC_CHUNKED, &chunks,
+                ))?;
             }
         }
-        let err;
         unsafe {
-            err = nc_def_var_deflate(self.ncid, self.varid, false as _, true as _, deflate_level);
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            error::checked(nc_def_var_deflate(
+                self.ncid,
+                self.varid,
+                false as _,
+                true as _,
+                deflate_level,
+            ))?;
         }
 
         Ok(())
@@ -147,15 +147,16 @@ macro_rules! impl_numeric {
                 };
                 // initialize `buff` to 0
                 let mut buff: $sized_type = 0 as $sized_type;
-                let err: nc_type;
                 // Get a pointer to an array
                 let indices_ptr = indices.as_ptr();
                 unsafe {
                     let _g = LOCK.lock().unwrap();
-                    err = $nc_get_var1_type(variable.ncid, variable.varid, indices_ptr, &mut buff);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked($nc_get_var1_type(
+                        variable.ncid,
+                        variable.varid,
+                        indices_ptr,
+                        &mut buff,
+                    ))?;
                 }
                 Ok(buff)
             }
@@ -246,21 +247,18 @@ macro_rules! impl_numeric {
                     ));
                 }
 
-                let err: nc_type;
                 unsafe {
                     let _g = LOCK.lock().unwrap();
 
-                    err = $nc_get_vara_type(
+                    error::checked($nc_get_vara_type(
                         variable.ncid,
                         variable.varid,
                         indices.as_ptr(),
                         slice_len.as_ptr(),
                         values.as_mut_ptr(),
-                    );
+                    ))?;
                 }
-                if err != NC_NOERR {
-                    return Err(err.into());
-                }
+
                 Ok(())
             }
 
@@ -290,14 +288,15 @@ macro_rules! impl_numeric {
                         &_indices
                     }
                 };
-                let err: nc_type;
                 let indices_ptr = indices.as_ptr();
                 unsafe {
                     let _g = LOCK.lock().unwrap();
-                    err = $nc_put_var1_type(variable.ncid, variable.varid, indices_ptr, &value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked($nc_put_var1_type(
+                        variable.ncid,
+                        variable.varid,
+                        indices_ptr,
+                        &value,
+                    ))?;
                 }
 
                 Ok(())
@@ -393,19 +392,15 @@ macro_rules! impl_numeric {
                     ));
                 }
 
-                let err: nc_type;
                 unsafe {
                     let _l = LOCK.lock().unwrap();
-                    err = $nc_put_vara_type(
+                    error::checked($nc_put_vara_type(
                         variable.ncid,
                         variable.varid,
                         indices.as_ptr(),
                         slice_len.as_ptr(),
                         values.as_ptr(),
-                    );
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    ))?;
                 }
 
                 Ok(())
@@ -525,20 +520,16 @@ impl Variable {
 
         let dimids: Vec<nc_type> = dims.iter().map(|x| x.id).collect();
         let mut id = 0;
-        let err;
         unsafe {
             let _l = LOCK.lock().unwrap();
-            err = nc_def_var(
+            error::checked(nc_def_var(
                 grp_id,
                 cname.as_ptr(),
                 vartype,
                 dimids.len() as _,
                 dimids.as_ptr(),
                 &mut id,
-            );
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            ))?;
         }
 
         Ok(Self {
@@ -615,17 +606,13 @@ impl Variable {
             return Err(error::Error::TypeMismatch);
         }
         let _l = LOCK.lock().unwrap();
-        let err: nc_type;
         unsafe {
-            err = nc_def_var_fill(
+            error::checked(nc_def_var_fill(
                 self.ncid,
                 self.varid,
                 NC_FILL,
                 &fill_value as *const T as *const _,
-            );
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            ))?;
         }
         let a = Attribute {
             name: "_FillValue".into(),
@@ -643,17 +630,13 @@ impl Variable {
         let mut location = std::mem::MaybeUninit::uninit();
         let mut nofill: nc_type = 0;
         let _l = LOCK.lock().unwrap();
-        let err;
         unsafe {
-            err = nc_inq_var_fill(
+            error::checked(nc_inq_var_fill(
                 self.ncid,
                 self.varid,
                 &mut nofill,
                 &mut location as *mut _ as *mut _,
-            );
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            ))?;
         }
         if nofill == 1 {
             return Ok(None);
@@ -679,13 +662,9 @@ macro_rules! impl_putvar {
         impl PutVar for &[$type] {
             const NCTYPE: nc_type = $nc_type;
             fn put(&self, ncid: nc_type, varid: nc_type) -> error::Result<()> {
-                let err;
                 unsafe {
                     let _g = LOCK.lock().unwrap();
-                    err = $nc_put_var(ncid, varid, self.as_ptr());
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked($nc_put_var(ncid, varid, self.as_ptr()))?;
                 }
                 Ok(())
             }

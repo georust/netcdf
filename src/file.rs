@@ -48,13 +48,9 @@ impl File {
     pub fn open(path: &path::Path) -> error::Result<File> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
-        let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
-            err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            error::checked(nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid))?;
         }
 
         let root = parse_file(ncid)?;
@@ -70,13 +66,9 @@ impl File {
     pub fn append(path: &path::Path) -> error::Result<File> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
-        let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
-            err = nc_open(f.as_ptr(), NC_WRITE, &mut ncid);
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            error::checked(nc_open(f.as_ptr(), NC_WRITE, &mut ncid))?;
         }
 
         let root = parse_file(ncid)?;
@@ -91,14 +83,11 @@ impl File {
     pub fn create(path: &path::Path) -> error::Result<File> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
-        let err: nc_type;
         unsafe {
             let _g = LOCK.lock().unwrap();
-            err = nc_create(f.as_ptr(), NC_NETCDF4 | NC_NOCLOBBER, &mut ncid);
+            error::checked(nc_create(f.as_ptr(), NC_NETCDF4 | NC_NOCLOBBER, &mut ncid))?;
         }
-        if err != NC_NOERR {
-            return Err(err.into());
-        }
+
         let root = Group {
             name: "root".to_string(),
             ncid,
@@ -149,19 +138,15 @@ impl<'a> MemFile<'a> {
     pub fn new(name: Option<&str>, mem: &'a [u8]) -> error::Result<Self> {
         let cstr = std::ffi::CString::new(name.unwrap_or("/")).unwrap();
         let mut ncid = 0;
-        let err;
         unsafe {
             let _l = LOCK.lock().unwrap();
-            err = nc_open_mem(
+            error::checked(nc_open_mem(
                 cstr.as_ptr(),
                 NC_NOWRITE,
                 mem.len(),
                 mem.as_ptr() as *const u8 as *mut _,
                 &mut ncid,
-            );
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            ))?;
         }
 
         let root = parse_file(ncid)?;
@@ -181,8 +166,8 @@ impl Drop for File {
     fn drop(&mut self) {
         unsafe {
             let _g = LOCK.lock().unwrap();
-            let err = nc_close(self.ncid);
-            assert_eq!(err, NC_NOERR);
+            // Can't really do much with an error here
+            let _err = error::checked(nc_close(self.ncid));
         }
     }
 }
@@ -194,23 +179,21 @@ fn get_group_dimensions(
     unlimited_dims: &[nc_type],
 ) -> error::Result<HashMap<String, Dimension>> {
     let mut ndims: nc_type = 0;
-    let err;
     unsafe {
-        err = nc_inq_dimids(ncid, &mut ndims, std::ptr::null_mut(), 0);
+        error::checked(nc_inq_dimids(ncid, &mut ndims, std::ptr::null_mut(), 0))?;
     }
-    if err != NC_NOERR {
-        return Err(err.into());
-    }
+
     if ndims == 0 {
         return Ok(HashMap::new());
     }
     let mut dimids = vec![0 as nc_type; ndims as usize];
-    let err;
     unsafe {
-        err = nc_inq_dimids(ncid, std::ptr::null_mut(), dimids.as_mut_ptr(), 0);
-    }
-    if err != NC_NOERR {
-        return Err(err.into());
+        error::checked(nc_inq_dimids(
+            ncid,
+            std::ptr::null_mut(),
+            dimids.as_mut_ptr(),
+            0,
+        ))?;
     }
 
     let mut dimensions = HashMap::with_capacity(ndims as _);
@@ -220,12 +203,13 @@ fn get_group_dimensions(
             *i = 0
         }
         let mut len = 0;
-        let err;
         unsafe {
-            err = nc_inq_dim(ncid, dimid as _, buf.as_mut_ptr() as *mut _, &mut len);
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            error::checked(nc_inq_dim(
+                ncid,
+                dimid as _,
+                buf.as_mut_ptr() as *mut _,
+                &mut len,
+            ))?;
         }
 
         let zero_pos = buf
@@ -255,13 +239,9 @@ fn get_group_dimensions(
 
 use super::attribute::Attribute;
 fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String, Attribute>> {
-    let err;
     let mut natts = 0;
     unsafe {
-        err = nc_inq_varnatts(ncid, varid, &mut natts);
-    }
-    if err != NC_NOERR {
-        return Err(err.into());
+        error::checked(nc_inq_varnatts(ncid, varid, &mut natts))?;
     }
     if natts == 0 {
         return Ok(HashMap::new());
@@ -272,11 +252,7 @@ fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String
         for i in buf.iter_mut() {
             *i = 0;
         }
-        let err = unsafe { nc_inq_attname(ncid, varid, i, buf.as_mut_ptr() as *mut _) };
-
-        if err != NC_NOERR {
-            return Err(err.into());
-        }
+        unsafe { error::checked(nc_inq_attname(ncid, varid, i, buf.as_mut_ptr() as *mut _))? };
 
         let zero_pos = buf
             .iter()
@@ -300,9 +276,8 @@ fn get_dimensions_of_var(
     unlimited_dims: &[nc_type],
 ) -> error::Result<Vec<Dimension>> {
     let mut ndims = 0;
-    let err;
     unsafe {
-        err = nc_inq_var(
+        error::checked(nc_inq_var(
             ncid,
             varid,
             std::ptr::null_mut(),
@@ -310,18 +285,14 @@ fn get_dimensions_of_var(
             &mut ndims,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
-        );
-    }
-    if err != NC_NOERR {
-        return Err(err.into());
+        ))?;
     }
     if ndims == 0 {
         return Ok(Vec::new());
     }
     let mut dimids = vec![0; ndims as usize];
-    let err;
     unsafe {
-        err = nc_inq_var(
+        error::checked(nc_inq_var(
             ncid,
             varid,
             std::ptr::null_mut(),
@@ -329,10 +300,7 @@ fn get_dimensions_of_var(
             std::ptr::null_mut(),
             dimids.as_mut_ptr(),
             std::ptr::null_mut(),
-        );
-    }
-    if err != NC_NOERR {
-        return Err(err.into());
+        ))?;
     }
 
     let mut dimensions = Vec::with_capacity(ndims as usize);
@@ -342,13 +310,13 @@ fn get_dimensions_of_var(
             *i = 0;
         }
         let mut dimlen = 0;
-        let err;
         unsafe {
-            err = nc_inq_dim(ncid, dimid, name.as_mut_ptr() as *mut _, &mut dimlen);
-        }
-
-        if err != NC_NOERR {
-            return Err(err.into());
+            error::checked(nc_inq_dim(
+                ncid,
+                dimid,
+                name.as_mut_ptr() as *mut _,
+                &mut dimlen,
+            ))?;
         }
 
         let zero_pos = name
@@ -380,25 +348,22 @@ fn get_variables(
     ncid: nc_type,
     unlimited_dims: &[nc_type],
 ) -> error::Result<HashMap<String, Variable>> {
-    let err;
     let mut nvars = 0;
     unsafe {
-        err = nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut());
-    }
-    if err != NC_NOERR {
-        return Err(err.into());
+        error::checked(nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut()))?;
     }
     if nvars == 0 {
         return Ok(HashMap::new());
     }
     let mut varids = vec![0; nvars as usize];
-    let err;
     unsafe {
-        err = nc_inq_varids(ncid, std::ptr::null_mut(), varids.as_mut_ptr());
+        error::checked(nc_inq_varids(
+            ncid,
+            std::ptr::null_mut(),
+            varids.as_mut_ptr(),
+        ))?;
     }
-    if err != NC_NOERR {
-        return Err(err.into());
-    }
+
     let mut variables = HashMap::with_capacity(nvars as usize);
     let mut name = [0u8; NC_MAX_NAME as usize + 1];
     for varid in varids.into_iter() {
@@ -406,9 +371,8 @@ fn get_variables(
             *i = 0;
         }
         let mut vartype = 0;
-        let err;
         unsafe {
-            err = nc_inq_var(
+            error::checked(nc_inq_var(
                 ncid,
                 varid,
                 name.as_mut_ptr() as *mut _,
@@ -416,10 +380,7 @@ fn get_variables(
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
-            );
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
+            ))?;
         }
         let attributes = get_attributes(ncid, varid)?;
         let dimensions = get_dimensions_of_var(ncid, varid, unlimited_dims)?;
@@ -449,26 +410,19 @@ fn get_groups(
     ncid: nc_type,
     parent_dim: &[HashMap<String, Dimension>],
 ) -> error::Result<HashMap<String, Group>> {
-    let err;
     let mut ngroups = 0;
 
     unsafe {
-        err = nc_inq_grps(ncid, &mut ngroups, std::ptr::null_mut());
-    }
-    if err != NC_NOERR {
-        return Err(err.into());
+        error::checked(nc_inq_grps(ncid, &mut ngroups, std::ptr::null_mut()))?;
     }
     if ngroups == 0 {
         return Ok(HashMap::new());
     }
-    let err;
     let mut grpids = vec![0; ngroups as usize];
     unsafe {
-        err = nc_inq_grps(ncid, std::ptr::null_mut(), grpids.as_mut_ptr());
+        error::checked(nc_inq_grps(ncid, std::ptr::null_mut(), grpids.as_mut_ptr()))?;
     }
-    if err != NC_NOERR {
-        return Err(err.into());
-    }
+
     let mut groups = HashMap::with_capacity(ngroups as usize);
     let mut cname = [0; NC_MAX_NAME as usize + 1];
     for grpid in grpids.into_iter() {
@@ -483,13 +437,10 @@ fn get_groups(
         for i in cname.iter_mut() {
             *i = 0;
         }
-        let err;
         unsafe {
-            err = nc_inq_grpname(grpid, cname.as_mut_ptr());
+            error::checked(nc_inq_grpname(grpid, cname.as_mut_ptr()))?;
         }
-        if err != NC_NOERR {
-            return Err(err.into());
-        }
+
         let name = unsafe { std::ffi::CStr::from_ptr(cname.as_ptr()) }
             .to_string_lossy()
             .to_string();
@@ -511,21 +462,18 @@ fn get_groups(
 }
 
 fn get_unlimited_dimensions(ncid: nc_type) -> error::Result<Vec<nc_type>> {
-    let err;
     let mut nunlim = 0;
     unsafe {
-        err = nc_inq_unlimdims(ncid, &mut nunlim, std::ptr::null_mut());
+        error::checked(nc_inq_unlimdims(ncid, &mut nunlim, std::ptr::null_mut()))?;
     }
-    if err != NC_NOERR {
-        return Err(err.into());
-    }
+
     let mut uldim = vec![0; nunlim as usize];
-    let err;
     unsafe {
-        err = nc_inq_unlimdims(ncid, std::ptr::null_mut(), uldim.as_mut_ptr());
-    }
-    if err != NC_NOERR {
-        return Err(err.into());
+        error::checked(nc_inq_unlimdims(
+            ncid,
+            std::ptr::null_mut(),
+            uldim.as_mut_ptr(),
+        ))?;
     }
     Ok(uldim)
 }

@@ -18,141 +18,155 @@ impl Attribute {
     }
     pub fn value(&self) -> error::Result<AttrValue> {
         let mut typ = 0;
-        let err;
         let cname = std::ffi::CString::new(self.name.clone()).unwrap();
         unsafe {
-            err = nc_inq_atttype(self.ncid, self.varid, cname.as_ptr(), &mut typ);
+            error::checked(nc_inq_atttype(
+                self.ncid,
+                self.varid,
+                cname.as_ptr(),
+                &mut typ,
+            ))?;
         }
-        if err != NC_NOERR {
-            return Err(err.into());
-        }
+
         match typ {
             NC_UBYTE => {
                 let mut value = 0;
-                let err;
                 unsafe {
-                    err = nc_get_att_uchar(self.ncid, self.varid, cname.as_ptr(), &mut value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_uchar(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut value,
+                    ))?;
                 }
                 Ok(AttrValue::Uchar(value))
             }
             NC_BYTE => {
                 let mut value = 0;
-                let err;
                 unsafe {
-                    err = nc_get_att_schar(self.ncid, self.varid, cname.as_ptr(), &mut value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_schar(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut value,
+                    ))?;
                 }
                 Ok(AttrValue::Schar(value))
             }
             NC_SHORT => {
                 let mut value = 0;
-                let err;
                 unsafe {
-                    err = nc_get_att_short(self.ncid, self.varid, cname.as_ptr(), &mut value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_short(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut value,
+                    ))?;
                 }
                 Ok(AttrValue::Short(value))
             }
             NC_USHORT => {
                 let mut value = 0;
-                let err;
                 unsafe {
-                    err = nc_get_att_ushort(self.ncid, self.varid, cname.as_ptr(), &mut value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_ushort(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut value,
+                    ))?;
                 }
                 Ok(AttrValue::Ushort(value))
             }
             NC_INT => {
                 let mut value = 0;
-                let err;
                 unsafe {
-                    err = nc_get_att_int(self.ncid, self.varid, cname.as_ptr(), &mut value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_int(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut value,
+                    ))?;
                 }
                 Ok(AttrValue::Int(value))
             }
             NC_UINT => {
                 let mut value = 0;
-                let err;
                 unsafe {
-                    err = nc_get_att_uint(self.ncid, self.varid, cname.as_ptr(), &mut value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_uint(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut value,
+                    ))?;
                 }
                 Ok(AttrValue::Uint(value))
             }
             NC_INT64 => {
                 let mut value = 0;
-                let err;
                 unsafe {
-                    err = nc_get_att_longlong(self.ncid, self.varid, cname.as_ptr(), &mut value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_longlong(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut value,
+                    ))?;
                 }
                 Ok(AttrValue::Longlong(value))
             }
             NC_UINT64 => {
                 let mut value = 0;
-                let err;
                 unsafe {
-                    err = nc_get_att_ulonglong(self.ncid, self.varid, cname.as_ptr(), &mut value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_ulonglong(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut value,
+                    ))?;
                 }
                 Ok(AttrValue::Ulonglong(value))
             }
             NC_FLOAT => {
                 let mut value = 0.0;
-                let err;
                 unsafe {
-                    err = nc_get_att_float(self.ncid, self.varid, cname.as_ptr(), &mut value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_float(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut value,
+                    ))?;
                 }
                 Ok(AttrValue::Float(value))
             }
             NC_DOUBLE => {
                 let mut value = 0.0;
-                let err;
                 unsafe {
-                    err = nc_get_att_double(self.ncid, self.varid, cname.as_ptr(), &mut value);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_double(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut value,
+                    ))?;
                 }
                 Ok(AttrValue::Double(value))
             }
             NC_CHAR => {
                 let mut lentext = 0;
-                let err;
                 unsafe {
-                    err = nc_inq_attlen(self.ncid, self.varid, cname.as_ptr(), &mut lentext);
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_inq_attlen(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        &mut lentext,
+                    ))?;
                 }
                 let mut buf = vec![0; lentext];
-                let err;
                 unsafe {
-                    err = nc_get_att_text(self.ncid, self.varid, cname.as_ptr(), buf.as_mut_ptr());
-                }
-                if err != NC_NOERR {
-                    return Err(err.into());
+                    error::checked(nc_get_att_text(
+                        self.ncid,
+                        self.varid,
+                        cname.as_ptr(),
+                        buf.as_mut_ptr(),
+                    ))?;
                 }
                 let value = buf
                     .into_iter()
@@ -191,53 +205,39 @@ impl Attribute {
         let cname: CString = CString::new(name).unwrap();
 
         let _l = LOCK.lock().unwrap();
-        let err;
-        unsafe {
+        error::checked(unsafe {
             match val {
                 AttrValue::Uchar(x) => {
-                    err = nc_put_att_uchar(ncid, varid, cname.as_ptr(), NC_UBYTE, 1, &x);
+                    nc_put_att_uchar(ncid, varid, cname.as_ptr(), NC_UBYTE, 1, &x)
                 }
                 AttrValue::Schar(x) => {
-                    err = nc_put_att_schar(ncid, varid, cname.as_ptr(), NC_BYTE, 1, &x);
+                    nc_put_att_schar(ncid, varid, cname.as_ptr(), NC_BYTE, 1, &x)
                 }
                 AttrValue::Ushort(x) => {
-                    err = nc_put_att_ushort(ncid, varid, cname.as_ptr(), NC_USHORT, 1, &x);
+                    nc_put_att_ushort(ncid, varid, cname.as_ptr(), NC_USHORT, 1, &x)
                 }
                 AttrValue::Short(x) => {
-                    err = nc_put_att_short(ncid, varid, cname.as_ptr(), NC_SHORT, 1, &x);
+                    nc_put_att_short(ncid, varid, cname.as_ptr(), NC_SHORT, 1, &x)
                 }
-                AttrValue::Uint(x) => {
-                    err = nc_put_att_uint(ncid, varid, cname.as_ptr(), NC_UINT, 1, &x);
-                }
-                AttrValue::Int(x) => {
-                    err = nc_put_att_int(ncid, varid, cname.as_ptr(), NC_INT, 1, &x);
-                }
+                AttrValue::Uint(x) => nc_put_att_uint(ncid, varid, cname.as_ptr(), NC_UINT, 1, &x),
+                AttrValue::Int(x) => nc_put_att_int(ncid, varid, cname.as_ptr(), NC_INT, 1, &x),
                 AttrValue::Ulonglong(x) => {
-                    err = nc_put_att_ulonglong(ncid, varid, cname.as_ptr(), NC_UINT64, 1, &x);
+                    nc_put_att_ulonglong(ncid, varid, cname.as_ptr(), NC_UINT64, 1, &x)
                 }
                 AttrValue::Longlong(x) => {
-                    err = nc_put_att_longlong(ncid, varid, cname.as_ptr(), NC_INT64, 1, &x);
+                    nc_put_att_longlong(ncid, varid, cname.as_ptr(), NC_INT64, 1, &x)
                 }
                 AttrValue::Float(x) => {
-                    err = nc_put_att_float(ncid, varid, cname.as_ptr(), NC_FLOAT, 1, &x);
+                    nc_put_att_float(ncid, varid, cname.as_ptr(), NC_FLOAT, 1, &x)
                 }
                 AttrValue::Double(x) => {
-                    err = nc_put_att_double(ncid, varid, cname.as_ptr(), NC_DOUBLE, 1, &x);
+                    nc_put_att_double(ncid, varid, cname.as_ptr(), NC_DOUBLE, 1, &x)
                 }
                 AttrValue::Str(ref x) => {
-                    err = nc_put_att_text(
-                        ncid,
-                        varid,
-                        cname.as_ptr(),
-                        x.len(),
-                        x.as_ptr() as *const _,
-                    );
+                    nc_put_att_text(ncid, varid, cname.as_ptr(), x.len(), x.as_ptr() as *const _)
                 }
             }
-        }
-        if err != NC_NOERR {
-            return Err(err.into());
-        }
+        })?;
 
         Ok(Attribute {
             name: name.to_string(),

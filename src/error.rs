@@ -95,3 +95,10 @@ impl fmt::Display for Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+pub(crate) fn checked(err: nc_type) -> Result<()> {
+    if err != netcdf_sys::NC_NOERR {
+        return Err(err.into());
+    }
+    Ok(())
+}
