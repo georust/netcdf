@@ -227,12 +227,12 @@ fn get_group_dimensions(
         if err != NC_NOERR {
             return Err(err.into());
         }
-        let name: Vec<_> = buf
+
+        let zero_pos = buf
             .iter()
-            .take_while(|x| **x != 0)
-            .map(|x| *x as u8)
-            .collect();
-        let name = String::from_utf8(name).unwrap();
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| buf.len());
+        let name = String::from(String::from_utf8_lossy(&buf[..zero_pos]));
 
         let len = if unlimited_dims.contains(&dimid) {
             None
@@ -277,12 +277,12 @@ fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String
         if err != NC_NOERR {
             return Err(err.into());
         }
-        let name: Vec<_> = buf
+
+        let zero_pos = buf
             .iter()
-            .take_while(|x| **x != 0)
-            .map(|x| *x as u8)
-            .collect();
-        let name = String::from_utf8(name).unwrap();
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| buf.len());
+        let name = String::from(String::from_utf8_lossy(&buf[..zero_pos]));
         let a = Attribute {
             name: name.clone(),
             ncid,
@@ -351,14 +351,11 @@ fn get_dimensions_of_var(
             return Err(err.into());
         }
 
-        let cstr = std::ffi::CString::new(
-            name.iter()
-                .take_while(|x| **x != 0)
-                .map(|x| *x)
-                .collect::<Vec<u8>>(),
-        )
-        .unwrap();
-        let name = cstr.to_string_lossy().into_owned();
+        let zero_pos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
+        let name = String::from(String::from_utf8_lossy(&name[..zero_pos]));
 
         let unlimited = unlimited_dims.contains(&dimid);
         let len = if unlimited {
@@ -427,14 +424,12 @@ fn get_variables(
         let attributes = get_attributes(ncid, varid)?;
         let dimensions = get_dimensions_of_var(ncid, varid, unlimited_dims)?;
 
-        let cstr = std::ffi::CString::new(
-            name.iter()
-                .take_while(|x| **x != 0)
-                .map(|x| *x)
-                .collect::<Vec<u8>>(),
-        )
-        .unwrap();
-        let name = cstr.to_string_lossy().into_owned();
+        let zero_pos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
+        let name = String::from(String::from_utf8_lossy(&name[..zero_pos]));
+
         let v = Variable {
             ncid,
             varid,
