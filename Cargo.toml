@@ -2,7 +2,7 @@
 name = "netcdf"
 version = "0.2.0"
 authors = [
-    "Michael Hiley <mike.hiley@ssec.wisc.edu>",
+    "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
 ]
 license = "MIT OR Apache-2.0"
@@ -26,3 +26,4 @@ tempfile = "3.1.0"
 
 [dependencies.netcdf-sys]
 path = "netcdf-sys"
+version = "0.2.0"
