@@ -1,5 +1,8 @@
 # rust-netcdf
 
+[![Build Status](https://travis-ci.org/mhiley/rust-netcdf.svg?branch=master)](https://travis-ci.org/mhiley/rust-netcdf)
+[![](http://meritbadge.herokuapp.com/netcdf)](https://crates.io/crates/netcdf)
+
 Medium-level [NetCDF](http://www.unidata.ucar.edu/software/netcdf/) bindings for Rust
 
 ## Status
