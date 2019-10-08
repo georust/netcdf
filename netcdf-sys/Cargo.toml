@@ -1,13 +1,18 @@
 [package]
 name = "netcdf-sys"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Mike Hiley <mike.hiley@ssec.wisc.edu>"]
 license = "MIT"
 description = "FFI bindings to NetCDF"
 repository = "https://github.com/mhiley/rust-netcdf"
 documentation = "https://github.com/mhiley/rust-netcdf"
-keywords = ["netcdf", "hdf", "hdf4", "hdf5", "cdm"]
+keywords = ["netcdf", "hdf", "hdf4", "hdf5", "cdm", "ffi"]
+edition = "2018"
+links = "netcdf"
+build = "build.rs"
 
-[dependencies]
-libc = "0.2"
-lazy_static = "1.0"
+[dev-dependencies]
+lazy_static = "1.4.0"
+
+[features]
+memio = []

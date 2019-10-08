@@ -1,132 +1,121 @@
-//! Rust bindings for Unidata's [libnetcdf] (http://www.unidata.ucar.edu/software/netcdf/)
+//! Rust bindings for Unidata's [libnetcdf](http://www.unidata.ucar.edu/software/netcdf/)
 //!
 //! # Examples
-//! 
+//!
 //! Read:
-//! 
-//! ```
-//! # let path_to_simple_xy = netcdf::test_file("simple_xy.nc");
+//!
+//! ```no_run
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Open file simple_xy.nc:
-//! let file = netcdf::open(&path_to_simple_xy).unwrap();
+//! let file = netcdf::open("simle_xy.nc")?;
 //!
-//! // Access any variable, attribute, or dimension through simple HashMap's:
-//! let var = file.root.variables.get("data").unwrap();
+//! // Access any variable, attribute, or dimension through lookups on hashmaps
+//! let var = &file.variables()["data"];
 //!
-//! // Read variable as any NC_TYPE, optionally failing if doing so would
-//! // force a cast:
-//! let data : Vec<i32> = var.get_int(false).unwrap();
+//! // Read variable as numeric types
+//! let data_i32 = var.value::<i32>(None)?;
+//! let data_f32 : f32 = var.value(None)?;
 //!
-//! // You can also use values() to read the variable, data will be implicitly casted
-//! // if needed
-//! let data : Vec<i32> = var.values().unwrap();
-//!
-//! // All variable data is read into 1-dimensional Vec.
-//! for x in 0..(6*12) {
-//!     assert_eq!(data[x], x as i32);
-//! }
+//! // You can also use values() to read the variable, data will be read as the type given as type parameter (in this case T=i32)
+//! // Pass (None, None) when you don't care about the hyperslab indexes (get all data)
+//! # #[cfg(feature = "ndarray")]
+//! let data = var.values::<i32>(None, None)?;
+//! # Ok(()) }
 //! ```
 //!
 //! Write:
 //!
-//! ```
+//! ```no_run
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Write
-//! let f = netcdf::test_file_new("crabs2.nc"); // just gets a path inside repo
-//! {
-//!     let mut file = netcdf::create(&f).unwrap();
-//!     
-//!     let dim_name = "ncrabs";
-//!     file.root.add_dimension(dim_name, 10).unwrap();
-//!     
-//!     let var_name = "crab_coolness_level";
-//!     let data : Vec<i32> = vec![42; 10];
-//!     // Variable type written to file is inferred from Vec type:
-//!     file.root.add_variable(
-//!                 var_name, 
-//!                 &vec![dim_name.to_string()],
-//!                 &data
-//!             ).unwrap();
-//! }
+//! let mut file = netcdf::create("crabs2.nc")?;
 //!
-//! // Append:
-//! {
-//!     // You can also modify a Variable inside an existing netCDF file
-//!     // open it in read/write mode
-//!     let mut file = netcdf::append(&f).unwrap();
-//!     // get a mutable binding of the variable "crab_coolness_level"
-//!     let mut var = file.root.variables.get_mut("crab_coolness_level").unwrap();
-//!    
-//!     let data : Vec<i32> = vec![100; 10];
-//!     // write 5 first elements of the vector `data` into `var` starting at index 2;
-//!     var.put_values_at(&data, &[2], &[5]);
-//!     // Change the first value of `var` into '999'
-//!     var.put_value_at(999 as f32, &[0]);
-//! }
+//! let dim_name = "ncrabs";
+//! file.add_dimension(dim_name, 10)?;
+//!
+//! let var_name = "crab_coolness_level";
+//! let data : Vec<i32> = vec![42; 10];
+//! // Variable type written to file
+//! let var = file.add_variable::<i32>(
+//!             var_name,
+//!             &[dim_name],
+//! )?;
+//! var.put_values(&data, None, None);
+//! # Ok(()) }
+//! ```
+//!
+//! Append:
+//! ```no_run
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // You can also modify a Variable inside an existing netCDF file
+//! // open it in read/write mode
+//! let mut file = netcdf::append("crabs2.nc")?;
+//! // get a mutable binding of the variable "crab_coolness_level"
+//! let mut var = file.variable_mut("crab_coolness_level").unwrap();
+//!
+//! let data : Vec<i32> = vec![100; 10];
+//! // write 5 first elements of the vector `data` into `var` starting at index 2;
+//! var.put_values(&data[..5], Some(&[2]), Some(&[5]));
+//! // Change the first value of `var` into '999'
+//! var.put_value(999.0f32, Some(&[0]));
+//! # Ok(()) }
 //! ```
 
-extern crate netcdf_sys;
-extern crate ndarray;
+use lazy_static::lazy_static;
+use netcdf_sys::nc_type;
+use std::sync::Mutex;
 
-#[macro_use]
-extern crate lazy_static;
-extern crate libc;
-
-use netcdf_sys::{libnetcdf_lock, nc_strerror};
-use std::ffi;
-use std::str;
-use std::path;
-use std::env;
-use std::fs;
-use std::collections::HashMap;
-
-pub mod file;
-pub mod variable;
 pub mod attribute;
-pub mod group;
 pub mod dimension;
+pub mod error;
+pub mod file;
+pub mod group;
+pub mod variable;
 
-pub use file::open;
-pub use file::create;
-pub use file::append;
+pub use attribute::*;
+pub use dimension::*;
+pub use file::*;
+pub use group::*;
+pub use variable::*;
 
-fn string_from_c_str(c_str: &ffi::CStr) -> String {
-    // see http://stackoverflow.com/questions/24145823/rust-ffi-c-string-handling
-    // for good rundown
-    let buf: &[u8] = c_str.to_bytes();
-    let str_slice: &str = str::from_utf8(buf).unwrap();
-    str_slice.to_owned()
+/// Open a netcdf file in create mode
+///
+/// Will overwrite exising file
+pub fn create<P>(name: P) -> error::Result<File>
+where
+    P: AsRef<std::path::Path>,
+{
+    File::create(name.as_ref())
 }
 
+/// Open a netcdf file in append mode
+pub fn append<P>(name: P) -> error::Result<File>
+where
+    P: AsRef<std::path::Path>,
+{
+    File::append(name.as_ref())
+}
+
+/// Open a netcdf file in read mode
+pub fn open<P>(name: P) -> error::Result<File>
+where
+    P: AsRef<std::path::Path>,
+{
+    File::open(name.as_ref())
+}
+
+#[cfg(feature = "memory")]
+/// Open a netcdf file from a buffer
+pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<MemFile<'a>> {
+    file::MemFile::new(name, mem)
+}
 
 lazy_static! {
-    pub static ref NC_ERRORS: HashMap<i32, String> = {
-        let mut m = HashMap::new();
-        // Invalid error codes are ok; nc_strerror will just return 
-        // "Unknown Error"
-        for i in -256..256 {
-            let msg_cstr : &ffi::CStr;
-            unsafe {
-                let _g = libnetcdf_lock.lock().unwrap();
-                let msg : *const i8 = nc_strerror(i);
-                msg_cstr = &ffi::CStr::from_ptr(msg);
-            }
-            m.insert(i, string_from_c_str(msg_cstr));
-        }
-        m
-    };
+    /// Use this when accessing netcdf functions
+    pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());
 }
 
-// Helpers for getting file paths
-pub fn test_file(f: &str) -> String {
-    let mnf_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let path = path::Path::new(&mnf_dir).join(
-        "testdata").join(f);
-    path.to_str().unwrap().to_string()
-}
-
-pub fn test_file_new(f: &str) -> String {
-    let mnf_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let path = path::Path::new(&mnf_dir).join("testout");
-    let new_file = path.join(f);
-    let _err = fs::create_dir(path);
-    new_file.to_str().unwrap().to_string()
-}
+#[cfg(feature = "indexmap")]
+use indexmap::IndexMap as HashMap;
+#[cfg(not(feature = "indexmap"))]
+use std::collections::HashMap;

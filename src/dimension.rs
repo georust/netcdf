@@ -1,40 +1,58 @@
-use std::ffi;
-use std::collections::HashMap;
+use super::error;
+use super::LOCK;
 use netcdf_sys::*;
-use string_from_c_str;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Dimension {
-    pub name : String,
-    pub len: u64,
-    pub id: i32,
+    pub(crate) name: String,
+    /// None when unlimited (size = 0)
+    pub(crate) len: Option<core::num::NonZeroUsize>,
+    pub(crate) id: nc_type,
+    pub(crate) ncid: nc_type,
 }
 
-pub fn init_dimensions(dims: &mut HashMap<String, Dimension>, grp_id: i32) {
-    // determine number of dims
-    let mut ndims = 0i32;
-    unsafe {
-        let _g = libnetcdf_lock.lock().unwrap();
-        let err = nc_inq_ndims(grp_id, &mut ndims);
-        assert_eq!(err, NC_NOERR);
+#[allow(clippy::len_without_is_empty)]
+impl Dimension {
+    pub fn len(&self) -> usize {
+        match self.len {
+            Some(x) => x.get(),
+            None => {
+                let mut len = 0;
+                let err = unsafe {
+                    let _l = LOCK.lock().unwrap();
+                    error::checked(nc_inq_dimlen(self.ncid, self.id, &mut len))
+                };
+
+                // Should log or handle this somehow...
+                err.map(|_| len).unwrap_or(0)
+            }
+        }
     }
 
-    // read each dim name and length
-    for i_dim in 0..ndims {
-        let mut buf_vec = vec![0i8; (NC_MAX_NAME + 1) as usize];
-        let mut dimlen : u64 = 0u64;
-        let c_str: &ffi::CStr;
+    pub fn is_unlimited(&self) -> bool {
+        self.len.is_none()
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn new(grpid: nc_type, name: &str, len: usize) -> error::Result<Dimension> {
+        use std::ffi::CString;
+
+        let mut dimid = 0;
+        let cname = CString::new(name).unwrap();
+
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
-            let buf_ptr : *mut i8 = buf_vec.as_mut_ptr();
-            let err = nc_inq_dim(grp_id, i_dim, buf_ptr, &mut dimlen);
-            assert_eq!(err, NC_NOERR);
-            c_str = ffi::CStr::from_ptr(buf_ptr);
+            let _l = LOCK.lock().unwrap();
+            error::checked(nc_def_dim(grpid, cname.as_ptr(), len, &mut dimid))?;
         }
-        let str_buf: String = string_from_c_str(c_str);
-        dims.insert(str_buf.clone(),
-                      Dimension{name: str_buf.clone(),
-                          len: dimlen,
-                          id: i_dim});
+
+        Ok(Dimension {
+            name: name.into(),
+            len: core::num::NonZeroUsize::new(len),
+            id: dimid,
+            ncid: grpid,
+        })
     }
 }

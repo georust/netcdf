@@ -1,279 +1,158 @@
-use std::collections::HashMap;
-use std::ffi;
+use super::attribute::AttrValue;
+use super::attribute::Attribute;
+use super::dimension::Dimension;
+use super::error;
+use super::variable::{Numeric, Variable};
+use super::HashMap;
 use netcdf_sys::*;
-use dimension::{init_dimensions, Dimension};
-use attribute::{init_attributes, Attribute};
-use variable::{init_variable, init_variables, Variable, Numeric};
-use string_from_c_str;
-use NC_ERRORS;
-use std::ptr;
 
+#[derive(Debug)]
 pub struct Group {
-    pub name : String,
-    pub id : i32,
-    pub variables : HashMap<String, Variable>,
-    pub attributes : HashMap<String, Attribute>,
-    pub dimensions : HashMap<String, Dimension>,
-    pub sub_groups : HashMap<String, Group>,
+    pub(crate) name: String,
+    pub(crate) ncid: nc_type,
+    pub(crate) grpid: Option<nc_type>,
+    pub(crate) variables: HashMap<String, Variable>,
+    pub(crate) attributes: HashMap<String, Attribute>,
+    pub(crate) parent_dimensions: Vec<HashMap<String, Dimension>>,
+    pub(crate) dimensions: HashMap<String, Dimension>,
+    pub(crate) groups: HashMap<String, Group>,
 }
 
-
-// Write support for all variable types
-pub trait PutVar {
-    fn get_nc_type(&self) -> i32;
-    fn put(&self, ncid: i32, varid: i32) -> Result<(), String> ;
-    fn len(&self) -> usize;
-}
-
-// This macro implements the trait PutVar for Vec<$type>
-// It just avoid code repetition for all numeric types
-// (the only difference between each type beeing the 
-// netCDF funtion to call and the numeric identifier
-// of the type used by the libnetCDF library)
-macro_rules! impl_putvar {
-    ($type: ty, $nc_type: ident, $nc_put_var: ident) => {
-        impl PutVar for Vec<$type> {
-            fn get_nc_type(&self) -> i32 { $nc_type }
-            fn len(&self) -> usize { self.len() }
-            fn put(&self, ncid: i32, varid: i32) -> Result<(), String> {
-                let err : i32;
-                unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
-                    err = $nc_put_var(ncid, varid, self.as_ptr());
-                }
-                if err != NC_NOERR {
-                    return Err(NC_ERRORS.get(&err).unwrap().clone());
-                }
-                Ok(())
-            }
-        }
+impl Group {
+    pub fn name(&self) -> &str {
+        &self.name
     }
-}
-impl_putvar!(i8, NC_BYTE, nc_put_var_schar);
-impl_putvar!(i16, NC_SHORT, nc_put_var_short);
-impl_putvar!(u16, NC_USHORT, nc_put_var_ushort);
-impl_putvar!(i32, NC_INT, nc_put_var_int);
-impl_putvar!(u32, NC_UINT, nc_put_var_uint);
-impl_putvar!(i64, NC_INT64, nc_put_var_longlong);
-impl_putvar!(u64, NC_UINT64, nc_put_var_ulonglong);
-impl_putvar!(f32, NC_FLOAT, nc_put_var_float);
-impl_putvar!(f64, NC_DOUBLE, nc_put_var_double);
-
-
-// Write support for all attribute types
-pub trait PutAttr {
-    fn get_nc_type(&self) -> i32;
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> ;
-}
-
-// This macro implements the trait PutAttr for $type
-// It just avoid code repetition for all numeric types
-// (the only difference between each type beeing the 
-// netCDF funtion to call and the numeric identifier
-// of the type used by the libnetCDF library)
-macro_rules! impl_putattr {
-    ($type: ty, $nc_type: ident, $nc_put_att: ident) => {
-        impl PutAttr for $type {
-            fn get_nc_type(&self) -> i32 { $nc_type }
-            fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-                let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
-                let err : i32;
-                unsafe {
-                    let _g = libnetcdf_lock.lock().unwrap();
-                    err = $nc_put_att(ncid, varid, name_c.as_ptr(), $nc_type, 1, self);
-                }
-                if err != NC_NOERR {
-                    return Err(NC_ERRORS.get(&err).unwrap().clone());
-                }
-                Ok(())
-            }
-        }
+    pub fn variables(&self) -> &HashMap<String, Variable> {
+        &self.variables
     }
-}
-impl_putattr!(i8, NC_BYTE, nc_put_att_schar);
-impl_putattr!(i16, NC_SHORT, nc_put_att_short);
-impl_putattr!(u16, NC_USHORT, nc_put_att_ushort);
-impl_putattr!(i32, NC_INT, nc_put_att_int);
-impl_putattr!(u32, NC_UINT, nc_put_att_uint);
-impl_putattr!(i64, NC_INT64, nc_put_att_longlong);
-impl_putattr!(u64, NC_UINT64, nc_put_att_ulonglong);
-impl_putattr!(f32, NC_FLOAT, nc_put_att_float);
-impl_putattr!(f64, NC_DOUBLE, nc_put_att_double);
-
-impl PutAttr for String {
-    fn get_nc_type(&self) -> i32 { NC_CHAR }
-    fn put(&self, ncid: i32, varid: i32, name: &str) -> Result<(), String> {
-        let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
-        let attr_c: ffi::CString = ffi::CString::new(self.clone()).unwrap();
-        let err : i32;
-        unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
-            err = nc_put_att_text(
-                ncid, varid, name_c.as_ptr(), 
-                attr_c.to_bytes().len() as u64, attr_c.as_ptr());
-        }
-        if err != NC_NOERR {
-            return Err(NC_ERRORS.get(&err).unwrap().clone());
-        }
-        Ok(())
+    pub fn variable_mut(&mut self, name: &str) -> Option<&mut Variable> {
+        self.variables.get_mut(name)
+    }
+    pub fn attributes(&self) -> &HashMap<String, Attribute> {
+        &self.attributes
+    }
+    pub fn attribute_mut(&mut self, name: &str) -> Option<&mut Attribute> {
+        self.attributes.get_mut(name)
+    }
+    pub fn dimensions(&self) -> &HashMap<String, Dimension> {
+        &self.dimensions
+    }
+    pub fn groups(&self) -> &HashMap<String, Group> {
+        &self.groups
+    }
+    pub fn groups_mut(&mut self, name: &str) -> Option<&mut Group> {
+        self.groups.get_mut(name)
     }
 }
 
 impl Group {
-    pub fn add_attribute<T: PutAttr>(&mut self, name: &str, val: T) 
-            -> Result<(), String> {
-        try!(val.put(self.id, NC_GLOBAL, name));
-        self.attributes.insert(
-                name.to_string().clone(),
-                Attribute {
-                    name: name.to_string().clone(),
-                    attrtype: val.get_nc_type(),
-                    id: 0, // XXX Should Attribute even keep track of an id?
-                    var_id: NC_GLOBAL,
-                    file_id: self.id
-                }
-            );
-        Ok(())
-    }
-
-    pub fn add_dimension(&mut self, name: &str, len: u64) 
-            -> Result<(), String> {
-        let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
-        let mut dimid: i32 = 0;
-        let err : i32;
-        unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
-            err = nc_def_dim(self.id, name_c.as_ptr(), len, &mut dimid);
-        }
-        if err != NC_NOERR {
-            return Err(NC_ERRORS.get(&err).unwrap().clone());
-        }
-        self.dimensions.insert(
-                name.to_string().clone(),
-                Dimension {
-                    name: name.to_string().clone(),
-                    len: len,
-                    id: dimid
-                }
-            );
-        Ok(())
-    }
-
-    // TODO this should probably take &Vec<&str> instead of &Vec<String>
-    pub fn add_variable<T: PutVar>(&mut self, name: &str, dims: &Vec<String>, data: &T) 
-                -> Result<(), String> {
-        let nctype: i32 = data.get_nc_type();
-        let grp_id = self.id;
-        let var = self.create_variable(name, dims, nctype)?;
-        data.put(grp_id, var.id)?; 
-        Ok(())
-    }
-
-    // TODO this should probably take &Vec<&str> instead of &Vec<String>
-    pub fn add_variable_with_fill_value<T: PutVar, N: Numeric>(&mut self, name: &str, dims: &Vec<String>, data: &T, fill_value: N) 
-                -> Result<(), String> {
-        let nctype: i32 = data.get_nc_type();
-        let grp_id = self.id;
-        let var = self.create_variable(name, dims, nctype)?;
-        var.set_fill_value(fill_value)?;
-        data.put(grp_id, var.id)?; 
-        Ok(())
-    }
-
-    // TODO this should probably take &Vec<&str> instead of &Vec<String>
-    /// Create a Variable into the dataset, without writting any data into it.
-    pub fn create_variable(&mut self, name: &str, dims: &Vec<String>, nctype: i32) 
-                -> Result<&mut Variable, String>
+    pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<()>
+    where
+        T: Into<AttrValue>,
     {
-        let name_c: ffi::CString = ffi::CString::new(name.clone()).unwrap();
-        let mut dimids: Vec<i32> = Vec::with_capacity(dims.len());
-        let mut var_dims : Vec<Dimension> = Vec::with_capacity(dims.len());
-        for dim_name in dims {
-            if !self.dimensions.contains_key(dim_name) {
-                return Err("Invalid dimension name".to_string());
+        let att = Attribute::put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name, val.into())?;
+        self.attributes.insert(name.to_string().clone(), att);
+        Ok(())
+    }
+
+    /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
+    pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&mut Dimension> {
+        if self.dimensions.contains_key(name) {
+            return Err(error::Error::AlreadyExists("dimension".into()));
+        }
+
+        let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?;
+        self.dimensions.insert(name.into(), d.clone());
+
+        fn recursively_add_dim(depth: usize, name: &str, d: &Dimension, g: &mut Group) {
+            for (_, grp) in g.groups.iter_mut() {
+                grp.parent_dimensions[depth].insert(name.to_string(), d.clone());
+                recursively_add_dim(depth, name, d, grp);
             }
-            var_dims.push(self.dimensions.get(dim_name).unwrap().clone());
         }
-        for dim in &var_dims {
-            dimids.push(dim.id);
+
+        let mydepth = self.parent_dimensions.len();
+        for (_, grp) in self.groups.iter_mut() {
+            recursively_add_dim(mydepth, name, &d, grp);
         }
-        let mut varid: i32 = 0;
-        let err : i32;
+
+        Ok(self.dimensions.get_mut(name).unwrap())
+    }
+
+    /// Adds a dimension with unbounded size
+    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<&mut Dimension> {
+        self.add_dimension(name, 0)
+    }
+
+    /// Create a Variable into the dataset, without writting any data into it.
+    pub fn add_variable<T>(&mut self, name: &str, dims: &[&str]) -> error::Result<&mut Variable>
+    where
+        T: Numeric,
+    {
+        if self.variables.get(name).is_some() {
+            return Err(error::Error::AlreadyExists("variable".into()));
+        }
+
+        // Assert all dimensions exists, and get &[&Dimension]
+        let (d, e): (Vec<_>, Vec<_>) = dims
+            .iter()
+            .map(|name| {
+                if let Some(x) = self.dimensions.get(*name) {
+                    return Ok(x);
+                }
+                for pdim in self.parent_dimensions.iter().rev() {
+                    if let Some(x) = pdim.get(*name) {
+                        return Ok(x);
+                    }
+                }
+                Err(*name)
+            })
+            .partition(Result::is_ok);
+
+        if !e.is_empty() {
+            let mut s = String::new();
+            s.push_str("dimension(s)");
+            for x in e.into_iter() {
+                s.push(' ');
+                s.push_str(x.unwrap_err());
+            }
+            return Err(error::Error::NotFound(s));
+        }
+
+        let d = d.into_iter().map(Result::unwrap).collect::<Vec<_>>();
+        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, &d, T::NCTYPE)?;
+
+        self.variables.insert(name.into(), var);
+
+        Ok(self.variables.get_mut(name).unwrap())
+    }
+
+    /// Add an empty group to the dataset
+    pub fn add_group(&mut self, name: &str) -> error::Result<&mut Group> {
+        let cstr = std::ffi::CString::new(name).unwrap();
+        let mut grpid = 0;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
-            err = nc_def_var(self.id, name_c.as_ptr(), nctype,
-                                dims.len() as i32, dimids.as_ptr(), &mut varid);
+            error::checked(nc_def_grp(
+                self.grpid.unwrap_or(self.ncid),
+                cstr.as_ptr(),
+                &mut grpid,
+            ))?;
         }
-        if err != NC_NOERR {
-            return Err(NC_ERRORS.get(&err).unwrap().clone());
-        }
-        init_variable(&mut self.variables, self.id, &mut self.dimensions, varid);
-        match self.variables.get_mut(name) {
-            Some(var) => Ok(var),
-            None => Err("Variable creation failed".into())
-        }
+
+        let mut parent_dimensions = self.parent_dimensions.clone();
+        parent_dimensions.push(self.dimensions.clone());
+
+        let g = Group {
+            ncid: self.grpid.unwrap_or(self.ncid),
+            name: name.to_string(),
+            grpid: Some(grpid),
+            parent_dimensions,
+            attributes: Default::default(),
+            dimensions: Default::default(),
+            groups: Default::default(),
+            variables: Default::default(),
+        };
+        self.groups.insert(name.to_string(), g);
+        Ok(self.groups.get_mut(name).unwrap())
     }
-}
-
-fn init_sub_groups(grp_id: i32, sub_groups: &mut HashMap<String, Group>,
-                   parent_dims: &HashMap<String, Dimension>) {
-    let mut ngrps = 0i32;
-    let mut grpids : Vec<i32>;
-
-    // Fetching the group ID's list must be done in 2 steps,
-    // 1 - Find out how many groups there are.
-    // 2 - Get a list of those group IDs.
-    // 
-    // the function `nc_inq_grps()` fulfill those 2 requests
-    // See: http://www.unidata.ucar.edu/software/netcdf/netcdf-4/newdocs/netcdf-c/nc_005finq_005fgrps.html
-    unsafe {
-        let _g = libnetcdf_lock.lock().unwrap();
-        // Get the number of groups
-        let mut err = nc_inq_grps(grp_id, &mut ngrps, ptr::null_mut());
-        assert_eq!(err, NC_NOERR);
-        // set the group capacity and len to the number of groups
-        grpids = Vec::with_capacity(ngrps as usize);
-        grpids.set_len(ngrps as usize);
-        // Get the list of group IDs
-        err = nc_inq_grps(grp_id, &mut ngrps, grpids.as_mut_ptr());
-        assert_eq!(err, NC_NOERR);
-    }
-    for i_grp in 0..ngrps {
-        let mut namelen = 0u64;
-        let c_str: &ffi::CStr;
-        let str_buf: String;
-        unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
-            // name length
-            let err = nc_inq_grpname_len(grpids[i_grp as usize], &mut namelen);
-            assert_eq!(err, NC_NOERR);
-            // name
-            let mut buf_vec = vec![0i8; (namelen+1) as usize];
-            let buf_ptr : *mut i8 = buf_vec.as_mut_ptr();
-            let err = nc_inq_grpname(grpids[i_grp as usize], buf_ptr);
-            assert_eq!(err, NC_NOERR);
-            c_str = ffi::CStr::from_ptr(buf_ptr);
-            str_buf = string_from_c_str(c_str);
-        }
-
-        // Per NetCDF doc, "Dimensions are visible in their groups, and all 
-        // child groups."
-        let mut new_grp = Group {
-                name: str_buf.clone(),
-                id: grpids[i_grp as usize],
-                variables: HashMap::new(),
-                attributes: HashMap::new(),
-                dimensions: parent_dims.clone(),
-                sub_groups: HashMap::new(),
-            };
-        init_group(&mut new_grp);
-        sub_groups.insert(str_buf.clone(), new_grp);
-    }
-}
-
-pub fn init_group(grp: &mut Group) {
-    init_dimensions(&mut grp.dimensions, grp.id);
-    init_attributes(&mut grp.attributes, grp.id, NC_GLOBAL, -1);
-    init_variables(&mut grp.variables, grp.id, &grp.dimensions);
-    init_sub_groups(grp.id, &mut grp.sub_groups, &grp.dimensions);
 }
