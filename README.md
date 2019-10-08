@@ -21,7 +21,7 @@ Not (yet) supported:
 * string variables
 
 All variable data is read into a 1-dimensional buffer, with the resulting layout with the last variable varying the fastest.
-The data can also be read into an [ndarray](https://github.com/bluss/rust-ndarray).
+The data can also be read into an [ndarray](https://github.com/rust-ndarray/rust-ndarray).
 
 ## Building
 
