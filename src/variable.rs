@@ -573,20 +573,18 @@ impl Variable {
             }
         };
         let _slice_len: Vec<usize>;
-        let full_length = self
-            .dimensions
-            .iter()
-            .map(|d| d.len())
-            .fold(1usize, |acc, x| acc.saturating_mul(x));
-        if full_length == std::usize::MAX {
-            return Err(error::Error::Overflow);
-        }
+        let full_length;
         let slice_len = match slice_len {
             Some(x) => {
+                full_length = x.iter().fold(1usize, |acc, x| acc.saturating_mul(*x));
+                if full_length == std::usize::MAX {
+                    return Err(error::Error::Overflow);
+                }
                 self.check_sizelen(full_length, indices, x, false)?;
                 x
             }
             None => {
+                full_length = self.dimensions.iter().map(|d| d.len()).product();
                 _slice_len = self.default_sizelen(full_length, indices, false)?;
                 &_slice_len
             }
@@ -721,7 +719,7 @@ impl Variable {
     /// Set a Fill Value
     pub fn set_fill_value<T>(&mut self, fill_value: T) -> error::Result<()>
     where
-        T: Numeric
+        T: Numeric,
     {
         if T::NCTYPE != self.vartype {
             return Err(error::Error::TypeMismatch);

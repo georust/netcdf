@@ -175,6 +175,36 @@ fn open_pres_temp_4d() {
 }
 
 #[test]
+#[cfg(feature = "ndarray")]
+fn ndarray_read_with_indices() {
+    let f = test_location().join("pres_temp_4D.nc");
+    let file = netcdf::open(f).unwrap();
+
+    let var = &file.variables()["pressure"];
+
+    let sizes = [
+        var.dimensions()[0].len(),
+        var.dimensions()[1].len(),
+        1,
+        var.dimensions()[2].len(),
+    ];
+    let indices = [0, 0, 3, 0];
+    let values = var.values::<f32>(Some(&indices), Some(&sizes)).unwrap();
+
+    assert_eq!(values.shape(), sizes);
+
+    let indices = [0, 1, 3, 0];
+    let sizes = [
+        var.dimensions()[0].len(),
+        var.dimensions()[1].len() - 1,
+        2,
+        var.dimensions()[2].len(),
+    ];
+    let values = var.values::<f32>(Some(&indices), Some(&sizes)).unwrap();
+    assert_eq!(values.shape(), sizes);
+}
+
+#[test]
 fn nc4_groups() {
     let f = test_location().join("simple_nc4.nc");
 
