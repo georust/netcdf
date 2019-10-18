@@ -141,8 +141,9 @@ impl Group {
         Ok(self.groups.get_mut(name).unwrap())
     }
 
-    /// Asserts all dimensions exists, and gets the pointer to these
-    fn find_dimensions(&self, dims: &[&str]) -> error::Result<Vec<&Dimension>> {
+    /// Asserts all dimensions exists, and gets a copy of these
+    /// (will be moved into a Variable)
+    fn find_dimensions(&self, dims: &[&str]) -> error::Result<Vec<Dimension>> {
         let (d, e): (Vec<_>, Vec<_>) = dims
             .iter()
             .map(|name| {
@@ -168,7 +169,11 @@ impl Group {
             return Err(error::Error::NotFound(s));
         }
 
-        let d = d.into_iter().map(Result::unwrap).collect::<Vec<_>>();
+        let d = d
+            .into_iter()
+            .map(Result::unwrap)
+            .cloned()
+            .collect::<Vec<_>>();
         Ok(d)
     }
 
@@ -182,7 +187,7 @@ impl Group {
         }
 
         let d = self.find_dimensions(dims)?;
-        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, &d, T::NCTYPE)?;
+        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
 
         self.variables.insert(name.into(), var);
         Ok(self.variables.get_mut(name).unwrap())
@@ -199,7 +204,7 @@ impl Group {
         }
 
         let d = self.find_dimensions(dims)?;
-        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, &d, NC_STRING)?;
+        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, NC_STRING)?;
 
         self.variables.insert(name.into(), var);
         Ok(self.variables.get_mut(name).unwrap())

@@ -469,7 +469,7 @@ impl Variable {
     pub(crate) fn new(
         grp_id: nc_type,
         name: &str,
-        dims: &[&Dimension],
+        dims: Vec<Dimension>,
         vartype: nc_type,
     ) -> error::Result<Self> {
         use std::ffi::CString;
@@ -492,7 +492,7 @@ impl Variable {
         Ok(Self {
             name: name.into(),
             attributes: HashMap::new(),
-            dimensions: dims.iter().map(|x| (**x).clone()).collect(),
+            dimensions: dims,
             vartype,
             ncid: grp_id,
             varid: id,
