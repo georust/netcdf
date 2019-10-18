@@ -4,7 +4,7 @@
 fn test_location() -> std::path::PathBuf {
     use std::path::Path;
 
-    let mnf_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let mnf_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into());
     Path::new(&mnf_dir).join("tests").join("testdata")
 }
 
@@ -171,6 +171,82 @@ fn last_dim_varies_fastest() {
             assert_eq!(data.as_slice().unwrap()[ind], ind as i32);
         }
     }
+}
+
+#[test]
+fn attributes_read() {
+    let f = test_location().join("patmosx_v05r03-preliminary_NOAA-19_asc_d20130630_c20140325.nc");
+    let file = netcdf::open(&f).unwrap();
+
+    let attr = &file
+        .attribute("PROGLANG")
+        .expect("Could not find attribute");
+
+    assert_eq!(attr.name(), "PROGLANG");
+
+    for attr in file.attributes() {
+        let _val = attr.value().expect("Could not get value");
+    }
+
+    let d = tempfile::tempdir().expect("Could not get tempdir");
+    let path = d.path().join("attributes_read.nc");
+    let mut file = netcdf::create(path).expect("Could not create file");
+
+    let var = &mut file
+        .add_variable::<f32>("var", &[])
+        .expect("Could not add variable");
+    var.add_attribute("att", "some attribute")
+        .expect("Could not add attribute");
+    assert_eq!(var.vartype(), netcdf_sys::NC_FLOAT);
+
+    for attr in var.attributes() {
+        attr.value().unwrap();
+    }
+}
+
+#[test]
+fn dimension_lengths() {
+    let d = tempfile::tempdir().expect("Could not create tempdir");
+    let path = d.path().join("dimension_lengths");
+    let mut file = netcdf::create(path).expect("Could not create file");
+
+    file.add_unlimited_dimension("unlim")
+        .expect("Could not create dimension");
+    file.add_dimension("lim", 10)
+        .expect("Could not create dimension");
+
+    let dim = &file.dimension("unlim").expect("Could not find dim");
+    assert_eq!(dim.len(), 0);
+
+    let dim = &file.dimension("lim").expect("Could not find dim");
+    assert_eq!(dim.len(), 10);
+
+    for dim in file.dimensions() {
+        assert!(dim.len() == 0 || dim.len() == 10);
+    }
+}
+
+#[test]
+fn netcdf_error() {
+    let path = ".";
+    let err = netcdf::open(path).unwrap_err();
+
+    use std::error::Error;
+    println!("{} {:?}", err, err.source());
+
+    let err: netcdf::error::Error = "hello".into();
+    println!("{}", err);
+    let err: netcdf::error::Error = String::from("hello").into();
+    println!("{}", err);
+
+    let d = tempfile::tempdir().expect("Could not get tempdir");
+    let path = d.path().join("netcdf_error.nc");
+    let mut file = netcdf::create(path).expect("Could not create file");
+
+    file.add_variable::<i8>("var", &["v"]).unwrap_err();
+    file.add_dimension("v", 3).expect("Could not add dimension");
+    file.add_variable::<i8>("var", &["v"]).unwrap();
+    file.add_variable::<i8>("var", &["v"]).unwrap_err();
 }
 
 #[test]
