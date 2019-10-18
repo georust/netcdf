@@ -1,8 +1,11 @@
+//! Interact with netcdf dimensions
+
 #![allow(clippy::similar_names)]
 use super::error;
 use super::LOCK;
 use netcdf_sys::*;
 
+/// Represents a netcdf dimension
 #[derive(Debug, Clone)]
 pub struct Dimension {
     pub(crate) name: String,
@@ -12,6 +15,8 @@ pub struct Dimension {
     pub(crate) ncid: nc_type,
 }
 
+/// Unique identifier for a dimensions in a file. Used when
+/// names can not be used directly
 #[derive(Debug, Copy, Clone)]
 pub struct Identifier {
     pub(crate) identifier: nc_type,
@@ -19,6 +24,8 @@ pub struct Identifier {
 
 #[allow(clippy::len_without_is_empty)]
 impl Dimension {
+    /// Get current length of the dimensions, which is
+    /// the product of all dimensions in the variable
     pub fn len(&self) -> usize {
         if let Some(x) = self.len {
             x.get()
@@ -34,14 +41,17 @@ impl Dimension {
         }
     }
 
+    /// Checks whether the dimension is growable
     pub fn is_unlimited(&self) -> bool {
         self.len.is_none()
     }
 
+    /// Gets the name of the dimension
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Grabs a unique identifier for this dimension
     pub fn identifier(&self) -> Identifier {
         Identifier {
             identifier: self.id,

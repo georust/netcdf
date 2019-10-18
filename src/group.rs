@@ -1,3 +1,6 @@
+//! All netcdf items belong in the root group, which can
+//! be interacted with to get the underlying data
+
 use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
@@ -6,6 +9,9 @@ use super::variable::{Numeric, Variable};
 use super::HashMap;
 use netcdf_sys::*;
 
+/// Main component of the netcdf format. Holds all variables,
+/// attributes, and dimensions. A group can always see the parents items,
+/// but a parent can not access a childs items.
 #[derive(Debug)]
 pub struct Group {
     pub(crate) name: String,
@@ -74,6 +80,7 @@ impl Group {
 }
 
 impl Group {
+    /// Add an attribute to the group
     pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<()>
     where
         T: Into<AttrValue>,

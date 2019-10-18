@@ -1,3 +1,5 @@
+//! Open, create, and append netcdf files
+
 #![allow(clippy::similar_names)]
 use super::error;
 use super::group::Group;
@@ -8,6 +10,7 @@ use std::convert::TryInto;
 use std::ffi::CString;
 use std::path;
 
+/// Container for netcdf type
 #[derive(Debug)]
 pub struct File {
     pub(crate) ncid: nc_type,
@@ -16,11 +19,14 @@ pub struct File {
 }
 
 impl File {
+    /// Current name of the file. This name sometimes gives the name
+    /// of the file used to open it, or some arbitrary name when
+    /// opened through a memory buffer
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Main entrypoint for interacting with the netcdf file. Also accesible
+    /// Main entrypoint for interacting with the netcdf file. Also accessible
     /// through the `Deref` trait on `File`
     pub fn root(&self) -> &Group {
         &self.root

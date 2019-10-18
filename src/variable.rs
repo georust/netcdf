@@ -1,3 +1,5 @@
+//! Variables in the netcdf file
+
 #![allow(clippy::similar_names)]
 use super::attribute::AttrValue;
 use super::attribute::Attribute;
@@ -27,18 +29,25 @@ pub struct Variable {
 
 #[allow(clippy::len_without_is_empty)]
 impl Variable {
+    /// Get name of variable
     pub fn name(&self) -> &str {
         &self.name
     }
+    /// Get an attribute of this variable
     pub fn attribute(&self, name: &str) -> Option<&Attribute> {
         self.attributes.get(name)
     }
+    /// Iterator over all the attributes of this variable
     pub fn attributes(&self) -> impl Iterator<Item = &Attribute> {
         self.attributes.values()
     }
+    /// Dimensions for a variable
     pub fn dimensions(&self) -> &[Dimension] {
         &self.dimensions
     }
+    /// Get the type of this variable. This will be an integer
+    /// such as `NC_FLOAT`, `NC_DOUBLE`, `NC_INT` from
+    /// the `netcdf-sys` crate
     pub fn vartype(&self) -> nc_type {
         self.vartype
     }
@@ -512,6 +521,7 @@ impl Variable {
         })
     }
 
+    /// Adds an attribute to the variable
     pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<()>
     where
         T: Into<AttrValue>,

@@ -61,6 +61,8 @@
 //! # Ok(()) }
 //! ```
 
+#![warn(missing_docs)]
+
 use lazy_static::lazy_static;
 use netcdf_sys::nc_type;
 use std::sync::Mutex;

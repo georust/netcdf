@@ -1,3 +1,5 @@
+//! Add and read attributes from netcdf groups and variables
+
 #![allow(clippy::similar_names)]
 use super::error;
 use super::LOCK;
@@ -5,6 +7,9 @@ use netcdf_sys::*;
 use std::ffi::CString;
 
 #[derive(Debug)]
+/// Extra properties of a variable or a group can be represented
+/// with attributes. Primarily added with `add_attribute` on
+/// the variable and group
 pub struct Attribute {
     pub(crate) name: String,
     /// Group or file this attribute is in
@@ -14,6 +19,7 @@ pub struct Attribute {
 }
 
 impl Attribute {
+    /// Get the name of the attribute
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -185,6 +191,9 @@ impl Attribute {
     }
 }
 
+/// Holds the attribute value which can be inserted and
+/// returned from the file
+#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AttrValue {
     Uchar(u8),
