@@ -19,6 +19,7 @@ impl Attribute {
     pub fn value(&self) -> error::Result<AttrValue> {
         let mut typ = 0;
         let cname = std::ffi::CString::new(self.name.clone()).unwrap();
+        let _l = LOCK.lock().unwrap();
         unsafe {
             error::checked(nc_inq_atttype(
                 self.ncid,
