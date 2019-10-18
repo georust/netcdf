@@ -159,21 +159,22 @@ impl Attribute {
                         &mut lentext,
                     ))?;
                 }
-                let mut buf = vec![0; lentext];
+                let mut buf: Vec<u8> = vec![0; lentext];
                 unsafe {
                     error::checked(nc_get_att_text(
                         self.ncid,
                         self.varid,
                         cname.as_ptr(),
-                        buf.as_mut_ptr(),
+                        buf.as_mut_ptr() as *mut _,
                     ))?;
                 }
-                let value = buf
-                    .into_iter()
-                    .take_while(|x| *x != 0)
-                    .map(|x| x as _)
-                    .collect::<Vec<_>>();
-                Ok(AttrValue::Str(String::from_utf8(value).unwrap()))
+                let pos = buf
+                    .iter()
+                    .position(|&x| x == 0)
+                    .unwrap_or_else(|| buf.len());
+                Ok(AttrValue::Str(String::from(String::from_utf8_lossy(
+                    &buf[..pos],
+                ))))
             }
             x => Err(error::Error::TypeUnknown(x)),
         }
