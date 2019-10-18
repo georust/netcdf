@@ -40,20 +40,11 @@ impl Variable {
     pub fn len(&self) -> usize {
         self.dimensions.iter().map(|d| d.len()).product()
     }
-    /// Sets compression on the variable. Must be set before filling in data
-    pub fn compression(
-        &mut self,
-        deflate_level: nc_type,
-        chunksize: Option<usize>,
-    ) -> error::Result<()> {
+
+    /// Sets compression on the variable. Must be set before filling in data.
+    /// `deflate_level` can take a value 0..=9
+    pub fn compression(&mut self, deflate_level: nc_type) -> error::Result<()> {
         let _l = LOCK.lock().unwrap();
-        if let Some(chunks) = chunksize {
-            unsafe {
-                error::checked(nc_def_var_chunking(
-                    self.ncid, self.varid, NC_CHUNKED, &chunks,
-                ))?;
-            }
-        }
         unsafe {
             error::checked(nc_def_var_deflate(
                 self.ncid,
@@ -61,6 +52,35 @@ impl Variable {
                 false as _,
                 true as _,
                 deflate_level,
+            ))?;
+        }
+
+        Ok(())
+    }
+
+    /// Set chunking for variable. Must be set before inserting data
+    ///
+    /// Use this when reading or writing smaller units of the hypercube than
+    /// the full dimensions lengths, to change how the variable is stored in
+    /// the file. This has no effect on the memory order when reading/putting
+    /// a buffer.
+    pub fn chunking(&mut self, chunksize: &[usize]) -> error::Result<()> {
+        let _l = LOCK.lock().unwrap();
+        if chunksize.len() != self.dimensions.len() {
+            return Err(error::Error::SliceLen);
+        }
+        let len = chunksize
+            .iter()
+            .fold(1usize, |acc, &x| acc.saturating_mul(x));
+        if len == std::usize::MAX {
+            return Err(error::Error::Overflow);
+        }
+        unsafe {
+            error::checked(nc_def_var_chunking(
+                self.ncid,
+                self.varid,
+                NC_CHUNKED,
+                chunksize.as_ptr(),
             ))?;
         }
 

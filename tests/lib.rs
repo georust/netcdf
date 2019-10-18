@@ -782,7 +782,7 @@ fn read_mismatched() {
 }
 
 #[test]
-fn use_compression() {
+fn use_compression_chunking() {
     let d = tempfile::tempdir().unwrap();
     let f = d.path().join("compressed_var.nc");
     let mut file = netcdf::create(f).unwrap();
@@ -793,10 +793,30 @@ fn use_compression() {
         .root_mut()
         .add_variable::<i32>("compressed", &["x"])
         .unwrap();
-    var.compression(5, Some(5)).unwrap();
+    var.compression(5).unwrap();
+    var.chunking(&[5]).unwrap();
 
     let v = vec![0i32; 10];
     var.put_values(&v, None, None).unwrap();
+
+    let var = &mut file
+        .add_variable::<i32>("compressed2", &["x", "x"])
+        .unwrap();
+    var.compression(9).unwrap();
+    var.chunking(&[5, 5]).unwrap();
+    var.put_values(&[1i32, 2, 3, 4, 5, 6, 7, 8, 9, 10], None, Some(&[10, 1]))
+        .unwrap();
+
+    let var = &mut file.add_variable::<i32>("chunked3", &["x"]).unwrap();
+    assert_eq!(
+        var.chunking(&[2, 2]).unwrap_err(),
+        netcdf::error::Error::SliceLen
+    );
+
+    file.add_dimension("y", 0).unwrap();
+    let var = &mut file.add_variable::<u8>("chunked4", &["y", "x"]).unwrap();
+
+    var.chunking(&[100, 2]).unwrap();
 }
 
 #[test]
