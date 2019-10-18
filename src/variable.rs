@@ -494,6 +494,43 @@ impl Variable {
         T::single_value_from_variable(self, indices)
     }
 
+    /// Reads a string variable. This involves two copies per read, and should
+    /// be avoided in performance critical code
+    pub fn string_value(&self, indices: Option<&[usize]>) -> error::Result<String> {
+        let _indices: Vec<usize>;
+        let indices = match indices {
+            Some(x) => {
+                self.check_indices(x, false)?;
+                x
+            }
+            None => {
+                _indices = self.default_indices(false)?;
+                &_indices
+            }
+        };
+        let _l = LOCK.lock().unwrap();
+
+        let mut s: *mut std::os::raw::c_char = std::ptr::null_mut();
+        unsafe {
+            error::checked(nc_get_var1_string(
+                self.ncid,
+                self.varid,
+                indices.as_ptr(),
+                &mut s,
+            ))?;
+        }
+        let string = unsafe { std::ffi::CStr::from_ptr(s) };
+
+        let value = string.to_string_lossy().into_owned();
+
+        unsafe {
+            // Make sure this is always called before exiting function
+            error::checked(nc_free_string(1, &mut s))?;
+        }
+
+        Ok(value)
+    }
+
     #[cfg(feature = "ndarray")]
     /// Fetches variable
     pub fn values<T: Numeric>(
@@ -592,6 +629,38 @@ impl Variable {
             }
         };
         T::put_value_at(self, indices, value)
+    }
+
+    /// Internally converts to a CString, avoid using this function when performance
+    /// is important
+    pub fn put_string(&mut self, value: &str, indices: Option<&[usize]>) -> error::Result<()> {
+        let _indices: Vec<usize>;
+        let indices = match indices {
+            Some(x) => {
+                self.check_indices(x, true)?;
+                x
+            }
+            None => {
+                _indices = self.default_indices(true)?;
+                &_indices
+            }
+        };
+
+        let value = std::ffi::CString::new(value).expect("String contained interior 0");
+        let mut ptr = value.as_ptr();
+
+        let _l = LOCK.lock().unwrap();
+
+        unsafe {
+            error::checked(nc_put_var1_string(
+                self.ncid,
+                self.varid,
+                indices.as_ptr(),
+                &mut ptr,
+            ))?
+        }
+
+        Ok(())
     }
 
     /// Put a slice of values at `indices`

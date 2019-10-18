@@ -84,49 +84,6 @@ impl Group {
         self.add_dimension(name, 0)
     }
 
-    /// Create a Variable into the dataset, without writting any data into it.
-    pub fn add_variable<T>(&mut self, name: &str, dims: &[&str]) -> error::Result<&mut Variable>
-    where
-        T: Numeric,
-    {
-        if self.variables.get(name).is_some() {
-            return Err(error::Error::AlreadyExists("variable".into()));
-        }
-
-        // Assert all dimensions exists, and get &[&Dimension]
-        let (d, e): (Vec<_>, Vec<_>) = dims
-            .iter()
-            .map(|name| {
-                if let Some(x) = self.dimensions.get(*name) {
-                    return Ok(x);
-                }
-                for pdim in self.parent_dimensions.iter().rev() {
-                    if let Some(x) = pdim.get(*name) {
-                        return Ok(x);
-                    }
-                }
-                Err(*name)
-            })
-            .partition(Result::is_ok);
-
-        if !e.is_empty() {
-            let mut s = String::new();
-            s.push_str("dimension(s)");
-            for x in e.into_iter() {
-                s.push(' ');
-                s.push_str(x.unwrap_err());
-            }
-            return Err(error::Error::NotFound(s));
-        }
-
-        let d = d.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, &d, T::NCTYPE)?;
-
-        self.variables.insert(name.into(), var);
-
-        Ok(self.variables.get_mut(name).unwrap())
-    }
-
     /// Add an empty group to the dataset
     pub fn add_group(&mut self, name: &str) -> error::Result<&mut Group> {
         let cstr = std::ffi::CString::new(name).unwrap();
@@ -154,5 +111,69 @@ impl Group {
         };
         self.groups.insert(name.to_string(), g);
         Ok(self.groups.get_mut(name).unwrap())
+    }
+
+    /// Asserts all dimensions exists, and gets the pointer to these
+    fn find_dimensions(&self, dims: &[&str]) -> error::Result<Vec<&Dimension>> {
+        let (d, e): (Vec<_>, Vec<_>) = dims
+            .iter()
+            .map(|name| {
+                if let Some(x) = self.dimensions.get(*name) {
+                    return Ok(x);
+                }
+                for pdim in self.parent_dimensions.iter().rev() {
+                    if let Some(x) = pdim.get(*name) {
+                        return Ok(x);
+                    }
+                }
+                Err(*name)
+            })
+            .partition(Result::is_ok);
+
+        if !e.is_empty() {
+            let mut s = String::new();
+            s.push_str("dimension(s)");
+            for x in e.into_iter() {
+                s.push(' ');
+                s.push_str(x.unwrap_err());
+            }
+            return Err(error::Error::NotFound(s));
+        }
+
+        let d = d.into_iter().map(Result::unwrap).collect::<Vec<_>>();
+        Ok(d)
+    }
+
+    /// Create a Variable into the dataset, with no data written into it
+    pub fn add_variable<T>(&mut self, name: &str, dims: &[&str]) -> error::Result<&mut Variable>
+    where
+        T: Numeric,
+    {
+        if self.variables.get(name).is_some() {
+            return Err(error::Error::AlreadyExists("variable".into()));
+        }
+
+        let d = self.find_dimensions(dims)?;
+        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, &d, T::NCTYPE)?;
+
+        self.variables.insert(name.into(), var);
+        Ok(self.variables.get_mut(name).unwrap())
+    }
+
+    /// Adds a variable with a basic type of string
+    pub fn add_string_variable(
+        &mut self,
+        name: &str,
+        dims: &[&str],
+    ) -> error::Result<&mut Variable> {
+        if self.variables.get(name).is_some() {
+            return Err(error::Error::AlreadyExists("variable".into()));
+        }
+
+        let d = self.find_dimensions(dims)?;
+        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, &d, NC_STRING)?;
+
+        self.variables.insert(name.into(), var);
+        Ok(self.variables.get_mut(name).unwrap())
     }
 }

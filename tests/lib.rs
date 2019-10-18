@@ -981,7 +981,7 @@ fn length_of_variable() {
 fn single_length_variable() {
     let d = tempfile::tempdir().unwrap();
     let path = d.path().join("single_length_variable.nc");
-    let mut file = netcdf::create(path).unwrap();
+    let mut file = netcdf::create(&path).unwrap();
 
     let var = &mut file.add_variable::<u8>("x", &[]).unwrap();
 
@@ -1001,4 +1001,72 @@ fn single_length_variable() {
 
     var.put_values::<u8>(&[10], Some(&[1]), None).unwrap_err();
     assert_eq!(var.value(None), Ok(8u8));
+
+    std::mem::drop(file);
+
+    let file = netcdf::open(path).unwrap();
+
+    let var = &file.variables()["x"];
+
+    assert_eq!(var.value::<u8>(None).unwrap(), 8);
+}
+
+#[test]
+fn put_then_def() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("put_then_def.nc");
+    let mut file = netcdf::create(path).unwrap();
+
+    let var = &mut file.add_variable::<i8>("x", &[]).unwrap();
+    var.put_value(3i8, None).unwrap();
+
+    let var2 = &mut file.add_variable::<i8>("y", &[]).unwrap();
+    var2.put_value(4i8, None).unwrap();
+}
+
+#[test]
+fn string_variables() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("string_variables.nc");
+    {
+        let mut file = netcdf::create(&path).unwrap();
+
+        file.add_unlimited_dimension("x").unwrap();
+        file.add_dimension("y", 2).unwrap();
+
+        let var = &mut file.add_string_variable("str", &["x"]).unwrap();
+
+        var.put_string("Hello world!", None).unwrap();
+        var.put_string(
+            "Trying a very long string just to see how that goes",
+            Some(&[2]),
+        )
+        .unwrap();
+        var.put_string("Foreign letters: ßæøå, #41&i1/99", Some(&[3]))
+            .unwrap();
+
+        // Some weird interaction between unlimited dimensions, put_str,
+        // and the name of this variable leads to crash. This
+        // can be observed by changing this     \ /    to "x"
+        let var = &mut file.add_variable::<i32>("y", &[]).unwrap();
+        var.put_value(42i32, Some(&[])).unwrap();
+    }
+    let file = netcdf::open(path).unwrap();
+
+    let var = &file.variables()["str"];
+
+    assert_eq!(var.string_value(Some(&[0])).unwrap(), "Hello world!");
+    assert_eq!(var.string_value(Some(&[1])).unwrap(), "");
+    assert_eq!(
+        var.string_value(Some(&[2])).unwrap(),
+        "Trying a very long string just to see how that goes"
+    );
+    assert_eq!(
+        var.string_value(Some(&[3])).unwrap(),
+        "Foreign letters: ßæøå, #41&i1/99"
+    );
+
+    println!("{:?}", file.variables());
+    let var = &file.variables()["y"];
+    var.string_value(None).unwrap_err();
 }
