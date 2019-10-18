@@ -47,14 +47,6 @@ impl Group {
     pub fn attributes(&self) -> impl Iterator<Item = &Attribute> {
         self.attributes.values()
     }
-    /// Get a single attribute (mutable)
-    pub fn attribute_mut(&mut self, name: &str) -> Option<&mut Attribute> {
-        self.attributes.get_mut(name)
-    }
-    /// Get all attributes (mutable)
-    pub fn attributes_mut(&mut self) -> impl Iterator<Item = &mut Attribute> {
-        self.attributes.values_mut()
-    }
     /// Get a single dimension
     pub fn dimension(&self, name: &str) -> Option<&Dimension> {
         self.dimensions.get(name)
