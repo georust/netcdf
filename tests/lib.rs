@@ -1087,6 +1087,34 @@ fn use_compression_chunking() {
 }
 
 #[test]
+fn set_compression_all_variables_in_a_group() {
+    let d = tempfile::tempdir().expect("Could not create tempdir");
+    let path = d.path().join("set_compression_all_variables_in_a_group.nc");
+    let mut file = netcdf::create(path).expect("Could not create file");
+
+    file.add_dimension("x", 10)
+        .expect("Could not create dimension");
+    file.add_dimension("y", 15)
+        .expect("Could not create dimension");
+    file.add_variable::<u8>("var0", &["x", "y"])
+        .expect("Could not create variable");
+    file.add_variable::<u8>("var1", &["x", "y"])
+        .expect("Could not create variable");
+    file.add_variable::<u8>("var2", &["x", "y"])
+        .expect("Could not create variable");
+    file.add_variable::<u8>("var3", &["x", "y"])
+        .expect("Could not create variable");
+
+    for ref mut var in file.variables_mut() {
+        var.compression(9).expect("Could not set compression level");
+    }
+
+    let var = file.variable_mut("var0").unwrap();
+    var.compression(netcdf_sys::NC_MAX_DEFLATE_LEVEL + 1)
+        .unwrap_err();
+}
+
+#[test]
 #[cfg(feature = "memory")]
 fn read_from_memory() {
     use std::io::Read;

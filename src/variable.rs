@@ -45,7 +45,10 @@ impl Variable {
     }
 
     /// Sets compression on the variable. Must be set before filling in data.
-    /// `deflate_level` can take a value 0..=9
+    ///
+    /// `deflate_level` can take a value 0..=9, with 0 being no
+    /// compression (good for CPU bound tasks), and 9 providing the
+    /// highest compression level (good for memory bound tasks)
     pub fn compression(&mut self, deflate_level: nc_type) -> error::Result<()> {
         let _l = LOCK.lock().unwrap();
         unsafe {
