@@ -1367,3 +1367,23 @@ fn string_variables() {
     let var = &file.variable("y").unwrap();
     var.string_value(None).unwrap_err();
 }
+
+#[test]
+fn unlimited_in_parents() {
+    let d = tempfile::tempdir().expect("Could not create tempdir");
+    let path = d.path().join("unlimited_in_parents.nc");
+    {
+        let mut file = netcdf::create(&path).unwrap();
+
+        file.add_dimension("x", 0).unwrap();
+        file.add_dimension("y", 0).unwrap();
+        file.add_dimension("z0", 5).unwrap();
+        let g = &mut file.add_group("g").unwrap();
+        g.add_dimension("z1", 0).unwrap();
+    }
+    let mut file = netcdf::append(&path).unwrap();
+
+    let g = &mut file.group_mut("g").unwrap();
+    g.add_variable::<i16>("w", &["z1"]).unwrap();
+    g.add_variable::<u16>("v", &["x"]).unwrap();
+}

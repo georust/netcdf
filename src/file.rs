@@ -410,7 +410,7 @@ fn get_variables(
 
 fn get_groups(
     ncid: nc_type,
-    parent_dim: &[HashMap<String, Dimension>],
+    parent_dim: &[&HashMap<String, Dimension>],
 ) -> error::Result<HashMap<String, Group>> {
     let mut ngroups = 0;
 
@@ -432,7 +432,7 @@ fn get_groups(
         let dimensions = get_group_dimensions(grpid, &unlim_dims)?;
         let variables = get_variables(grpid, &unlim_dims)?;
         let mut parent_dimensions = parent_dim.to_vec();
-        parent_dimensions.push(dimensions.clone());
+        parent_dimensions.push(&dimensions);
         let subgroups = get_groups(grpid, &parent_dimensions)?;
         let attributes = get_attributes(grpid, NC_GLOBAL)?;
 
@@ -452,7 +452,7 @@ fn get_groups(
             ncid,
             grpid: Some(grpid),
             attributes,
-            parent_dimensions: parent_dim.to_vec(),
+            parent_dimensions: parent_dim.iter().map(|&x| x.clone()).collect(),
             dimensions,
             variables,
             groups: subgroups,
@@ -490,8 +490,7 @@ fn parse_file(ncid: nc_type) -> error::Result<Group> {
 
     let variables = get_variables(ncid, &unlimited_dimensions)?;
 
-    // Empty parent group
-    let groups = get_groups(ncid, &[])?;
+    let groups = get_groups(ncid, &[&dimensions])?;
 
     Ok(Group {
         ncid,
