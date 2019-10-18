@@ -134,6 +134,9 @@ impl Variable {
             if *s == 0 {
                 return Err(error::Error::ZeroSlice);
             }
+            if i.checked_add(*s).is_none() {
+                return Err(error::Error::Overflow);
+            }
             if i + s > d.len() {
                 if !putting {
                     return Err(error::Error::SliceMismatch);
