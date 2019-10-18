@@ -28,7 +28,7 @@ pub enum Error {
     AlreadyExists(String),
     /// Could not find variable/attribute/etc
     NotFound(String),
-    /// Slice lenghts are ambiguous
+    /// Slice lengths are ambiguous
     Ambiguous,
     /// Overflows possible lengths
     Overflow,
