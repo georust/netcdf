@@ -1,8 +1,10 @@
+#![allow(clippy::similar_names)]
 use super::error;
 use super::group::Group;
 use super::HashMap;
 use super::LOCK;
 use netcdf_sys::*;
+use std::convert::TryInto;
 use std::ffi::CString;
 use std::path;
 
@@ -44,8 +46,9 @@ impl std::ops::DerefMut for File {
 }
 
 impl File {
+    #[allow(clippy::doc_markdown)]
     /// Open a netCDF file in read only mode.
-    pub fn open(path: &path::Path) -> error::Result<File> {
+    pub fn open(path: &path::Path) -> error::Result<Self> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         unsafe {
@@ -55,15 +58,16 @@ impl File {
 
         let root = parse_file(ncid)?;
 
-        Ok(File {
+        Ok(Self {
             ncid,
             name: path.file_name().unwrap().to_string_lossy().to_string(),
             root,
         })
     }
+    #[allow(clippy::doc_markdown)]
     /// Open a netCDF file in append mode (read/write).
     /// The file must already exist.
-    pub fn append(path: &path::Path) -> error::Result<File> {
+    pub fn append(path: &path::Path) -> error::Result<Self> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         unsafe {
@@ -73,16 +77,17 @@ impl File {
 
         let root = parse_file(ncid)?;
 
-        Ok(File {
+        Ok(Self {
             ncid,
             name: path.file_name().unwrap().to_string_lossy().to_string(),
             root,
         })
     }
+    #[allow(clippy::doc_markdown)]
     /// Open a netCDF file in creation mode.
     ///
     /// Will overwrite existing file if any
-    pub fn create(path: &path::Path) -> error::Result<File> {
+    pub fn create(path: &path::Path) -> error::Result<Self> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         unsafe {
@@ -94,13 +99,13 @@ impl File {
             name: "root".to_string(),
             ncid,
             grpid: None,
-            variables: Default::default(),
-            attributes: Default::default(),
-            parent_dimensions: Default::default(),
-            dimensions: Default::default(),
-            groups: Default::default(),
+            variables: HashMap::default(),
+            attributes: HashMap::default(),
+            parent_dimensions: Vec::default(),
+            dimensions: HashMap::default(),
+            groups: HashMap::default(),
         };
-        Ok(File {
+        Ok(Self {
             ncid,
             name: path.file_name().unwrap().to_string_lossy().to_string(),
             root,
@@ -121,6 +126,7 @@ impl File {
 /// let variables = file.variables();
 /// # Ok(()) }
 /// ```
+#[allow(clippy::module_name_repetitions)]
 pub struct MemFile<'a> {
     file: File,
     _buffer: std::marker::PhantomData<&'a [u8]>,
@@ -188,7 +194,7 @@ fn get_group_dimensions(
     if ndims == 0 {
         return Ok(HashMap::new());
     }
-    let mut dimids = vec![0 as nc_type; ndims as usize];
+    let mut dimids = vec![0 as nc_type; ndims.try_into()?];
     unsafe {
         error::checked(nc_inq_dimids(
             ncid,
@@ -198,9 +204,9 @@ fn get_group_dimensions(
         ))?;
     }
 
-    let mut dimensions = HashMap::with_capacity(ndims as _);
-    let mut buf = [0u8; NC_MAX_NAME as usize + 1];
-    for dimid in dimids.into_iter() {
+    let mut dimensions = HashMap::with_capacity(ndims.try_into()?);
+    let mut buf = [0_u8; NC_MAX_NAME as usize + 1];
+    for dimid in dimids {
         for i in buf.iter_mut() {
             *i = 0
         }
@@ -248,8 +254,8 @@ fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String
     if natts == 0 {
         return Ok(HashMap::new());
     }
-    let mut attributes = HashMap::with_capacity(natts as _);
-    let mut buf = [0u8; NC_MAX_NAME as usize + 1];
+    let mut attributes = HashMap::with_capacity(natts.try_into()?);
+    let mut buf = [0_u8; NC_MAX_NAME as usize + 1];
     for i in 0..natts {
         for i in buf.iter_mut() {
             *i = 0;
@@ -292,7 +298,7 @@ fn get_dimensions_of_var(
     if ndims == 0 {
         return Ok(Vec::new());
     }
-    let mut dimids = vec![0; ndims as usize];
+    let mut dimids = vec![0; ndims.try_into()?];
     unsafe {
         error::checked(nc_inq_var(
             ncid,
@@ -305,9 +311,9 @@ fn get_dimensions_of_var(
         ))?;
     }
 
-    let mut dimensions = Vec::with_capacity(ndims as usize);
-    let mut name = [0u8; NC_MAX_NAME as usize + 1];
-    for dimid in dimids.into_iter() {
+    let mut dimensions = Vec::with_capacity(ndims.try_into()?);
+    let mut name = [0_u8; NC_MAX_NAME as usize + 1];
+    for dimid in dimids {
         for i in name.iter_mut() {
             *i = 0;
         }
@@ -357,7 +363,7 @@ fn get_variables(
     if nvars == 0 {
         return Ok(HashMap::new());
     }
-    let mut varids = vec![0; nvars as usize];
+    let mut varids = vec![0; nvars.try_into()?];
     unsafe {
         error::checked(nc_inq_varids(
             ncid,
@@ -366,9 +372,9 @@ fn get_variables(
         ))?;
     }
 
-    let mut variables = HashMap::with_capacity(nvars as usize);
-    let mut name = [0u8; NC_MAX_NAME as usize + 1];
-    for varid in varids.into_iter() {
+    let mut variables = HashMap::with_capacity(nvars.try_into()?);
+    let mut name = [0_u8; NC_MAX_NAME as usize + 1];
+    for varid in varids {
         for i in name.iter_mut() {
             *i = 0;
         }
@@ -420,14 +426,14 @@ fn get_groups(
     if ngroups == 0 {
         return Ok(HashMap::new());
     }
-    let mut grpids = vec![0; ngroups as usize];
+    let mut grpids = vec![0; ngroups.try_into()?];
     unsafe {
         error::checked(nc_inq_grps(ncid, std::ptr::null_mut(), grpids.as_mut_ptr()))?;
     }
 
-    let mut groups = HashMap::with_capacity(ngroups as usize);
+    let mut groups = HashMap::with_capacity(ngroups.try_into()?);
     let mut cname = [0; NC_MAX_NAME as usize + 1];
-    for grpid in grpids.into_iter() {
+    for grpid in grpids {
         let unlim_dims = get_unlimited_dimensions(grpid)?;
         let dimensions = get_group_dimensions(grpid, &unlim_dims)?;
         let variables = get_variables(grpid, &unlim_dims)?;
@@ -469,7 +475,7 @@ fn get_unlimited_dimensions(ncid: nc_type) -> error::Result<Vec<nc_type>> {
         error::checked(nc_inq_unlimdims(ncid, &mut nunlim, std::ptr::null_mut()))?;
     }
 
-    let mut uldim = vec![0; nunlim as usize];
+    let mut uldim = vec![0; nunlim.try_into()?];
     unsafe {
         error::checked(nc_inq_unlimdims(
             ncid,
@@ -496,7 +502,7 @@ fn parse_file(ncid: nc_type) -> error::Result<Group> {
         ncid,
         grpid: None,
         name: "root".into(),
-        parent_dimensions: Default::default(),
+        parent_dimensions: Vec::default(),
         dimensions,
         attributes,
         variables,

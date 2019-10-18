@@ -1,3 +1,4 @@
+#![allow(clippy::similar_names)]
 use super::error;
 use super::LOCK;
 use netcdf_sys::*;
@@ -12,25 +13,24 @@ pub struct Dimension {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct DimensionIdentifier {
+pub struct Identifier {
     pub(crate) identifier: nc_type,
 }
 
 #[allow(clippy::len_without_is_empty)]
 impl Dimension {
     pub fn len(&self) -> usize {
-        match self.len {
-            Some(x) => x.get(),
-            None => {
-                let mut len = 0;
-                let err = unsafe {
-                    let _l = LOCK.lock().unwrap();
-                    error::checked(nc_inq_dimlen(self.ncid, self.id, &mut len))
-                };
+        if let Some(x) = self.len {
+            x.get()
+        } else {
+            let mut len = 0;
+            let err = unsafe {
+                let _l = LOCK.lock().unwrap();
+                error::checked(nc_inq_dimlen(self.ncid, self.id, &mut len))
+            };
 
-                // Should log or handle this somehow...
-                err.map(|_| len).unwrap_or(0)
-            }
+            // Should log or handle this somehow...
+            err.map(|_| len).unwrap_or(0)
         }
     }
 
@@ -42,13 +42,13 @@ impl Dimension {
         &self.name
     }
 
-    pub fn identifier(&self) -> DimensionIdentifier {
-        DimensionIdentifier {
+    pub fn identifier(&self) -> Identifier {
+        Identifier {
             identifier: self.id,
         }
     }
 
-    pub(crate) fn new(grpid: nc_type, name: &str, len: usize) -> error::Result<Dimension> {
+    pub(crate) fn new(grpid: nc_type, name: &str, len: usize) -> error::Result<Self> {
         use std::ffi::CString;
 
         let mut dimid = 0;
@@ -59,7 +59,7 @@ impl Dimension {
             error::checked(nc_def_dim(grpid, cname.as_ptr(), len, &mut dimid))?;
         }
 
-        Ok(Dimension {
+        Ok(Self {
             name: name.into(),
             len: core::num::NonZeroUsize::new(len),
             id: dimid,

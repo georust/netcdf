@@ -1,6 +1,8 @@
+#![allow(clippy::similar_names)]
 use super::nc_type;
 use super::LOCK;
 use netcdf_sys::nc_strerror;
+use std::num::TryFromIntError;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
@@ -32,6 +34,8 @@ pub enum Error {
     Ambiguous,
     /// Overflows possible lengths
     Overflow,
+    /// Conversion error
+    Conversion(TryFromIntError),
 }
 
 impl std::error::Error for Error {
@@ -41,20 +45,26 @@ impl std::error::Error for Error {
 }
 
 impl From<&str> for Error {
-    fn from(s: &str) -> Error {
-        Error::Str(s.into())
+    fn from(s: &str) -> Self {
+        Self::Str(s.into())
     }
 }
 
 impl From<String> for Error {
-    fn from(s: String) -> Error {
-        Error::Str(s)
+    fn from(s: String) -> Self {
+        Self::Str(s)
     }
 }
 
 impl From<nc_type> for Error {
-    fn from(nc: nc_type) -> Error {
-        Error::Netcdf(nc)
+    fn from(nc: nc_type) -> Self {
+        Self::Netcdf(nc)
+    }
+}
+
+impl From<TryFromIntError> for Error {
+    fn from(e: TryFromIntError) -> Self {
+        Self::Conversion(e)
     }
 }
 
@@ -62,26 +72,22 @@ use std::fmt;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Str(x) => write!(f, "{}", x),
-            Error::IndexLen => write!(f, "indices does not match in length with the variable"),
-            Error::SliceLen => write!(f, "slices does not match in length with the variable"),
-            Error::IndexMismatch => {
-                write!(f, "requested index is bigger than the dimension length")
-            }
-            Error::SliceMismatch => {
-                write!(f, "requested slice is bigger than the dimension length")
-            }
-            Error::ZeroSlice => write!(f, "must request a slice length larger than zero"),
-            Error::BufferLen(has, need) => write!(
+            Self::Str(x) => write!(f, "{}", x),
+            Self::IndexLen => write!(f, "indices does not match in length with the variable"),
+            Self::SliceLen => write!(f, "slices does not match in length with the variable"),
+            Self::IndexMismatch => write!(f, "requested index is bigger than the dimension length"),
+            Self::SliceMismatch => write!(f, "requested slice is bigger than the dimension length"),
+            Self::ZeroSlice => write!(f, "must request a slice length larger than zero"),
+            Self::BufferLen(has, need) => write!(
                 f,
                 "buffer size mismatch, has size {}, but needs size {}",
                 has, need
             ),
-            Error::TypeMismatch => write!(f, "netcdf types does not correspond to what is defined"),
-            Error::TypeUnknown(t) => write!(f, "netcdf type {} is not known", t),
-            Error::AlreadyExists(x) => write!(f, "{} already exists", x),
-            Error::NotFound(x) => write!(f, "Could not find {}", x),
-            Error::Netcdf(x) => {
+            Self::TypeMismatch => write!(f, "netcdf types does not correspond to what is defined"),
+            Self::TypeUnknown(t) => write!(f, "netcdf type {} is not known", t),
+            Self::AlreadyExists(x) => write!(f, "{} already exists", x),
+            Self::NotFound(x) => write!(f, "Could not find {}", x),
+            Self::Netcdf(x) => {
                 let _l = LOCK.lock().unwrap();
                 let msg;
                 unsafe {
@@ -91,8 +97,9 @@ impl fmt::Display for Error {
 
                 write!(f, "netcdf error({}): {}", x, msg.to_string_lossy())
             }
-            Error::Ambiguous => write!(f, "Could not find an appropriate length of the slices"),
-            Error::Overflow => write!(f, "slice would exceed maximum size of possible buffers"),
+            Self::Ambiguous => write!(f, "Could not find an appropriate length of the slices"),
+            Self::Overflow => write!(f, "slice would exceed maximum size of possible buffers"),
+            Self::Conversion(e) => e.fmt(f),
         }
     }
 }

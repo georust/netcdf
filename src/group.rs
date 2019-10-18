@@ -56,19 +56,19 @@ impl Group {
         self.dimensions.values()
     }
     /// Get a group
-    pub fn group(&self, name: &str) -> Option<&Group> {
+    pub fn group(&self, name: &str) -> Option<&Self> {
         self.groups.get(name)
     }
     /// Iterator over all groups
-    pub fn groups(&self) -> impl Iterator<Item = &Group> {
+    pub fn groups(&self) -> impl Iterator<Item = &Self> {
         self.groups.values()
     }
     /// Mutable access to group
-    pub fn group_mut(&mut self, name: &str) -> Option<&mut Group> {
+    pub fn group_mut(&mut self, name: &str) -> Option<&mut Self> {
         self.groups.get_mut(name)
     }
     /// Iterator over all groups (mutable access)
-    pub fn groups_mut(&mut self) -> impl Iterator<Item = &mut Group> {
+    pub fn groups_mut(&mut self) -> impl Iterator<Item = &mut Self> {
         self.groups.values_mut()
     }
 }
@@ -85,6 +85,12 @@ impl Group {
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&mut Dimension> {
+        fn recursively_add_dim(depth: usize, name: &str, d: &Dimension, g: &mut Group) {
+            for grp in g.groups.values_mut() {
+                grp.parent_dimensions[depth].insert(name.to_string(), d.clone());
+                recursively_add_dim(depth, name, d, grp);
+            }
+        }
         if self.dimensions.contains_key(name) {
             return Err(error::Error::AlreadyExists("dimension".into()));
         }
@@ -92,15 +98,8 @@ impl Group {
         let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?;
         self.dimensions.insert(name.into(), d.clone());
 
-        fn recursively_add_dim(depth: usize, name: &str, d: &Dimension, g: &mut Group) {
-            for (_, grp) in g.groups.iter_mut() {
-                grp.parent_dimensions[depth].insert(name.to_string(), d.clone());
-                recursively_add_dim(depth, name, d, grp);
-            }
-        }
-
         let mydepth = self.parent_dimensions.len();
-        for (_, grp) in self.groups.iter_mut() {
+        for grp in self.groups.values_mut() {
             recursively_add_dim(mydepth, name, &d, grp);
         }
 
@@ -113,7 +112,7 @@ impl Group {
     }
 
     /// Add an empty group to the dataset
-    pub fn add_group(&mut self, name: &str) -> error::Result<&mut Group> {
+    pub fn add_group(&mut self, name: &str) -> error::Result<&mut Self> {
         let cstr = std::ffi::CString::new(name).unwrap();
         let mut grpid = 0;
         unsafe {
@@ -127,15 +126,15 @@ impl Group {
         let mut parent_dimensions = self.parent_dimensions.clone();
         parent_dimensions.push(self.dimensions.clone());
 
-        let g = Group {
+        let g = Self {
             ncid: self.grpid.unwrap_or(self.ncid),
             name: name.to_string(),
             grpid: Some(grpid),
             parent_dimensions,
-            attributes: Default::default(),
-            dimensions: Default::default(),
-            groups: Default::default(),
-            variables: Default::default(),
+            attributes: HashMap::default(),
+            dimensions: HashMap::default(),
+            groups: HashMap::default(),
+            variables: HashMap::default(),
         };
         self.groups.insert(name.to_string(), g);
         Ok(self.groups.get_mut(name).unwrap())
@@ -162,7 +161,7 @@ impl Group {
         if !e.is_empty() {
             let mut s = String::new();
             s.push_str("dimension(s)");
-            for x in e.into_iter() {
+            for x in e {
                 s.push(' ');
                 s.push_str(x.unwrap_err());
             }
@@ -182,28 +181,27 @@ impl Group {
     pub fn add_variable_from_identifiers<T>(
         &mut self,
         name: &str,
-        dims: &[super::dimension::DimensionIdentifier],
+        dims: &[super::dimension::Identifier],
     ) -> error::Result<&mut Variable>
     where
         T: Numeric,
     {
-        let mut d: Vec<_> = Default::default();
+        let mut d: Vec<_> = Vec::default();
         for (i, dim) in dims.iter().enumerate() {
             let id = dim.identifier;
-            let dim0 = match self.dimensions.values().find(|&x| x.id == id) {
+            d.push(match self.dimensions.values().find(|&x| x.id == id) {
                 Some(x) => x.clone(),
                 None => match self
                     .parent_dimensions
                     .iter()
                     .rev()
                     .flatten()
-                    .find(|(_, ref x)| x.id == id)
+                    .find(|(_, x)| x.id == id)
                 {
                     Some((_, x)) => x.clone(),
                     None => return Err(error::Error::NotFound(format!("dimension #{}", i))),
                 },
-            };
-            d.push(dim0);
+            });
         }
 
         let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;

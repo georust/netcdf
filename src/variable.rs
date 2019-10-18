@@ -1,3 +1,4 @@
+#![allow(clippy::similar_names)]
 use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
@@ -7,8 +8,10 @@ use super::LOCK;
 #[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
 use netcdf_sys::*;
+use std::convert::TryInto;
 use std::marker::Sized;
 
+#[allow(clippy::doc_markdown)]
 /// This struct defines a netCDF variable.
 #[derive(Debug)]
 pub struct Variable {
@@ -41,7 +44,7 @@ impl Variable {
     }
     /// Get current length of the variable
     pub fn len(&self) -> usize {
-        self.dimensions.iter().map(|d| d.len()).product()
+        self.dimensions.iter().map(Dimension::len).product()
     }
 
     /// Sets compression on the variable. Must be set before filling in data.
@@ -77,8 +80,8 @@ impl Variable {
         }
         let len = chunksize
             .iter()
-            .fold(1usize, |acc, &x| acc.saturating_mul(x));
-        if len == std::usize::MAX {
+            .fold(1_usize, |acc, &x| acc.saturating_mul(x));
+        if len == usize::max_value() {
             return Err(error::Error::Overflow);
         }
         unsafe {
@@ -153,8 +156,10 @@ impl Variable {
             }
         }
 
-        let thislen = sizelen.iter().fold(1usize, |acc, &x| acc.saturating_mul(x));
-        if thislen == std::usize::MAX {
+        let thislen = sizelen
+            .iter()
+            .fold(1_usize, |acc, &x| acc.saturating_mul(x));
+        if thislen == usize::max_value() {
             return Err(error::Error::Overflow);
         }
 
@@ -202,15 +207,19 @@ impl Variable {
         }
 
         if let Some(pos) = unlim_pos {
-            let l = sizelen.iter().fold(1usize, |acc, &x| acc.saturating_mul(x));
-            if l == std::usize::MAX {
+            let l = sizelen
+                .iter()
+                .fold(1_usize, |acc, &x| acc.saturating_mul(x));
+            if l == usize::max_value() {
                 return Err(error::Error::Overflow);
             }
             sizelen[pos] = totallen / l;
         }
 
-        let wantedlen = sizelen.iter().fold(1usize, |acc, &x| acc.saturating_mul(x));
-        if wantedlen == std::usize::MAX {
+        let wantedlen = sizelen
+            .iter()
+            .fold(1_usize, |acc, &x| acc.saturating_mul(x));
+        if wantedlen == usize::max_value() {
             return Err(error::Error::Overflow);
         }
         if totallen != wantedlen {
@@ -220,6 +229,7 @@ impl Variable {
     }
 }
 
+#[allow(clippy::doc_markdown)]
 /// This trait allow an implicit cast when fetching
 /// a netCDF variable. These methods are not be called
 /// directly, but used through methods on `Variable`
@@ -254,6 +264,7 @@ where
         values: *mut Self,
     ) -> error::Result<()>;
 
+    #[allow(clippy::doc_markdown)]
     /// Put a single value into a netCDF variable
     ///
     /// # Safety
@@ -265,6 +276,7 @@ where
         value: Self,
     ) -> error::Result<()>;
 
+    #[allow(clippy::doc_markdown)]
     /// put a SLICE of values into a netCDF variable at the given index
     ///
     /// # Safety
@@ -292,6 +304,7 @@ macro_rules! impl_numeric {
         $nc_get_var1_type: ident,
         $nc_put_var1_type: ident,
         $nc_put_vara_type: ident) => {
+        #[allow(clippy::use_self)] // False positives
         unsafe impl Numeric for $sized_type {
             const NCTYPE: nc_type = $nc_type;
 
@@ -299,9 +312,9 @@ macro_rules! impl_numeric {
             unsafe fn single_value_from_variable(
                 variable: &Variable,
                 indices: &[usize],
-            ) -> error::Result<$sized_type> {
+            ) -> error::Result<Self> {
                 // initialize `buff` to 0
-                let mut buff: $sized_type = 0 as $sized_type;
+                let mut buff: Self = 0 as _;
                 // Get a pointer to an array
                 let indices_ptr = indices.as_ptr();
                 let _g = LOCK.lock().unwrap();
@@ -483,7 +496,7 @@ impl Variable {
                 grp_id,
                 cname.as_ptr(),
                 vartype,
-                dimids.len() as _,
+                dimids.len().try_into()?,
                 dimids.as_ptr(),
                 &mut id,
             ))?;
@@ -511,16 +524,13 @@ impl Variable {
     ///  Fetches one specific value at specific indices
     ///  indices must has the same length as self.dimensions.
     pub fn value<T: Numeric>(&self, indices: Option<&[usize]>) -> error::Result<T> {
-        let _indices: Vec<usize>;
-        let indices = match indices {
-            Some(x) => {
-                self.check_indices(x, false)?;
-                x
-            }
-            None => {
-                _indices = self.default_indices(false)?;
-                &_indices
-            }
+        let indices_: Vec<usize>;
+        let indices = if let Some(x) = indices {
+            self.check_indices(x, false)?;
+            x
+        } else {
+            indices_ = self.default_indices(false)?;
+            &indices_
         };
 
         unsafe { T::single_value_from_variable(self, indices) }
@@ -529,16 +539,13 @@ impl Variable {
     /// Reads a string variable. This involves two copies per read, and should
     /// be avoided in performance critical code
     pub fn string_value(&self, indices: Option<&[usize]>) -> error::Result<String> {
-        let _indices: Vec<usize>;
-        let indices = match indices {
-            Some(x) => {
-                self.check_indices(x, false)?;
-                x
-            }
-            None => {
-                _indices = self.default_indices(false)?;
-                &_indices
-            }
+        let indices_: Vec<usize>;
+        let indices = if let Some(x) = indices {
+            self.check_indices(x, false)?;
+            x
+        } else {
+            indices_ = self.default_indices(false)?;
+            &indices_
         };
         let _l = LOCK.lock().unwrap();
 
@@ -570,33 +577,27 @@ impl Variable {
         indices: Option<&[usize]>,
         slice_len: Option<&[usize]>,
     ) -> error::Result<ArrayD<T>> {
-        let _indices: Vec<usize>;
-        let indices = match indices {
-            Some(x) => {
-                self.check_indices(x, false)?;
-                x
-            }
-            None => {
-                _indices = self.default_indices(false)?;
-                &_indices
-            }
+        let indices_: Vec<usize>;
+        let indices = if let Some(x) = indices {
+            self.check_indices(x, false)?;
+            x
+        } else {
+            indices_ = self.default_indices(false)?;
+            &indices_
         };
-        let _slice_len: Vec<usize>;
+        let slice_len_: Vec<usize>;
         let full_length;
-        let slice_len = match slice_len {
-            Some(x) => {
-                full_length = x.iter().fold(1usize, |acc, x| acc.saturating_mul(*x));
-                if full_length == std::usize::MAX {
-                    return Err(error::Error::Overflow);
-                }
-                self.check_sizelen(full_length, indices, x, false)?;
-                x
+        let slice_len = if let Some(x) = slice_len {
+            full_length = x.iter().fold(1_usize, |acc, x| acc.saturating_mul(*x));
+            if full_length == usize::max_value() {
+                return Err(error::Error::Overflow);
             }
-            None => {
-                full_length = self.dimensions.iter().map(|d| d.len()).product();
-                _slice_len = self.default_sizelen(full_length, indices, false)?;
-                &_slice_len
-            }
+            self.check_sizelen(full_length, indices, x, false)?;
+            x
+        } else {
+            full_length = self.dimensions.iter().map(Dimension::len).product();
+            slice_len_ = self.default_sizelen(full_length, indices, false)?;
+            &slice_len_
         };
 
         let mut values = Vec::with_capacity(full_length);
@@ -615,27 +616,21 @@ impl Variable {
         indices: Option<&[usize]>,
         slice_len: Option<&[usize]>,
     ) -> error::Result<()> {
-        let _indices: Vec<usize>;
-        let indices = match indices {
-            Some(x) => {
-                self.check_indices(x, false)?;
-                x
-            }
-            None => {
-                _indices = self.default_indices(false)?;
-                &_indices
-            }
+        let indices_: Vec<usize>;
+        let indices = if let Some(x) = indices {
+            self.check_indices(x, false)?;
+            x
+        } else {
+            indices_ = self.default_indices(false)?;
+            &indices_
         };
-        let _slice_len: Vec<usize>;
-        let slice_len = match slice_len {
-            Some(x) => {
-                self.check_sizelen(buffer.len(), indices, x, false)?;
-                x
-            }
-            None => {
-                _slice_len = self.default_sizelen(buffer.len(), indices, false)?;
-                &_slice_len
-            }
+        let slice_len_: Vec<usize>;
+        let slice_len = if let Some(x) = slice_len {
+            self.check_sizelen(buffer.len(), indices, x, false)?;
+            x
+        } else {
+            slice_len_ = self.default_sizelen(buffer.len(), indices, false)?;
+            &slice_len_
         };
 
         unsafe { T::variable_to_ptr(self, indices, slice_len, buffer.as_mut_ptr()) }
@@ -647,33 +642,27 @@ impl Variable {
         value: T,
         indices: Option<&[usize]>,
     ) -> error::Result<()> {
-        let _indices: Vec<usize>;
-        let indices = match indices {
-            Some(x) => {
-                self.check_indices(x, true)?;
-                x
-            }
-            None => {
-                _indices = self.default_indices(true)?;
-                &_indices
-            }
+        let indices_: Vec<usize>;
+        let indices = if let Some(x) = indices {
+            self.check_indices(x, true)?;
+            x
+        } else {
+            indices_ = self.default_indices(true)?;
+            &indices_
         };
         unsafe { T::put_value_at(self, indices, value) }
     }
 
-    /// Internally converts to a CString, avoid using this function when performance
+    /// Internally converts to a `CString`, avoid using this function when performance
     /// is important
     pub fn put_string(&mut self, value: &str, indices: Option<&[usize]>) -> error::Result<()> {
-        let _indices: Vec<usize>;
-        let indices = match indices {
-            Some(x) => {
-                self.check_indices(x, true)?;
-                x
-            }
-            None => {
-                _indices = self.default_indices(true)?;
-                &_indices
-            }
+        let indices_: Vec<usize>;
+        let indices = if let Some(x) = indices {
+            self.check_indices(x, true)?;
+            x
+        } else {
+            indices_ = self.default_indices(true)?;
+            &indices_
         };
 
         let value = std::ffi::CString::new(value).expect("String contained interior 0");
@@ -700,32 +689,27 @@ impl Variable {
         indices: Option<&[usize]>,
         slice_len: Option<&[usize]>,
     ) -> error::Result<()> {
-        let _indices: Vec<usize>;
-        let indices = match indices {
-            Some(x) => {
-                self.check_indices(x, true)?;
-                x
-            }
-            None => {
-                _indices = self.default_indices(true)?;
-                &_indices
-            }
+        let indices_: Vec<usize>;
+        let indices = if let Some(x) = indices {
+            self.check_indices(x, true)?;
+            x
+        } else {
+            indices_ = self.default_indices(true)?;
+            &indices_
         };
-        let _slice_len: Vec<usize>;
-        let slice_len = match slice_len {
-            Some(x) => {
-                self.check_sizelen(values.len(), indices, x, true)?;
-                x
-            }
-            None => {
-                _slice_len = self.default_sizelen(values.len(), indices, true)?;
-                &_slice_len
-            }
+        let slice_len_: Vec<usize>;
+        let slice_len = if let Some(x) = slice_len {
+            self.check_sizelen(values.len(), indices, x, true)?;
+            x
+        } else {
+            slice_len_ = self.default_sizelen(values.len(), indices, true)?;
+            &slice_len_
         };
         unsafe { T::put_values_at(self, indices, slice_len, values) }
     }
 
     /// Set a Fill Value
+    #[allow(clippy::needless_pass_by_value)] // All values will be small
     pub fn set_fill_value<T>(&mut self, fill_value: T) -> error::Result<()>
     where
         T: Numeric,

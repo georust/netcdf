@@ -1,3 +1,4 @@
+#![allow(clippy::similar_names)]
 use super::error;
 use super::LOCK;
 use netcdf_sys::*;
@@ -16,6 +17,8 @@ impl Attribute {
     pub fn name(&self) -> &str {
         &self.name
     }
+    /// Get the value of the attribute
+    #[allow(clippy::too_many_lines)]
     pub fn value(&self) -> error::Result<AttrValue> {
         let mut typ = 0;
         let cname = std::ffi::CString::new(self.name.clone()).unwrap();
@@ -198,12 +201,13 @@ pub enum AttrValue {
 }
 
 impl Attribute {
+    #[allow(clippy::needless_pass_by_value)] // All values will be small
     pub(crate) fn put(
         ncid: nc_type,
         varid: nc_type,
         name: &str,
         val: AttrValue,
-    ) -> error::Result<Attribute> {
+    ) -> error::Result<Self> {
         let cname: CString = CString::new(name).unwrap();
 
         let _l = LOCK.lock().unwrap();
@@ -241,7 +245,7 @@ impl Attribute {
             }
         })?;
 
-        Ok(Attribute {
+        Ok(Self {
             name: name.to_string(),
             ncid,
             varid,
@@ -251,63 +255,63 @@ impl Attribute {
 
 // Boring implementations
 impl From<u8> for AttrValue {
-    fn from(x: u8) -> AttrValue {
-        AttrValue::Uchar(x)
+    fn from(x: u8) -> Self {
+        Self::Uchar(x)
     }
 }
 impl From<i8> for AttrValue {
-    fn from(x: i8) -> AttrValue {
-        AttrValue::Schar(x)
+    fn from(x: i8) -> Self {
+        Self::Schar(x)
     }
 }
 impl From<u16> for AttrValue {
-    fn from(x: u16) -> AttrValue {
-        AttrValue::Ushort(x)
+    fn from(x: u16) -> Self {
+        Self::Ushort(x)
     }
 }
 impl From<i16> for AttrValue {
-    fn from(x: i16) -> AttrValue {
-        AttrValue::Short(x)
+    fn from(x: i16) -> Self {
+        Self::Short(x)
     }
 }
 impl From<u32> for AttrValue {
-    fn from(x: u32) -> AttrValue {
-        AttrValue::Uint(x)
+    fn from(x: u32) -> Self {
+        Self::Uint(x)
     }
 }
 impl From<i32> for AttrValue {
-    fn from(x: i32) -> AttrValue {
-        AttrValue::Int(x)
+    fn from(x: i32) -> Self {
+        Self::Int(x)
     }
 }
 impl From<u64> for AttrValue {
-    fn from(x: u64) -> AttrValue {
-        AttrValue::Ulonglong(x)
+    fn from(x: u64) -> Self {
+        Self::Ulonglong(x)
     }
 }
 impl From<i64> for AttrValue {
-    fn from(x: i64) -> AttrValue {
-        AttrValue::Longlong(x)
+    fn from(x: i64) -> Self {
+        Self::Longlong(x)
     }
 }
 impl From<f32> for AttrValue {
-    fn from(x: f32) -> AttrValue {
-        AttrValue::Float(x)
+    fn from(x: f32) -> Self {
+        Self::Float(x)
     }
 }
 impl From<f64> for AttrValue {
-    fn from(x: f64) -> AttrValue {
-        AttrValue::Double(x)
+    fn from(x: f64) -> Self {
+        Self::Double(x)
     }
 }
 impl From<&str> for AttrValue {
-    fn from(x: &str) -> AttrValue {
-        AttrValue::Str(x.to_string())
+    fn from(x: &str) -> Self {
+        Self::Str(x.to_string())
     }
 }
 impl From<String> for AttrValue {
-    fn from(x: String) -> AttrValue {
-        AttrValue::Str(x)
+    fn from(x: String) -> Self {
+        Self::Str(x)
     }
 }
 
