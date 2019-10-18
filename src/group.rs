@@ -19,29 +19,65 @@ pub struct Group {
 }
 
 impl Group {
+    /// Name of the current group
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn variables(&self) -> &HashMap<String, Variable> {
-        &self.variables
+    /// Get a variable from the group
+    pub fn variable(&self, name: &str) -> Option<&Variable> {
+        self.variables.get(name)
     }
+    /// Iterate over all variables in a group
+    pub fn variables(&self) -> impl Iterator<Item = &Variable> {
+        self.variables.values()
+    }
+    /// Get a mutable variable from the group
     pub fn variable_mut(&mut self, name: &str) -> Option<&mut Variable> {
         self.variables.get_mut(name)
     }
-    pub fn attributes(&self) -> &HashMap<String, Attribute> {
-        &self.attributes
+    /// Iterate over all variables in a group, with mutable access
+    pub fn variables_mut(&mut self) -> impl Iterator<Item = &mut Variable> {
+        self.variables.values_mut()
     }
+    /// Get a single attribute
+    pub fn attribute(&self, name: &str) -> Option<&Attribute> {
+        self.attributes.get(name)
+    }
+    /// Get all attributes
+    pub fn attributes(&self) -> impl Iterator<Item = &Attribute> {
+        self.attributes.values()
+    }
+    /// Get a single attribute (mutable)
     pub fn attribute_mut(&mut self, name: &str) -> Option<&mut Attribute> {
         self.attributes.get_mut(name)
     }
-    pub fn dimensions(&self) -> &HashMap<String, Dimension> {
-        &self.dimensions
+    /// Get all attributes (mutable)
+    pub fn attributes_mut(&mut self) -> impl Iterator<Item = &mut Attribute> {
+        self.attributes.values_mut()
     }
-    pub fn groups(&self) -> &HashMap<String, Group> {
-        &self.groups
+    /// Get a single dimension
+    pub fn dimension(&self, name: &str) -> Option<&Dimension> {
+        self.dimensions.get(name)
     }
-    pub fn groups_mut(&mut self, name: &str) -> Option<&mut Group> {
+    /// Iterator over all dimensions
+    pub fn dimensions(&self) -> impl Iterator<Item = &Dimension> {
+        self.dimensions.values()
+    }
+    /// Get a group
+    pub fn group(&self, name: &str) -> Option<&Group> {
+        self.groups.get(name)
+    }
+    /// Iterator over all groups
+    pub fn groups(&self) -> impl Iterator<Item = &Group> {
+        self.groups.values()
+    }
+    /// Mutable access to group
+    pub fn group_mut(&mut self, name: &str) -> Option<&mut Group> {
         self.groups.get_mut(name)
+    }
+    /// Iterator over all groups (mutable access)
+    pub fn groups_mut(&mut self) -> impl Iterator<Item = &mut Group> {
+        self.groups.values_mut()
     }
 }
 

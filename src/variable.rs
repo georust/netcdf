@@ -27,8 +27,11 @@ impl Variable {
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn attributes(&self) -> &HashMap<String, Attribute> {
-        &self.attributes
+    pub fn attribute(&self, name: &str) -> Option<&Attribute> {
+        self.attributes.get(name)
+    }
+    pub fn attributes(&self) -> impl Iterator<Item = &Attribute> {
+        self.attributes.values()
     }
     pub fn dimensions(&self) -> &[Dimension] {
         &self.dimensions

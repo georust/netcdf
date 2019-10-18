@@ -10,7 +10,7 @@
 //! let file = netcdf::open("simle_xy.nc")?;
 //!
 //! // Access any variable, attribute, or dimension through lookups on hashmaps
-//! let var = &file.variables()["data"];
+//! let var = &file.variable("data").expect("Could not find variable 'data'");
 //!
 //! // Read variable as numeric types
 //! let data_i32 = var.value::<i32>(None)?;
@@ -115,7 +115,4 @@ lazy_static! {
     pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());
 }
 
-#[cfg(feature = "indexmap")]
 use indexmap::IndexMap as HashMap;
-#[cfg(not(feature = "indexmap"))]
-use std::collections::HashMap;
