@@ -721,7 +721,7 @@ impl Variable {
     /// Set a Fill Value
     pub fn set_fill_value<T>(&mut self, fill_value: T) -> error::Result<()>
     where
-        T: Numeric + Into<super::attribute::AttrValue>,
+        T: Numeric
     {
         if T::NCTYPE != self.vartype {
             return Err(error::Error::TypeMismatch);
