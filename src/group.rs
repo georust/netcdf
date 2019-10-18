@@ -51,7 +51,7 @@ impl Group {
         T: Into<AttrValue>,
     {
         let att = Attribute::put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name, val.into())?;
-        self.attributes.insert(name.to_string().clone(), att);
+        self.attributes.insert(name.to_string(), att);
         Ok(())
     }
 

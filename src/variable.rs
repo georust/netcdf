@@ -212,16 +212,32 @@ impl Variable {
 }
 
 /// This trait allow an implicit cast when fetching
-/// a netCDF variable
-pub trait Numeric
+/// a netCDF variable. These methods are not be called
+/// directly, but used through methods on `Variable`
+pub unsafe trait Numeric
 where
     Self: Sized,
 {
+    /// Constant corresponding to a netcdf type
     const NCTYPE: nc_type;
-    /// Returns a single indexed value of the variable as Self
-    fn single_value_from_variable(variable: &Variable, indices: &[usize]) -> error::Result<Self>;
 
-    /// Get multiple values at once
+    /// Returns a single indexed value of the variable as Self
+    ///
+    /// # Safety
+    ///
+    /// Requires `indices` to be of a valid length
+    unsafe fn single_value_from_variable(
+        variable: &Variable,
+        indices: &[usize],
+    ) -> error::Result<Self>;
+
+    /// Get multiple values at once, without checking the validity of
+    /// `indices` or `slice_len`
+    ///
+    /// # Safety
+    ///
+    /// Requires `values` to be of at least size `slice_len.product()`,
+    /// `indices` and `slice_len` to be of a valid length
     unsafe fn variable_to_ptr(
         variable: &Variable,
         indices: &[usize],
@@ -230,10 +246,22 @@ where
     ) -> error::Result<()>;
 
     /// Put a single value into a netCDF variable
-    fn put_value_at(variable: &mut Variable, indices: &[usize], value: Self) -> error::Result<()>;
+    ///
+    /// # Safety
+    ///
+    /// Requires `indices` to be of a valid length
+    unsafe fn put_value_at(
+        variable: &mut Variable,
+        indices: &[usize],
+        value: Self,
+    ) -> error::Result<()>;
 
     /// put a SLICE of values into a netCDF variable at the given index
-    fn put_values_at(
+    ///
+    /// # Safety
+    ///
+    /// Requires `indices` and `slice_len` to be of a valid length
+    unsafe fn put_values_at(
         variable: &mut Variable,
         indices: &[usize],
         slice_len: &[usize],
@@ -241,11 +269,11 @@ where
     ) -> error::Result<()>;
 }
 
-// This macro implements the trait Numeric for the type "sized_type".
-// The use of this macro reduce code duplication for the implementation of Numeric
-// for the common numeric types (i32, f32 ...): they only differs by the name of the
-// C function used to fetch values from the NetCDF variable (eg: 'nc_get_var_ushort', ...).
-//
+/// This macro implements the trait Numeric for the type "sized_type".
+///
+/// The use of this macro reduce code duplication for the implementation of Numeric
+/// for the common numeric types (i32, f32 ...): they only differs by the name of the
+/// C function used to fetch values from the NetCDF variable (eg: 'nc_get_var_ushort', ...).
 macro_rules! impl_numeric {
     (
         $sized_type: ty,
@@ -255,10 +283,11 @@ macro_rules! impl_numeric {
         $nc_get_var1_type: ident,
         $nc_put_var1_type: ident,
         $nc_put_vara_type: ident) => {
-        impl Numeric for $sized_type {
+        unsafe impl Numeric for $sized_type {
             const NCTYPE: nc_type = $nc_type;
+
             // fetch ONE value from variable using `$nc_get_var1`
-            fn single_value_from_variable(
+            unsafe fn single_value_from_variable(
                 variable: &Variable,
                 indices: &[usize],
             ) -> error::Result<$sized_type> {
@@ -266,15 +295,13 @@ macro_rules! impl_numeric {
                 let mut buff: $sized_type = 0 as $sized_type;
                 // Get a pointer to an array
                 let indices_ptr = indices.as_ptr();
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
-                    error::checked($nc_get_var1_type(
-                        variable.ncid,
-                        variable.varid,
-                        indices_ptr,
-                        &mut buff,
-                    ))?;
-                }
+                let _g = LOCK.lock().unwrap();
+                error::checked($nc_get_var1_type(
+                    variable.ncid,
+                    variable.varid,
+                    indices_ptr,
+                    &mut buff,
+                ))?;
                 Ok(buff)
             }
 
@@ -296,39 +323,35 @@ macro_rules! impl_numeric {
             }
 
             // put a SINGLE value into a netCDF variable at the given index
-            fn put_value_at(
+            unsafe fn put_value_at(
                 variable: &mut Variable,
                 indices: &[usize],
                 value: Self,
             ) -> error::Result<()> {
-                unsafe {
-                    let _g = LOCK.lock().unwrap();
-                    error::checked($nc_put_var1_type(
-                        variable.ncid,
-                        variable.varid,
-                        indices.as_ptr(),
-                        &value,
-                    ))
-                }
+                let _g = LOCK.lock().unwrap();
+                error::checked($nc_put_var1_type(
+                    variable.ncid,
+                    variable.varid,
+                    indices.as_ptr(),
+                    &value,
+                ))
             }
 
             // put a SLICE of values into a netCDF variable at the given index
-            fn put_values_at(
+            unsafe fn put_values_at(
                 variable: &mut Variable,
                 indices: &[usize],
                 slice_len: &[usize],
                 values: &[Self],
             ) -> error::Result<()> {
-                unsafe {
-                    let _l = LOCK.lock().unwrap();
-                    error::checked($nc_put_vara_type(
-                        variable.ncid,
-                        variable.varid,
-                        indices.as_ptr(),
-                        slice_len.as_ptr(),
-                        values.as_ptr(),
-                    ))
-                }
+                let _l = LOCK.lock().unwrap();
+                error::checked($nc_put_vara_type(
+                    variable.ncid,
+                    variable.varid,
+                    indices.as_ptr(),
+                    slice_len.as_ptr(),
+                    values.as_ptr(),
+                ))
             }
         }
     };
@@ -472,7 +495,7 @@ impl Variable {
         T: Into<AttrValue>,
     {
         let att = Attribute::put(self.ncid, self.varid, name, val.into())?;
-        self.attributes.insert(name.to_string().clone(), att);
+        self.attributes.insert(name.to_string(), att);
         Ok(())
     }
 
@@ -491,7 +514,7 @@ impl Variable {
             }
         };
 
-        T::single_value_from_variable(self, indices)
+        unsafe { T::single_value_from_variable(self, indices) }
     }
 
     /// Reads a string variable. This involves two copies per read, and should
@@ -628,7 +651,7 @@ impl Variable {
                 &_indices
             }
         };
-        T::put_value_at(self, indices, value)
+        unsafe { T::put_value_at(self, indices, value) }
     }
 
     /// Internally converts to a CString, avoid using this function when performance
@@ -692,7 +715,7 @@ impl Variable {
                 &_slice_len
             }
         };
-        T::put_values_at(self, indices, slice_len, values)
+        unsafe { T::put_values_at(self, indices, slice_len, values) }
     }
 
     /// Set a Fill Value
