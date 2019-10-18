@@ -177,7 +177,44 @@ impl Group {
         Ok(d)
     }
 
+    /// Adds a variable from a set of unique identifiers, recursing upwards
+    /// from the current group if necessary.
+    pub fn add_variable_from_identifiers<T>(
+        &mut self,
+        name: &str,
+        dims: &[super::dimension::DimensionIdentifier],
+    ) -> error::Result<&mut Variable>
+    where
+        T: Numeric,
+    {
+        let mut d: Vec<_> = Default::default();
+        for (i, dim) in dims.iter().enumerate() {
+            let id = dim.identifier;
+            let dim0 = match self.dimensions.values().find(|&x| x.id == id) {
+                Some(x) => x.clone(),
+                None => match self
+                    .parent_dimensions
+                    .iter()
+                    .rev()
+                    .flatten()
+                    .find(|(_, ref x)| x.id == id)
+                {
+                    Some((_, x)) => x.clone(),
+                    None => return Err(error::Error::NotFound(format!("dimension #{}", i))),
+                },
+            };
+            d.push(dim0);
+        }
+
+        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
+        self.variables.insert(name.into(), var);
+        Ok(self.variables.get_mut(name).unwrap())
+    }
+
     /// Create a Variable into the dataset, with no data written into it
+    ///
+    /// Dimensions are identified using the name of the dimension, and will recurse upwards
+    /// if not found in the current group.
     pub fn add_variable<T>(&mut self, name: &str, dims: &[&str]) -> error::Result<&mut Variable>
     where
         T: Numeric,

@@ -11,6 +11,11 @@ pub struct Dimension {
     pub(crate) ncid: nc_type,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct DimensionIdentifier {
+    pub(crate) identifier: nc_type,
+}
+
 #[allow(clippy::len_without_is_empty)]
 impl Dimension {
     pub fn len(&self) -> usize {
@@ -35,6 +40,12 @@ impl Dimension {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn identifier(&self) -> DimensionIdentifier {
+        DimensionIdentifier {
+            identifier: self.id,
+        }
     }
 
     pub(crate) fn new(grpid: nc_type, name: &str, len: usize) -> error::Result<Dimension> {

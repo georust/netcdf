@@ -1387,3 +1387,89 @@ fn unlimited_in_parents() {
     g.add_variable::<i16>("w", &["z1"]).unwrap();
     g.add_variable::<u16>("v", &["x"]).unwrap();
 }
+
+#[test]
+fn dimension_identifiers() {
+    let d = tempfile::tempdir().expect("Could not create tempdir");
+    let path = d.path().join("dimension_identifiers.nc");
+    {
+        let mut file = netcdf::create(&path).unwrap();
+
+        // Create groups and dimensions
+        let dim = &file.add_dimension("x", 10).unwrap();
+        let vrootid = dim.identifier();
+        let g = &mut file.add_group("g").unwrap();
+        let dim = &g.add_dimension("x", 5).unwrap();
+        let vgid = dim.identifier();
+        let gg = file.group_mut("g").unwrap().add_group("g").unwrap();
+        let dim = &gg.add_dimension("x", 7).unwrap();
+        let vggid = dim.identifier();
+
+        // Create variables
+        file.add_variable_from_identifiers::<i8>("v_self_id", &[vrootid])
+            .unwrap();
+        let g = &mut file.group_mut("g").unwrap();
+        g.add_variable_from_identifiers::<i8>("v_root_id", &[vrootid])
+            .unwrap();
+        g.add_variable_from_identifiers::<i8>("v_self_id", &[vgid])
+            .unwrap();
+
+        let gg = &mut g.group_mut("g").unwrap();
+        gg.add_variable_from_identifiers::<i8>("v_root_id", &[vrootid])
+            .unwrap();
+        gg.add_variable_from_identifiers::<i8>("v_up_id", &[vgid])
+            .unwrap();
+        gg.add_variable_from_identifiers::<i8>("v_self_id", &[vggid])
+            .unwrap();
+    }
+
+    let file = &netcdf::open(path).unwrap();
+
+    assert_eq!(file.variable("v_self_id").unwrap().len(), 10);
+    assert_eq!(
+        file.group("g")
+            .unwrap()
+            .variable("v_root_id")
+            .unwrap()
+            .len(),
+        10
+    );
+    assert_eq!(
+        file.group("g")
+            .unwrap()
+            .variable("v_self_id")
+            .unwrap()
+            .len(),
+        5
+    );
+    assert_eq!(
+        file.group("g")
+            .unwrap()
+            .group("g")
+            .unwrap()
+            .variable("v_self_id")
+            .unwrap()
+            .len(),
+        7
+    );
+    assert_eq!(
+        file.group("g")
+            .unwrap()
+            .group("g")
+            .unwrap()
+            .variable("v_up_id")
+            .unwrap()
+            .len(),
+        5
+    );
+    assert_eq!(
+        file.group("g")
+            .unwrap()
+            .group("g")
+            .unwrap()
+            .variable("v_root_id")
+            .unwrap()
+            .len(),
+        10
+    );
+}
