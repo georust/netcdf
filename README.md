@@ -2,6 +2,10 @@
 
 [![Build Status](https://travis-ci.org/mhiley/rust-netcdf.svg?branch=master)](https://travis-ci.org/mhiley/rust-netcdf)
 [![](http://meritbadge.herokuapp.com/netcdf)](https://crates.io/crates/netcdf)
+[![Coverage Status](https://coveralls.io/repos/github/lwandrebeck/rust-netcdf/badge.svg?branch=master)](https://coveralls.io/github/lwandrebeck/rust-netcdf?branch=master)
+[![codecov](https://codecov.io/gh/lwandrebeck/rust-netcdf/branch/master/graph/badge.svg)](https://codecov.io/gh/lwandrebeck/rust-netcdf)
+![Crates.io](https://img.shields.io/crates/l/netcdf)
+[![dependency status](https://deps.rs/repo/github/lwandrebeck/rust-netcdf/status.svg)](https://deps.rs/repo/github/lwandrebeck/rust-netcdf)
 
 Medium-level [NetCDF](http://www.unidata.ucar.edu/software/netcdf/) bindings for Rust
 
