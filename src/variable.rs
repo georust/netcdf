@@ -11,6 +11,7 @@ use super::LOCK;
 use ndarray::ArrayD;
 use netcdf_sys::*;
 use std::convert::TryInto;
+use std::ffi::CStr;
 use std::marker::Sized;
 
 #[allow(clippy::doc_markdown)]
@@ -488,6 +489,30 @@ impl_numeric!(
     nc_put_vara_double
 );
 
+/// Holds the contents of a netcdf string. Use deref to get a `CStr`
+struct NcString {
+    data: *mut std::os::raw::c_char,
+}
+impl NcString {
+    /// Create an `NcString`
+    unsafe fn from_ptr(ptr: *mut i8) -> Self {
+        Self { data: ptr }
+    }
+}
+impl Drop for NcString {
+    fn drop(&mut self) {
+        unsafe {
+            error::checked(nc_free_string(1, &mut self.data)).unwrap();
+        }
+    }
+}
+impl std::ops::Deref for NcString {
+    type Target = CStr;
+    fn deref(&self) -> &Self::Target {
+        unsafe { CStr::from_ptr(self.data) }
+    }
+}
+
 impl Variable {
     pub(crate) fn new(
         grp_id: nc_type,
@@ -569,16 +594,8 @@ impl Variable {
                 &mut s,
             ))?;
         }
-        let string = unsafe { std::ffi::CStr::from_ptr(s) };
-
-        let value = string.to_string_lossy().into_owned();
-
-        unsafe {
-            // Make sure this is always called before exiting function
-            error::checked(nc_free_string(1, &mut s))?;
-        }
-
-        Ok(value)
+        let string = unsafe { NcString::from_ptr(s) };
+        Ok(string.to_string_lossy().into_owned())
     }
 
     #[cfg(feature = "ndarray")]
