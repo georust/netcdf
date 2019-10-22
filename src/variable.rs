@@ -299,11 +299,12 @@ where
     ) -> error::Result<()>;
 }
 
-/// This macro implements the trait Numeric for the type "sized_type".
+#[allow(clippy::doc_markdown)]
+/// This macro implements the trait Numeric for the type `sized_type`.
 ///
 /// The use of this macro reduce code duplication for the implementation of Numeric
 /// for the common numeric types (i32, f32 ...): they only differs by the name of the
-/// C function used to fetch values from the NetCDF variable (eg: 'nc_get_var_ushort', ...).
+/// C function used to fetch values from the NetCDF variable (eg: `nc_get_var_ushort`, ...).
 macro_rules! impl_numeric {
     (
         $sized_type: ty,
