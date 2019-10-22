@@ -62,6 +62,7 @@
 //! ```
 
 #![warn(missing_docs)]
+#![allow(clippy::must_use_candidate)]
 
 use lazy_static::lazy_static;
 use netcdf_sys::nc_type;

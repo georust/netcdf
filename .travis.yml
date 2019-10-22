@@ -38,19 +38,22 @@ before_script:
   - cargo install cargo-travis || echo "cargo-travis already installed"
   - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin || true
   - cargo install-update -a # update outdated cached binaries
+  - rustup component add clippy
 
 script:
   - |
+      cargo build --all --no-default-features --verbose &&
       cargo build --all --verbose &&
       cargo test --all --verbose &&
       cargo bench --all --verbose &&
-      cargo doc --all --verbose
+      cargo doc --all --verbose &&
+      cargo clippy -- --warn clippy::pedantic
 
 after_success:
   - |
     cargo +nightly tarpaulin --verbose --out Xml &&
     bash <(curl -s https://codecov.io/bash) &&
-    cargo coveralls --verbose
+    cargo +nightly coveralls --verbose
 
 env:
   global:
