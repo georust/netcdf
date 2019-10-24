@@ -8,9 +8,10 @@ authors = [
 license = "MIT OR Apache-2.0"
 description = "High-level NetCDF bindings for Rust"
 repository = "https://github.com/mhiley/rust-netcdf"
-documentation = "https://github.com/mhiley/rust-netcdf"
+documentation = "https://docs.rs/crate/netcdf/0.3.0"
 keywords = ["netcdf", "hdf", "hdf5", "libnetcdf", "netcdf4"]
 edition = "2018"
+readme = "README.md"
 
 [features]
 default = ["ndarray"]
