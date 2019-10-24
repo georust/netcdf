@@ -1,6 +1,8 @@
 # rust-netcdf
 
+[![Docs](https://docs.rs/netcdf/badge.svg)](https://docs.rs/netcdf)
 [![Build Status](https://travis-ci.org/mhiley/rust-netcdf.svg?branch=master)](https://travis-ci.org/mhiley/rust-netcdf)
+[![Crates.io](https://img.shields.io/crates/d/netcdf.svg)](https://crates.io/crates/netcdf)
 [![](http://meritbadge.herokuapp.com/netcdf)](https://crates.io/crates/netcdf)
 [![Coverage Status](https://coveralls.io/repos/github/mhiley/rust-netcdf/badge.svg?branch=master)](https://coveralls.io/github/mhiley/rust-netcdf?branch=master)
 [![codecov](https://codecov.io/gh/mhiley/rust-netcdf/branch/master/graph/badge.svg)](https://codecov.io/gh/mhiley/rust-netcdf)
