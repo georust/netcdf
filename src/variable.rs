@@ -56,6 +56,23 @@ impl Variable {
     pub fn len(&self) -> usize {
         self.dimensions.iter().map(Dimension::len).product()
     }
+    
+    /// Set endianness of the variable. Must be set before inserting data
+    ///
+    /// `endian` can take a value 0..=2 with 0 being NC_ENDIAN_NATIVE,
+    /// 1 NC_ENDIAN_LITTLE, 2 NC_ENDIAN_BIG
+    /// 
+    pub fn endian(&self, endianness: nc_type) -> error::Result<()> {
+		let _l = LOCK.lock().unwrap();
+		unsafe {
+			error::checked(nc_def_var_endian(
+				self.ncid,
+				self.varid,
+				endianness,
+			))?;
+		}
+		Ok(())
+	}
 
     /// Sets compression on the variable. Must be set before filling in data.
     ///
