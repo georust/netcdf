@@ -29,6 +29,7 @@ pub struct Variable {
 }
 
 /// Enum for variables endianness
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Endianness {
 	/// Native endianness, depends on machine architecture (x86_64 is Little)
 	Native,
@@ -67,16 +68,21 @@ impl Variable {
         self.dimensions.iter().map(Dimension::len).product()
     }
     /// Get endianness of the variable.
-    pub fn endian_value(&self) -> nc_type {
+    pub fn endian_value(&self) -> error::Result<Endianness> {
 		let mut e: nc_type = 0;
 		unsafe {
-			nc_inq_var_endian(
+			error::checked(nc_inq_var_endian(
 				self.ncid,
 				self.varid,
 				&mut e,
-			);
+			))?;
 		}
-		e
+		match e {
+			NC_ENDIAN_NATIVE => Ok(Endianness::Native),
+			NC_ENDIAN_LITTLE => Ok(Endianness::Little),
+			NC_ENDIAN_BIG => Ok(Endianness::Big),
+			_ => Err(e.into())
+		}
     }
     /// Set endianness of the variable. Must be set before inserting data
     ///
@@ -85,7 +91,7 @@ impl Variable {
     /// 
     pub fn endian(&mut self, e: Endianness) -> error::Result<()> {
 		let _l = LOCK.lock().unwrap();
-		let endianness: std::os::raw::c_int = match e {
+		let endianness = match e {
 			Endianness::Native => NC_ENDIAN_NATIVE,
 			Endianness::Little => NC_ENDIAN_LITTLE,
 			Endianness::Big => NC_ENDIAN_BIG,
