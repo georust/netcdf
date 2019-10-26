@@ -81,7 +81,7 @@ impl Variable {
 			NC_ENDIAN_NATIVE => Ok(Endianness::Native),
 			NC_ENDIAN_LITTLE => Ok(Endianness::Little),
 			NC_ENDIAN_BIG => Ok(Endianness::Big),
-			_ => Err(e.into())
+			_ => Err(NC_EVARMETA.into())
 		}
     }
     /// Set endianness of the variable. Must be set before inserting data
