@@ -1473,3 +1473,41 @@ fn dimension_identifiers() {
         10
     );
 }
+
+#[test]
+/// Test setting/getting endian value when creating a Variable
+fn set_get_endian() {
+	use netcdf::variable::Endianness;
+    let d = tempfile::tempdir().unwrap();
+    let f = d.path().join("append.nc");
+    let dim_name = "some_dimension";
+    for i in &[Endianness::Little, Endianness::Big]
+    {
+		{
+			// first creates a simple netCDF file
+			// and create a variable called "some_variable" in it
+			let mut file_w = netcdf::File::create(&f).unwrap();
+			file_w.root_mut().add_dimension(dim_name, 3).unwrap();
+			let var = &mut file_w
+				.root_mut()
+				.add_variable::<i32>("some_variable", &[dim_name])
+				.unwrap();
+			var.endian(*i).unwrap();
+			assert_eq!(var.endian_value(), Ok(*i));
+			var.put_values::<i32>(&[1, 2, 3], None, None).unwrap();
+			// close it (done when `file_w` goes out of scope)
+		}
+		{
+			// re-open it
+			// and get "some variable" endian_value
+			let mut file_o = netcdf::open(&f).unwrap();
+			let var = &mut file_o
+				.root_mut()
+				.variable("some_variable")
+				.unwrap();
+			assert_eq!(var.endian_value(), Ok(*i));
+			// close it (done when `file_a` goes out of scope)
+		}
+	}
+}
+

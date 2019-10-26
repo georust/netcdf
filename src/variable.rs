@@ -86,8 +86,8 @@ impl Variable {
     }
     /// Set endianness of the variable. Must be set before inserting data
     ///
-    /// `endian` can take a value 0..=2 with 0 being NC_ENDIAN_NATIVE,
-    /// 1 NC_ENDIAN_LITTLE, 2 NC_ENDIAN_BIG
+    /// `endian` can take a `Endianness` value with Native being NC_ENDIAN_NATIVE (0),
+    /// Little NC_ENDIAN_LITTLE (1), Big NC_ENDIAN_BIG (2)
     /// 
     pub fn endian(&mut self, e: Endianness) -> error::Result<()> {
 		let _l = LOCK.lock().unwrap();
