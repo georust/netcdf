@@ -28,6 +28,17 @@ pub struct Variable {
     pub(crate) varid: nc_type,
 }
 
+/// Enum for variables endianness
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Endianness {
+	/// Native endianness, depends on machine architecture (x86_64 is Little)
+	Native,
+	/// Lille endian
+	Little,
+	/// Big endian
+	Big,
+}
+
 #[allow(clippy::len_without_is_empty)]
 impl Variable {
     /// Get name of variable
@@ -56,6 +67,44 @@ impl Variable {
     pub fn len(&self) -> usize {
         self.dimensions.iter().map(Dimension::len).product()
     }
+    /// Get endianness of the variable.
+    pub fn endian_value(&self) -> error::Result<Endianness> {
+		let mut e: nc_type = 0;
+		unsafe {
+			error::checked(nc_inq_var_endian(
+				self.ncid,
+				self.varid,
+				&mut e,
+			))?;
+		}
+		match e {
+			NC_ENDIAN_NATIVE => Ok(Endianness::Native),
+			NC_ENDIAN_LITTLE => Ok(Endianness::Little),
+			NC_ENDIAN_BIG => Ok(Endianness::Big),
+			_ => Err(NC_EVARMETA.into())
+		}
+    }
+    /// Set endianness of the variable. Must be set before inserting data
+    ///
+    /// `endian` can take a `Endianness` value with Native being NC_ENDIAN_NATIVE (0),
+    /// Little NC_ENDIAN_LITTLE (1), Big NC_ENDIAN_BIG (2)
+    /// 
+    pub fn endian(&mut self, e: Endianness) -> error::Result<()> {
+		let _l = LOCK.lock().unwrap();
+		let endianness = match e {
+			Endianness::Native => NC_ENDIAN_NATIVE,
+			Endianness::Little => NC_ENDIAN_LITTLE,
+			Endianness::Big => NC_ENDIAN_BIG,
+		};
+		unsafe {
+			error::checked(nc_def_var_endian(
+				self.ncid,
+				self.varid,
+				endianness,
+			))?;
+		}
+		Ok(())
+	}
 
     /// Sets compression on the variable. Must be set before filling in data.
     ///
