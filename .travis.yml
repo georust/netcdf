@@ -44,6 +44,7 @@ script:
   - |
       cargo build --all --no-default-features --verbose &&
       cargo build --all --verbose &&
+      cargo build --examples --verbose &&
       cargo test --all --verbose &&
       cargo bench --all --verbose &&
       cargo doc --all --verbose &&
