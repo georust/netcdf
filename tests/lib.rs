@@ -1,5 +1,7 @@
 #![cfg(test)]
 
+use netcdf::attribute::AttrValue;
+
 /// Get location of the test files
 fn test_location() -> std::path::PathBuf {
     use std::path::Path;
@@ -72,7 +74,6 @@ fn access_through_deref() {
 
 #[test]
 fn global_attrs() {
-    use netcdf::attribute::AttrValue;
     let f = test_location().join("patmosx_v05r03-preliminary_NOAA-19_asc_d20130630_c20140325.nc");
 
     let file = netcdf::File::open(&f).unwrap();
@@ -252,7 +253,6 @@ fn netcdf_error() {
 #[test]
 #[cfg(feature = "ndarray")]
 fn open_pres_temp_4d() {
-    use netcdf::attribute::AttrValue;
     let f = test_location().join("pres_temp_4D.nc");
 
     let file = netcdf::File::open(&f).unwrap();
@@ -486,7 +486,6 @@ fn def_dims_vars_attrs() {
         assert_eq!(data_test, data_file);
 
         // verify global attrs
-        use netcdf::attribute::AttrValue;
         assert_eq!(
             AttrValue::Int(3),
             file.root()
@@ -743,7 +742,6 @@ fn all_attr_types() {
     }
 
     {
-        use netcdf::attribute::AttrValue;
         let f = d.path().join("all_attr_types.nc");
         let file = netcdf::File::open(&f).unwrap();
 
@@ -1002,7 +1000,6 @@ fn set_fill_value() {
         .value()
         .unwrap();
     // compare requested fill_value and attribute _FillValue
-    use netcdf::attribute::AttrValue;
     assert_eq!(AttrValue::Int(fill_value), attr);
 
     let fill = var.fill_value::<i32>().unwrap();
@@ -1010,6 +1007,57 @@ fn set_fill_value() {
 
     // Expecting an error when trying to get the wrong variable type
     var.fill_value::<f32>().unwrap_err();
+}
+
+#[test]
+fn more_fill_values() {
+    let d = tempfile::tempdir().expect("Could not create tempdir");
+    let path = d.path().join("more_fill_values.nc");
+    let mut file = netcdf::create(path).expect("Could not open file");
+
+    file.add_dimension("x", 2).unwrap();
+    let var = &mut file.add_variable::<i32>("v0", &["x"]).unwrap();
+    var.set_fill_value(1_i32).unwrap();
+
+    var.put_value(6, Some(&[1])).unwrap();
+    assert_eq!(var.fill_value::<i32>().unwrap(), Some(1));
+
+    assert_eq!(var.value::<i32>(Some(&[0])).unwrap(), 1_i32);
+    assert_eq!(var.value::<i32>(Some(&[1])).unwrap(), 6_i32);
+
+    let var = &mut file.add_variable::<i32>("v1", &["x"]).unwrap();
+    unsafe {
+        var.set_nofill().unwrap();
+    }
+    var.put_value(6, Some(&[1])).unwrap();
+    assert_eq!(var.fill_value::<i32>().unwrap(), None);
+
+    // assert_eq!(var.value::<i32>(Some(&[0])).unwrap(), GARBAGE);
+    assert_eq!(var.value::<i32>(Some(&[1])).unwrap(), 6_i32);
+    assert!(var.attribute("_FillValue").is_none());
+
+    let var = &mut file.add_variable::<i32>("v2", &["x"]).unwrap();
+    var.set_fill_value(2_i32).unwrap();
+    assert_eq!(
+        var.attribute("_FillValue").unwrap().value().unwrap(),
+        AttrValue::Int(2)
+    );
+    var.set_fill_value(3_i32).unwrap();
+    assert_eq!(
+        var.attribute("_FillValue").unwrap().value().unwrap(),
+        AttrValue::Int(3)
+    );
+    unsafe { var.set_nofill().unwrap() };
+    assert_eq!(var.fill_value::<i32>().unwrap(), None);
+
+    var.put_value(6, Some(&[1])).unwrap();
+    assert_eq!(var.fill_value::<i32>().unwrap(), None);
+
+    // assert_eq!(var.value::<i32>(Some(&[0])).unwrap(), GARBAGE);
+    assert_eq!(var.value::<i32>(Some(&[1])).unwrap(), 6_i32);
+
+    // Following is the expected behaviour, but is not followed by netcdf
+    // assert!(var.attribute("_FillValue").is_none());
 }
 
 #[test]
