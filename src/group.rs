@@ -24,8 +24,14 @@ pub struct Group {
     pub(crate) dimensions: HashMap<String, Dimension>,
     pub(crate) groups: HashMap<String, Rc<UnsafeCell<Group>>>,
     /// Do not mutate parent, only for walking and getting dimensions
-    /// and types
+    /// and types. Use the `parents` iterator for walking upwards.
+    ///
+    /// Contains `None` only when `Group` is the root node
     pub(crate) parent: Option<Weak<UnsafeCell<Group>>>,
+    /// Given as `parent` when supplying to child groups.
+    ///
+    /// Should never be `None` (this is just to be able
+    /// to get a `Weak` into itself
     pub(crate) this: Option<Weak<UnsafeCell<Group>>>,
 }
 
@@ -104,7 +110,7 @@ impl Group {
         }
 
         let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?;
-        self.dimensions.insert(name.into(), d.clone());
+        self.dimensions.insert(name.into(), d);
 
         Ok(self.dimensions.get_mut(name).unwrap())
     }
@@ -182,7 +188,7 @@ impl Group {
         Ok(d)
     }
 
-    fn parents(&self) -> impl Iterator<Item = &Group> {
+    fn parents(&self) -> impl Iterator<Item = &Self> {
         ParentIterator::new(self)
     }
 
@@ -201,9 +207,9 @@ impl Group {
             let id = dim.identifier;
             d.push(match self.dimensions.values().find(|&x| x.id == id) {
                 Some(x) => x.clone(),
-                None => match self.parents()
-                    .map(|x| x.dimensions())
-                    .flatten()
+                None => match self
+                    .parents()
+                    .flat_map(Self::dimensions)
                     .find(|d| d.id == id)
                 {
                     Some(d) => d.clone(),
@@ -263,7 +269,7 @@ impl<'a> ParentIterator<'a> {
     fn new(g: &Group) -> Self {
         Self {
             g: g.this.clone().unwrap(),
-            _phantom : std::marker::PhantomData,
+            _phantom: std::marker::PhantomData,
         }
     }
 }
@@ -272,12 +278,12 @@ impl<'a> Iterator for ParentIterator<'a> {
     type Item = &'a Group;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let g: &Group = unsafe { &* self.g.upgrade().unwrap().get() };
+        let g: &Group = unsafe { &*self.g.upgrade().unwrap().get() };
         let p = match &g.parent {
             None => return None,
             Some(p) => p,
         };
         self.g = p.clone();
-        Some(unsafe{ &* self.g.upgrade().unwrap().get()})
+        Some(unsafe { &*self.g.upgrade().unwrap().get() })
     }
 }
