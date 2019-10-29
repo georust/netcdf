@@ -21,7 +21,6 @@ pub struct Group {
     pub(crate) grpid: Option<nc_type>,
     pub(crate) variables: HashMap<String, Variable>,
     pub(crate) attributes: HashMap<String, Attribute>,
-    pub(crate) parent_dimensions: Vec<HashMap<String, Dimension>>,
     pub(crate) dimensions: HashMap<String, Dimension>,
     pub(crate) groups: HashMap<String, Rc<UnsafeCell<Group>>>,
     /// Do not mutate parent, only for walking and getting dimensions
@@ -100,23 +99,12 @@ impl Group {
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&mut Dimension> {
-        fn recursively_add_dim(depth: usize, name: &str, d: &Dimension, g: &mut Group) {
-            for grp in g.groups_mut() {
-                grp.parent_dimensions[depth].insert(name.to_string(), d.clone());
-                recursively_add_dim(depth, name, d, grp);
-            }
-        }
         if self.dimensions.contains_key(name) {
             return Err(error::Error::AlreadyExists("dimension".into()));
         }
 
         let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?;
         self.dimensions.insert(name.into(), d.clone());
-
-        let mydepth = self.parent_dimensions.len();
-        for grp in self.groups_mut() {
-            recursively_add_dim(mydepth, name, &d, grp);
-        }
 
         Ok(self.dimensions.get_mut(name).unwrap())
     }
@@ -138,14 +126,10 @@ impl Group {
             ))?;
         }
 
-        let mut parent_dimensions = self.parent_dimensions.clone();
-        parent_dimensions.push(self.dimensions.clone());
-
         let g = Rc::new(UnsafeCell::new(Self {
             ncid: self.grpid.unwrap_or(self.ncid),
             name: name.to_string(),
             grpid: Some(grpid),
-            parent_dimensions,
             attributes: HashMap::default(),
             dimensions: HashMap::default(),
             groups: HashMap::default(),
@@ -168,11 +152,11 @@ impl Group {
         let (d, e): (Vec<_>, Vec<_>) = dims
             .iter()
             .map(|name| {
-                if let Some(x) = self.dimensions.get(*name) {
+                if let Some(x) = self.dimensions().find(|d| &d.name() == name) {
                     return Ok(x);
                 }
-                for pdim in self.parent_dimensions.iter().rev() {
-                    if let Some(x) = pdim.get(*name) {
+                for pdim in self.parents() {
+                    if let Some(x) = pdim.dimensions().find(|d| &d.name() == name) {
                         return Ok(x);
                     }
                 }
@@ -198,6 +182,10 @@ impl Group {
         Ok(d)
     }
 
+    fn parents(&self) -> impl Iterator<Item = &Group> {
+        ParentIterator::new(self)
+    }
+
     /// Adds a variable from a set of unique identifiers, recursing upwards
     /// from the current group if necessary.
     pub fn add_variable_from_identifiers<T>(
@@ -213,14 +201,12 @@ impl Group {
             let id = dim.identifier;
             d.push(match self.dimensions.values().find(|&x| x.id == id) {
                 Some(x) => x.clone(),
-                None => match self
-                    .parent_dimensions
-                    .iter()
-                    .rev()
+                None => match self.parents()
+                    .map(|x| x.dimensions())
                     .flatten()
-                    .find(|(_, x)| x.id == id)
+                    .find(|d| d.id == id)
                 {
-                    Some((_, x)) => x.clone(),
+                    Some(d) => d.clone(),
                     None => return Err(error::Error::NotFound(format!("dimension #{}", i))),
                 },
             });
@@ -265,5 +251,33 @@ impl Group {
 
         self.variables.insert(name.into(), var);
         Ok(self.variables.get_mut(name).unwrap())
+    }
+}
+
+struct ParentIterator<'a> {
+    g: Weak<UnsafeCell<Group>>,
+    _phantom: std::marker::PhantomData<&'a Group>,
+}
+
+impl<'a> ParentIterator<'a> {
+    fn new(g: &Group) -> Self {
+        Self {
+            g: g.this.clone().unwrap(),
+            _phantom : std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a> Iterator for ParentIterator<'a> {
+    type Item = &'a Group;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let g: &Group = unsafe { &* self.g.upgrade().unwrap().get() };
+        let p = match &g.parent {
+            None => return None,
+            Some(p) => p,
+        };
+        self.g = p.clone();
+        Some(unsafe{ &* self.g.upgrade().unwrap().get()})
     }
 }
