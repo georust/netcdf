@@ -802,6 +802,24 @@ impl Variable {
         self.attributes.insert("_FillValue".into(), a);
         Ok(())
     }
+
+    /// Set the fill value to no value. Use this when wanting to avoid
+    /// duplicate writes into empty variables.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe, as reading from this variable without
+    /// writing to it will produce potential garbage values
+    pub unsafe fn set_nofill(&mut self) -> error::Result<()> {
+        let _l = LOCK.lock().unwrap();
+        error::checked(nc_def_var_fill(
+            self.ncid,
+            self.varid,
+            NC_NOFILL,
+            std::ptr::null_mut(),
+        ))
+    }
+
     /// Get the fill value of a variable
     pub fn fill_value<T: Numeric>(&self) -> error::Result<Option<T>> {
         if T::NCTYPE != self.vartype {
