@@ -6,16 +6,18 @@ use super::group::Group;
 use super::HashMap;
 use super::LOCK;
 use netcdf_sys::*;
+use std::cell::UnsafeCell;
 use std::convert::TryInto;
 use std::ffi::CString;
 use std::path;
+use std::rc::Rc;
 
 /// Container for netcdf type
 #[derive(Debug)]
 pub struct File {
     pub(crate) ncid: nc_type,
     pub(crate) name: String,
-    pub(crate) root: Group,
+    pub(crate) root: Rc<UnsafeCell<Group>>,
 }
 
 impl File {
@@ -29,25 +31,25 @@ impl File {
     /// Main entrypoint for interacting with the netcdf file. Also accessible
     /// through the `Deref` trait on `File`
     pub fn root(&self) -> &Group {
-        &self.root
+        unsafe { &*self.root.get() }
     }
 
     /// Mutable access to the root group
     pub fn root_mut(&mut self) -> &mut Group {
-        &mut self.root
+        unsafe { &mut *self.root.get() }
     }
 }
 
 impl std::ops::Deref for File {
     type Target = Group;
     fn deref(&self) -> &Self::Target {
-        &self.root
+        unsafe { &*self.root.get() }
     }
 }
 
 impl std::ops::DerefMut for File {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.root
+        unsafe { &mut *self.root.get() }
     }
 }
 
@@ -101,16 +103,22 @@ impl File {
             error::checked(nc_create(f.as_ptr(), NC_NETCDF4 | NC_CLOBBER, &mut ncid))?;
         }
 
-        let root = Group {
+        let root = Rc::new(UnsafeCell::new(Group {
             name: "root".to_string(),
             ncid,
             grpid: None,
             variables: HashMap::default(),
             attributes: HashMap::default(),
-            parent_dimensions: Vec::default(),
             dimensions: HashMap::default(),
             groups: HashMap::default(),
-        };
+            parent: None,
+            this: None,
+        }));
+        {
+            let rootref = Some(Rc::downgrade(&root));
+            let root = unsafe { &mut *root.get() };
+            root.this = rootref;
+        }
         Ok(Self {
             ncid,
             name: path.file_name().unwrap().to_string_lossy().to_string(),
@@ -423,7 +431,8 @@ fn get_variables(
 fn get_groups(
     ncid: nc_type,
     parent_dim: &[&HashMap<String, Dimension>],
-) -> error::Result<HashMap<String, Group>> {
+    parent: &Rc<UnsafeCell<Group>>,
+) -> error::Result<HashMap<String, Rc<UnsafeCell<Group>>>> {
     let mut ngroups = 0;
 
     unsafe {
@@ -445,7 +454,6 @@ fn get_groups(
         let variables = get_variables(grpid, &unlim_dims)?;
         let mut parent_dimensions = parent_dim.to_vec();
         parent_dimensions.push(&dimensions);
-        let subgroups = get_groups(grpid, &parent_dimensions)?;
         let attributes = get_attributes(grpid, NC_GLOBAL)?;
 
         for i in cname.iter_mut() {
@@ -459,16 +467,26 @@ fn get_groups(
             .to_string_lossy()
             .to_string();
 
-        let g = Group {
+        let g = Rc::new(UnsafeCell::new(Group {
             name: name.clone(),
             ncid,
             grpid: Some(grpid),
             attributes,
-            parent_dimensions: parent_dim.iter().map(|&x| x.clone()).collect(),
-            dimensions,
+            dimensions: dimensions.clone(),
             variables,
-            groups: subgroups,
-        };
+            groups: HashMap::default(),
+            parent: Some(Rc::downgrade(parent)),
+            this: None,
+        }));
+
+        let subgroups = get_groups(grpid, &parent_dimensions, &g)?;
+        let refcell = Rc::downgrade(&g);
+        {
+            let g = unsafe { &mut *g.get() };
+            g.this = Some(refcell);
+            g.groups = subgroups;
+        }
+
         groups.insert(name, g);
     }
 
@@ -492,7 +510,7 @@ fn get_unlimited_dimensions(ncid: nc_type) -> error::Result<Vec<nc_type>> {
     Ok(uldim)
 }
 
-fn parse_file(ncid: nc_type) -> error::Result<Group> {
+fn parse_file(ncid: nc_type) -> error::Result<Rc<UnsafeCell<Group>>> {
     let _l = LOCK.lock().unwrap();
 
     let unlimited_dimensions = get_unlimited_dimensions(ncid)?;
@@ -502,16 +520,24 @@ fn parse_file(ncid: nc_type) -> error::Result<Group> {
 
     let variables = get_variables(ncid, &unlimited_dimensions)?;
 
-    let groups = get_groups(ncid, &[&dimensions])?;
-
-    Ok(Group {
+    let g = Rc::new(UnsafeCell::new(Group {
         ncid,
         grpid: None,
         name: "root".into(),
-        parent_dimensions: Vec::default(),
-        dimensions,
+        dimensions: dimensions.clone(),
         attributes,
         variables,
-        groups,
-    })
+        groups: HashMap::default(),
+        parent: None,
+        this: None,
+    }));
+    let thisref = Some(Rc::downgrade(&g));
+    let groups = get_groups(ncid, &[&dimensions], &g)?;
+    {
+        let g = unsafe { &mut *g.get() };
+        g.this = thisref;
+        g.groups = groups;
+    }
+
+    Ok(g)
 }

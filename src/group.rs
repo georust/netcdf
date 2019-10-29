@@ -8,6 +8,8 @@ use super::error;
 use super::variable::{Numeric, Variable};
 use super::HashMap;
 use netcdf_sys::*;
+use std::cell::UnsafeCell;
+use std::rc::{Rc, Weak};
 
 /// Main component of the netcdf format. Holds all variables,
 /// attributes, and dimensions. A group can always see the parents items,
@@ -19,9 +21,18 @@ pub struct Group {
     pub(crate) grpid: Option<nc_type>,
     pub(crate) variables: HashMap<String, Variable>,
     pub(crate) attributes: HashMap<String, Attribute>,
-    pub(crate) parent_dimensions: Vec<HashMap<String, Dimension>>,
     pub(crate) dimensions: HashMap<String, Dimension>,
-    pub(crate) groups: HashMap<String, Group>,
+    pub(crate) groups: HashMap<String, Rc<UnsafeCell<Group>>>,
+    /// Do not mutate parent, only for walking and getting dimensions
+    /// and types. Use the `parents` iterator for walking upwards.
+    ///
+    /// Contains `None` only when `Group` is the root node
+    pub(crate) parent: Option<Weak<UnsafeCell<Group>>>,
+    /// Given as `parent` when supplying to child groups.
+    ///
+    /// Should never be `None` (this is just to be able
+    /// to get a `Weak` into itself
+    pub(crate) this: Option<Weak<UnsafeCell<Group>>>,
 }
 
 impl Group {
@@ -63,19 +74,21 @@ impl Group {
     }
     /// Get a group
     pub fn group(&self, name: &str) -> Option<&Self> {
-        self.groups.get(name)
+        self.groups.get(name).map(|x| unsafe { &*x.get() })
     }
     /// Iterator over all groups
     pub fn groups(&self) -> impl Iterator<Item = &Self> {
-        self.groups.values()
+        self.groups.values().map(|x| unsafe { &*x.get() })
     }
     /// Mutable access to group
     pub fn group_mut(&mut self, name: &str) -> Option<&mut Self> {
-        self.groups.get_mut(name)
+        // self is taken as &mut, can always unwrap safely
+        self.groups.get(name).map(|x| unsafe { &mut *x.get() })
     }
     /// Iterator over all groups (mutable access)
     pub fn groups_mut(&mut self) -> impl Iterator<Item = &mut Self> {
-        self.groups.values_mut()
+        // Takes self as &mut
+        self.groups.values_mut().map(|x| unsafe { &mut *x.get() })
     }
 }
 
@@ -92,23 +105,12 @@ impl Group {
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&mut Dimension> {
-        fn recursively_add_dim(depth: usize, name: &str, d: &Dimension, g: &mut Group) {
-            for grp in g.groups.values_mut() {
-                grp.parent_dimensions[depth].insert(name.to_string(), d.clone());
-                recursively_add_dim(depth, name, d, grp);
-            }
-        }
         if self.dimensions.contains_key(name) {
             return Err(error::Error::AlreadyExists("dimension".into()));
         }
 
         let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?;
-        self.dimensions.insert(name.into(), d.clone());
-
-        let mydepth = self.parent_dimensions.len();
-        for grp in self.groups.values_mut() {
-            recursively_add_dim(mydepth, name, &d, grp);
-        }
+        self.dimensions.insert(name.into(), d);
 
         Ok(self.dimensions.get_mut(name).unwrap())
     }
@@ -130,21 +132,24 @@ impl Group {
             ))?;
         }
 
-        let mut parent_dimensions = self.parent_dimensions.clone();
-        parent_dimensions.push(self.dimensions.clone());
-
-        let g = Self {
+        let g = Rc::new(UnsafeCell::new(Self {
             ncid: self.grpid.unwrap_or(self.ncid),
             name: name.to_string(),
             grpid: Some(grpid),
-            parent_dimensions,
             attributes: HashMap::default(),
             dimensions: HashMap::default(),
             groups: HashMap::default(),
             variables: HashMap::default(),
-        };
+            parent: Some(self.this.clone().unwrap()),
+            this: None,
+        }));
+        {
+            let gref = Some(Rc::downgrade(&g));
+            let g = unsafe { &mut *g.get() };
+            g.this = gref;
+        }
         self.groups.insert(name.to_string(), g);
-        Ok(self.groups.get_mut(name).unwrap())
+        Ok(self.group_mut(name).unwrap())
     }
 
     /// Asserts all dimensions exists, and gets a copy of these
@@ -153,11 +158,11 @@ impl Group {
         let (d, e): (Vec<_>, Vec<_>) = dims
             .iter()
             .map(|name| {
-                if let Some(x) = self.dimensions.get(*name) {
+                if let Some(x) = self.dimensions().find(|d| &d.name() == name) {
                     return Ok(x);
                 }
-                for pdim in self.parent_dimensions.iter().rev() {
-                    if let Some(x) = pdim.get(*name) {
+                for pdim in self.parents() {
+                    if let Some(x) = pdim.dimensions().find(|d| &d.name() == name) {
                         return Ok(x);
                     }
                 }
@@ -183,6 +188,10 @@ impl Group {
         Ok(d)
     }
 
+    fn parents(&self) -> impl Iterator<Item = &Self> {
+        ParentIterator::new(self)
+    }
+
     /// Adds a variable from a set of unique identifiers, recursing upwards
     /// from the current group if necessary.
     pub fn add_variable_from_identifiers<T>(
@@ -199,13 +208,11 @@ impl Group {
             d.push(match self.dimensions.values().find(|&x| x.id == id) {
                 Some(x) => x.clone(),
                 None => match self
-                    .parent_dimensions
-                    .iter()
-                    .rev()
-                    .flatten()
-                    .find(|(_, x)| x.id == id)
+                    .parents()
+                    .flat_map(Self::dimensions)
+                    .find(|d| d.id == id)
                 {
-                    Some((_, x)) => x.clone(),
+                    Some(d) => d.clone(),
                     None => return Err(error::Error::NotFound(format!("dimension #{}", i))),
                 },
             });
@@ -250,5 +257,33 @@ impl Group {
 
         self.variables.insert(name.into(), var);
         Ok(self.variables.get_mut(name).unwrap())
+    }
+}
+
+struct ParentIterator<'a> {
+    g: Weak<UnsafeCell<Group>>,
+    _phantom: std::marker::PhantomData<&'a Group>,
+}
+
+impl<'a> ParentIterator<'a> {
+    fn new(g: &Group) -> Self {
+        Self {
+            g: g.this.clone().unwrap(),
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a> Iterator for ParentIterator<'a> {
+    type Item = &'a Group;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let g: &Group = unsafe { &*self.g.upgrade().unwrap().get() };
+        let p = match &g.parent {
+            None => return None,
+            Some(p) => p,
+        };
+        self.g = p.clone();
+        Some(unsafe { &*self.g.upgrade().unwrap().get() })
     }
 }
