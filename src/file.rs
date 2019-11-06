@@ -109,7 +109,7 @@ impl File {
             grpid: None,
             variables: Vec::default(),
             attributes: Vec::default(),
-            dimensions: HashMap::default(),
+            dimensions: Vec::default(),
             groups: HashMap::default(),
             parent: None,
             this: None,
@@ -199,14 +199,14 @@ use super::dimension::Dimension;
 fn get_group_dimensions(
     ncid: nc_type,
     unlimited_dims: &[nc_type],
-) -> error::Result<HashMap<String, Dimension>> {
+) -> error::Result<Vec<Dimension>> {
     let mut ndims: nc_type = 0;
     unsafe {
         error::checked(nc_inq_dimids(ncid, &mut ndims, std::ptr::null_mut(), 0))?;
     }
 
     if ndims == 0 {
-        return Ok(HashMap::new());
+        return Ok(Vec::new());
     }
     let mut dimids = vec![0 as nc_type; ndims.try_into()?];
     unsafe {
@@ -218,7 +218,7 @@ fn get_group_dimensions(
         ))?;
     }
 
-    let mut dimensions = HashMap::with_capacity(ndims.try_into()?);
+    let mut dimensions = Vec::with_capacity(ndims.try_into()?);
     let mut buf = [0_u8; NC_MAX_NAME as usize + 1];
     for dimid in dimids {
         for i in buf.iter_mut() {
@@ -245,15 +245,12 @@ fn get_group_dimensions(
         } else {
             Some(unsafe { core::num::NonZeroUsize::new_unchecked(len) })
         };
-        dimensions.insert(
-            name.clone(),
-            Dimension {
-                ncid,
-                name,
-                len,
-                id: dimid,
-            },
-        );
+        dimensions.push(Dimension {
+            ncid,
+            name,
+            len,
+            id: dimid,
+        });
     }
 
     Ok(dimensions)
@@ -427,7 +424,6 @@ fn get_variables(ncid: nc_type, unlimited_dims: &[nc_type]) -> error::Result<Vec
 
 fn get_groups(
     ncid: nc_type,
-    parent_dim: &[&HashMap<String, Dimension>],
     parent: &Rc<UnsafeCell<Group>>,
 ) -> error::Result<HashMap<String, Rc<UnsafeCell<Group>>>> {
     let mut ngroups = 0;
@@ -449,8 +445,6 @@ fn get_groups(
         let unlim_dims = get_unlimited_dimensions(grpid)?;
         let dimensions = get_group_dimensions(grpid, &unlim_dims)?;
         let variables = get_variables(grpid, &unlim_dims)?;
-        let mut parent_dimensions = parent_dim.to_vec();
-        parent_dimensions.push(&dimensions);
         let attributes = get_attributes(grpid, NC_GLOBAL)?;
 
         for i in cname.iter_mut() {
@@ -476,7 +470,7 @@ fn get_groups(
             this: None,
         }));
 
-        let subgroups = get_groups(grpid, &parent_dimensions, &g)?;
+        let subgroups = get_groups(grpid, &g)?;
         let refcell = Rc::downgrade(&g);
         {
             let g = unsafe { &mut *g.get() };
@@ -529,7 +523,7 @@ fn parse_file(ncid: nc_type) -> error::Result<Rc<UnsafeCell<Group>>> {
         this: None,
     }));
     let thisref = Some(Rc::downgrade(&g));
-    let groups = get_groups(ncid, &[&dimensions], &g)?;
+    let groups = get_groups(ncid, &g)?;
     {
         let g = unsafe { &mut *g.get() };
         g.this = thisref;

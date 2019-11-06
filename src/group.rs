@@ -21,7 +21,7 @@ pub struct Group {
     pub(crate) grpid: Option<nc_type>,
     pub(crate) variables: Vec<Variable>,
     pub(crate) attributes: Vec<Attribute>,
-    pub(crate) dimensions: HashMap<String, Dimension>,
+    pub(crate) dimensions: Vec<Dimension>,
     pub(crate) groups: HashMap<String, Rc<UnsafeCell<Group>>>,
     /// Do not mutate parent, only for walking and getting dimensions
     /// and types. Use the `parents` iterator for walking upwards.
@@ -66,11 +66,11 @@ impl Group {
     }
     /// Get a single dimension
     pub fn dimension(&self, name: &str) -> Option<&Dimension> {
-        self.dimensions.get(name)
+        self.dimensions().find(|x| x.name() == name)
     }
     /// Iterator over all dimensions
     pub fn dimensions(&self) -> impl Iterator<Item = &Dimension> {
-        self.dimensions.values()
+        self.dimensions.iter()
     }
     /// Get a group
     pub fn group(&self, name: &str) -> Option<&Self> {
@@ -104,19 +104,19 @@ impl Group {
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
-    pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&mut Dimension> {
-        if self.dimensions.contains_key(name) {
+    pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&Dimension> {
+        if self.dimension(name).is_some() {
             return Err(error::Error::AlreadyExists("dimension".into()));
         }
 
         let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?;
-        self.dimensions.insert(name.into(), d);
+        self.dimensions.push(d);
 
-        Ok(self.dimensions.get_mut(name).unwrap())
+        Ok(self.dimension(name).unwrap())
     }
 
     /// Adds a dimension with unbounded size
-    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<&mut Dimension> {
+    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<&Dimension> {
         self.add_dimension(name, 0)
     }
 
@@ -137,7 +137,7 @@ impl Group {
             name: name.to_string(),
             grpid: Some(grpid),
             attributes: Vec::default(),
-            dimensions: HashMap::default(),
+            dimensions: Vec::default(),
             groups: HashMap::default(),
             variables: Vec::default(),
             parent: Some(self.this.clone().unwrap()),
@@ -205,7 +205,7 @@ impl Group {
         let mut d: Vec<_> = Vec::default();
         for (i, dim) in dims.iter().enumerate() {
             let id = dim.identifier;
-            d.push(match self.dimensions.values().find(|&x| x.id == id) {
+            d.push(match self.dimensions().find(|&x| x.id == id) {
                 Some(x) => x.clone(),
                 None => match self
                     .parents()
