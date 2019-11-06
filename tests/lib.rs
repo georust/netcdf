@@ -206,6 +206,18 @@ fn attributes_read() {
 }
 
 #[test]
+fn variable_not_replacing() {
+    let d = tempfile::tempdir().unwrap();
+    let p = d.path().join("variable_not_replacing.nc");
+    let mut f = netcdf::create(p).unwrap();
+
+    f.add_variable::<u16>("a", &[]).unwrap();
+    f.add_variable::<i16>("b", &[]).unwrap();
+    f.add_variable::<u8>("a", &[]).unwrap_err();
+    f.add_variable_from_identifiers::<i8>("b", &[]).unwrap_err();
+}
+
+#[test]
 /// Making sure attributes are updated correctly (replacing previous value)
 fn attribute_put() {
     let d = tempfile::tempdir().expect("Could not create tempdir");
@@ -335,6 +347,18 @@ fn nc4_groups() {
     for (i, x) in data.iter().enumerate() {
         assert_eq!(*x, i as i32);
     }
+}
+
+#[test]
+fn groups_put_extra() {
+    let d = tempfile::tempdir().expect("Could not create tempdir");
+    let p = d.path().join("groups_put_extra");
+    let mut f = netcdf::create(p).unwrap();
+
+    f.add_group("a").unwrap();
+    f.add_group("b").unwrap();
+    // Groups can not be added with the same name
+    f.add_group("a").unwrap_err();
 }
 
 #[test]

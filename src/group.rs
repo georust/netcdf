@@ -125,6 +125,9 @@ impl Group {
 
     /// Add an empty group to the dataset
     pub fn add_group(&mut self, name: &str) -> error::Result<&mut Self> {
+        if self.group(name).is_some() {
+            return Err(error::Error::AlreadyExists(name.to_string()));
+        }
         let cstr = std::ffi::CString::new(name).unwrap();
         let mut grpid = 0;
         unsafe {
@@ -205,6 +208,9 @@ impl Group {
     where
         T: Numeric,
     {
+        if self.variable(name).is_some() {
+            return Err(error::Error::AlreadyExists(format!("variable {}", name)));
+        }
         let mut d: Vec<_> = Vec::default();
         for (i, dim) in dims.iter().enumerate() {
             let id = dim.identifier;
