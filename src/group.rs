@@ -6,7 +6,6 @@ use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
 use super::variable::{Numeric, Variable};
-use super::HashMap;
 use netcdf_sys::*;
 use std::cell::UnsafeCell;
 use std::rc::{Rc, Weak};
@@ -22,7 +21,7 @@ pub struct Group {
     pub(crate) variables: Vec<Variable>,
     pub(crate) attributes: Vec<Attribute>,
     pub(crate) dimensions: Vec<Dimension>,
-    pub(crate) groups: HashMap<String, Rc<UnsafeCell<Group>>>,
+    pub(crate) groups: Vec<Rc<UnsafeCell<Group>>>,
     /// Do not mutate parent, only for walking and getting dimensions
     /// and types. Use the `parents` iterator for walking upwards.
     ///
@@ -74,21 +73,21 @@ impl Group {
     }
     /// Get a group
     pub fn group(&self, name: &str) -> Option<&Self> {
-        self.groups.get(name).map(|x| unsafe { &*x.get() })
+        self.groups().find(|x| x.name() == name)
     }
     /// Iterator over all groups
     pub fn groups(&self) -> impl Iterator<Item = &Self> {
-        self.groups.values().map(|x| unsafe { &*x.get() })
+        self.groups.iter().map(|x| unsafe { &*x.get() })
     }
     /// Mutable access to group
     pub fn group_mut(&mut self, name: &str) -> Option<&mut Self> {
         // self is taken as &mut, can always unwrap safely
-        self.groups.get(name).map(|x| unsafe { &mut *x.get() })
+        self.groups_mut().find(|x| x.name() == name)
     }
     /// Iterator over all groups (mutable access)
     pub fn groups_mut(&mut self) -> impl Iterator<Item = &mut Self> {
         // Takes self as &mut
-        self.groups.values_mut().map(|x| unsafe { &mut *x.get() })
+        self.groups.iter_mut().map(|x| unsafe { &mut *x.get() })
     }
 }
 
@@ -138,7 +137,7 @@ impl Group {
             grpid: Some(grpid),
             attributes: Vec::default(),
             dimensions: Vec::default(),
-            groups: HashMap::default(),
+            groups: Vec::default(),
             variables: Vec::default(),
             parent: Some(self.this.clone().unwrap()),
             this: None,
@@ -148,7 +147,7 @@ impl Group {
             let g = unsafe { &mut *g.get() };
             g.this = gref;
         }
-        self.groups.insert(name.to_string(), g);
+        self.groups.push(g);
         Ok(self.group_mut(name).unwrap())
     }
 

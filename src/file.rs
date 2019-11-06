@@ -3,7 +3,6 @@
 #![allow(clippy::similar_names)]
 use super::error;
 use super::group::Group;
-use super::HashMap;
 use super::LOCK;
 use netcdf_sys::*;
 use std::cell::UnsafeCell;
@@ -110,7 +109,7 @@ impl File {
             variables: Vec::default(),
             attributes: Vec::default(),
             dimensions: Vec::default(),
-            groups: HashMap::default(),
+            groups: Vec::default(),
             parent: None,
             this: None,
         }));
@@ -425,21 +424,21 @@ fn get_variables(ncid: nc_type, unlimited_dims: &[nc_type]) -> error::Result<Vec
 fn get_groups(
     ncid: nc_type,
     parent: &Rc<UnsafeCell<Group>>,
-) -> error::Result<HashMap<String, Rc<UnsafeCell<Group>>>> {
+) -> error::Result<Vec<Rc<UnsafeCell<Group>>>> {
     let mut ngroups = 0;
 
     unsafe {
         error::checked(nc_inq_grps(ncid, &mut ngroups, std::ptr::null_mut()))?;
     }
     if ngroups == 0 {
-        return Ok(HashMap::new());
+        return Ok(Vec::new());
     }
     let mut grpids = vec![0; ngroups.try_into()?];
     unsafe {
         error::checked(nc_inq_grps(ncid, std::ptr::null_mut(), grpids.as_mut_ptr()))?;
     }
 
-    let mut groups = HashMap::with_capacity(ngroups.try_into()?);
+    let mut groups = Vec::with_capacity(ngroups.try_into()?);
     let mut cname = [0; NC_MAX_NAME as usize + 1];
     for grpid in grpids {
         let unlim_dims = get_unlimited_dimensions(grpid)?;
@@ -465,7 +464,7 @@ fn get_groups(
             attributes,
             dimensions: dimensions.clone(),
             variables,
-            groups: HashMap::default(),
+            groups: Vec::default(),
             parent: Some(Rc::downgrade(parent)),
             this: None,
         }));
@@ -478,7 +477,7 @@ fn get_groups(
             g.groups = subgroups;
         }
 
-        groups.insert(name, g);
+        groups.push(g);
     }
 
     Ok(groups)
@@ -518,7 +517,7 @@ fn parse_file(ncid: nc_type) -> error::Result<Rc<UnsafeCell<Group>>> {
         dimensions: dimensions.clone(),
         attributes,
         variables,
-        groups: HashMap::default(),
+        groups: Vec::default(),
         parent: None,
         this: None,
     }));
