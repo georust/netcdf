@@ -109,10 +109,10 @@ impl Group {
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&Dimension> {
         if self.dimension(name).is_some() {
-            return Err(error::Error::AlreadyExists("dimension".into()));
+            return Err(error::Error::AlreadyExists(format!("dimension {}", name)));
         }
 
-        let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?;
+        let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name.to_string(), len)?;
         self.dimensions.push(d);
 
         Ok(self.dimension(name).unwrap())

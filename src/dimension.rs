@@ -60,11 +60,11 @@ impl Dimension {
         }
     }
 
-    pub(crate) fn new(grpid: nc_type, name: &str, len: usize) -> error::Result<Self> {
+    pub(crate) fn new(grpid: nc_type, name: String, len: usize) -> error::Result<Self> {
         use std::ffi::CString;
 
         let mut dimid = 0;
-        let cname = CString::new(name).unwrap();
+        let cname = CString::new(name.as_str()).unwrap();
 
         unsafe {
             let _l = LOCK.lock().unwrap();
@@ -72,7 +72,7 @@ impl Dimension {
         }
 
         Ok(Self {
-            name: name.into(),
+            name,
             len: core::num::NonZeroUsize::new(len),
             id: dimid,
             ncid: grpid,

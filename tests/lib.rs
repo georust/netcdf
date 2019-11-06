@@ -277,6 +277,9 @@ fn netcdf_error() {
     file.add_dimension("v", 3).expect("Could not add dimension");
     file.add_variable::<i8>("var", &["v"]).unwrap();
     file.add_variable::<i8>("var", &["v"]).unwrap_err();
+
+    file.add_dimension("v", 2).unwrap_err();
+    file.add_unlimited_dimension("v").unwrap_err();
 }
 
 #[test]
