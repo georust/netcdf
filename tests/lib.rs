@@ -206,6 +206,35 @@ fn attributes_read() {
 }
 
 #[test]
+fn variable_not_replacing() {
+    let d = tempfile::tempdir().unwrap();
+    let p = d.path().join("variable_not_replacing.nc");
+    let mut f = netcdf::create(p).unwrap();
+
+    f.add_variable::<u16>("a", &[]).unwrap();
+    f.add_variable::<i16>("b", &[]).unwrap();
+    f.add_variable::<u8>("a", &[]).unwrap_err();
+    f.add_variable_from_identifiers::<i8>("b", &[]).unwrap_err();
+}
+
+#[test]
+/// Making sure attributes are updated correctly (replacing previous value)
+fn attribute_put() {
+    let d = tempfile::tempdir().expect("Could not create tempdir");
+    let p = d.path().join("attribute_put.nc");
+    let mut f = netcdf::create(p).unwrap();
+
+    f.add_attribute("a", "1").unwrap();
+    assert_eq!(f.attribute("a").unwrap().value().unwrap(), "1".into());
+    f.add_attribute("b", "2").unwrap();
+    assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
+    f.add_attribute("a", 2u32).unwrap();
+    assert_eq!(f.attribute("a").unwrap().value().unwrap(), 2u32.into());
+    f.add_attribute("b", "2").unwrap();
+    assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
+}
+
+#[test]
 fn dimension_lengths() {
     let d = tempfile::tempdir().expect("Could not create tempdir");
     let path = d.path().join("dimension_lengths");
@@ -248,6 +277,9 @@ fn netcdf_error() {
     file.add_dimension("v", 3).expect("Could not add dimension");
     file.add_variable::<i8>("var", &["v"]).unwrap();
     file.add_variable::<i8>("var", &["v"]).unwrap_err();
+
+    file.add_dimension("v", 2).unwrap_err();
+    file.add_unlimited_dimension("v").unwrap_err();
 }
 
 #[test]
@@ -318,6 +350,18 @@ fn nc4_groups() {
     for (i, x) in data.iter().enumerate() {
         assert_eq!(*x, i as i32);
     }
+}
+
+#[test]
+fn groups_put_extra() {
+    let d = tempfile::tempdir().expect("Could not create tempdir");
+    let p = d.path().join("groups_put_extra");
+    let mut f = netcdf::create(p).unwrap();
+
+    f.add_group("a").unwrap();
+    f.add_group("b").unwrap();
+    // Groups can not be added with the same name
+    f.add_group("a").unwrap_err();
 }
 
 #[test]
@@ -1198,7 +1242,7 @@ fn add_confliciting_dimensions() {
     let e = file.add_dimension("x", 11).unwrap_err();
     assert_eq!(
         e,
-        netcdf::error::Error::AlreadyExists("dimension".to_string())
+        netcdf::error::Error::AlreadyExists("dimension x".to_string())
     );
     assert_eq!(file.dimension("x").unwrap().len(), 10);
 }

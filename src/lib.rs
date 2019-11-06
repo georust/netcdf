@@ -117,5 +117,3 @@ lazy_static! {
     /// Use this when accessing netcdf functions
     pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());
 }
-
-use indexmap::IndexMap as HashMap;

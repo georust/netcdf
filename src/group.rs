@@ -6,7 +6,6 @@ use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
 use super::variable::{Numeric, Variable};
-use super::HashMap;
 use netcdf_sys::*;
 use std::cell::UnsafeCell;
 use std::rc::{Rc, Weak};
@@ -19,10 +18,10 @@ pub struct Group {
     pub(crate) name: String,
     pub(crate) ncid: nc_type,
     pub(crate) grpid: Option<nc_type>,
-    pub(crate) variables: HashMap<String, Variable>,
-    pub(crate) attributes: HashMap<String, Attribute>,
-    pub(crate) dimensions: HashMap<String, Dimension>,
-    pub(crate) groups: HashMap<String, Rc<UnsafeCell<Group>>>,
+    pub(crate) variables: Vec<Variable>,
+    pub(crate) attributes: Vec<Attribute>,
+    pub(crate) dimensions: Vec<Dimension>,
+    pub(crate) groups: Vec<Rc<UnsafeCell<Group>>>,
     /// Do not mutate parent, only for walking and getting dimensions
     /// and types. Use the `parents` iterator for walking upwards.
     ///
@@ -42,53 +41,52 @@ impl Group {
     }
     /// Get a variable from the group
     pub fn variable(&self, name: &str) -> Option<&Variable> {
-        self.variables.get(name)
+        self.variables().find(|x| x.name() == name)
     }
     /// Iterate over all variables in a group
     pub fn variables(&self) -> impl Iterator<Item = &Variable> {
-        self.variables.values()
+        self.variables.iter()
     }
     /// Get a mutable variable from the group
     pub fn variable_mut(&mut self, name: &str) -> Option<&mut Variable> {
-        self.variables.get_mut(name)
+        self.variables_mut().find(|x| x.name() == name)
     }
     /// Iterate over all variables in a group, with mutable access
     pub fn variables_mut(&mut self) -> impl Iterator<Item = &mut Variable> {
-        self.variables.values_mut()
+        self.variables.iter_mut()
     }
     /// Get a single attribute
     pub fn attribute(&self, name: &str) -> Option<&Attribute> {
-        self.attributes.get(name)
+        self.attributes().find(|x| x.name() == name)
     }
     /// Get all attributes
     pub fn attributes(&self) -> impl Iterator<Item = &Attribute> {
-        self.attributes.values()
+        self.attributes.iter()
     }
     /// Get a single dimension
     pub fn dimension(&self, name: &str) -> Option<&Dimension> {
-        self.dimensions.get(name)
+        self.dimensions().find(|x| x.name() == name)
     }
     /// Iterator over all dimensions
     pub fn dimensions(&self) -> impl Iterator<Item = &Dimension> {
-        self.dimensions.values()
+        self.dimensions.iter()
     }
     /// Get a group
     pub fn group(&self, name: &str) -> Option<&Self> {
-        self.groups.get(name).map(|x| unsafe { &*x.get() })
+        self.groups().find(|x| x.name() == name)
     }
     /// Iterator over all groups
     pub fn groups(&self) -> impl Iterator<Item = &Self> {
-        self.groups.values().map(|x| unsafe { &*x.get() })
+        self.groups.iter().map(|x| unsafe { &*x.get() })
     }
     /// Mutable access to group
     pub fn group_mut(&mut self, name: &str) -> Option<&mut Self> {
-        // self is taken as &mut, can always unwrap safely
-        self.groups.get(name).map(|x| unsafe { &mut *x.get() })
+        self.groups_mut().find(|x| x.name() == name)
     }
     /// Iterator over all groups (mutable access)
     pub fn groups_mut(&mut self) -> impl Iterator<Item = &mut Self> {
         // Takes self as &mut
-        self.groups.values_mut().map(|x| unsafe { &mut *x.get() })
+        self.groups.iter_mut().map(|x| unsafe { &mut *x.get() })
     }
 }
 
@@ -99,29 +97,37 @@ impl Group {
         T: Into<AttrValue>,
     {
         let att = Attribute::put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name, val.into())?;
-        self.attributes.insert(name.to_string(), att);
+        let pos = self.attributes().position(|x| x.name() == name);
+        if let Some(i) = pos {
+            self.attributes[i] = att;
+        } else {
+            self.attributes.push(att);
+        }
         Ok(())
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
-    pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&mut Dimension> {
-        if self.dimensions.contains_key(name) {
-            return Err(error::Error::AlreadyExists("dimension".into()));
+    pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&Dimension> {
+        if self.dimension(name).is_some() {
+            return Err(error::Error::AlreadyExists(format!("dimension {}", name)));
         }
 
-        let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name, len)?;
-        self.dimensions.insert(name.into(), d);
+        let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name.to_string(), len)?;
+        self.dimensions.push(d);
 
-        Ok(self.dimensions.get_mut(name).unwrap())
+        Ok(self.dimension(name).unwrap())
     }
 
     /// Adds a dimension with unbounded size
-    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<&mut Dimension> {
+    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<&Dimension> {
         self.add_dimension(name, 0)
     }
 
     /// Add an empty group to the dataset
     pub fn add_group(&mut self, name: &str) -> error::Result<&mut Self> {
+        if self.group(name).is_some() {
+            return Err(error::Error::AlreadyExists(name.to_string()));
+        }
         let cstr = std::ffi::CString::new(name).unwrap();
         let mut grpid = 0;
         unsafe {
@@ -136,10 +142,10 @@ impl Group {
             ncid: self.grpid.unwrap_or(self.ncid),
             name: name.to_string(),
             grpid: Some(grpid),
-            attributes: HashMap::default(),
-            dimensions: HashMap::default(),
-            groups: HashMap::default(),
-            variables: HashMap::default(),
+            attributes: Vec::default(),
+            dimensions: Vec::default(),
+            groups: Vec::default(),
+            variables: Vec::default(),
             parent: Some(self.this.clone().unwrap()),
             this: None,
         }));
@@ -148,7 +154,7 @@ impl Group {
             let g = unsafe { &mut *g.get() };
             g.this = gref;
         }
-        self.groups.insert(name.to_string(), g);
+        self.groups.push(g);
         Ok(self.group_mut(name).unwrap())
     }
 
@@ -158,11 +164,11 @@ impl Group {
         let (d, e): (Vec<_>, Vec<_>) = dims
             .iter()
             .map(|name| {
-                if let Some(x) = self.dimensions().find(|d| &d.name() == name) {
+                if let Some(x) = self.dimension(name) {
                     return Ok(x);
                 }
                 for pdim in self.parents() {
-                    if let Some(x) = pdim.dimensions().find(|d| &d.name() == name) {
+                    if let Some(x) = pdim.dimension(name) {
                         return Ok(x);
                     }
                 }
@@ -188,7 +194,7 @@ impl Group {
         Ok(d)
     }
 
-    fn parents(&self) -> impl Iterator<Item = &Self> {
+    pub(crate) fn parents(&self) -> impl Iterator<Item = &Self> {
         ParentIterator::new(self)
     }
 
@@ -202,25 +208,32 @@ impl Group {
     where
         T: Numeric,
     {
+        if self.variable(name).is_some() {
+            return Err(error::Error::AlreadyExists(format!("variable {}", name)));
+        }
         let mut d: Vec<_> = Vec::default();
         for (i, dim) in dims.iter().enumerate() {
             let id = dim.identifier;
-            d.push(match self.dimensions.values().find(|&x| x.id == id) {
+            let found_dim = match self
+                .dimensions()
+                .find(|&x| x.ncid == dim.ncid && x.id == id)
+            {
                 Some(x) => x.clone(),
                 None => match self
                     .parents()
                     .flat_map(Self::dimensions)
-                    .find(|d| d.id == id)
+                    .find(|d| d.ncid == dim.ncid && d.id == id)
                 {
                     Some(d) => d.clone(),
                     None => return Err(error::Error::NotFound(format!("dimension #{}", i))),
                 },
-            });
+            };
+            d.push(found_dim);
         }
 
         let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
-        self.variables.insert(name.into(), var);
-        Ok(self.variables.get_mut(name).unwrap())
+        self.variables.push(var);
+        Ok(self.variable_mut(name).unwrap())
     }
 
     /// Create a Variable into the dataset, with no data written into it
@@ -231,15 +244,15 @@ impl Group {
     where
         T: Numeric,
     {
-        if self.variables.get(name).is_some() {
+        if self.variable(name).is_some() {
             return Err(error::Error::AlreadyExists("variable".into()));
         }
 
         let d = self.find_dimensions(dims)?;
         let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
 
-        self.variables.insert(name.into(), var);
-        Ok(self.variables.get_mut(name).unwrap())
+        self.variables.push(var);
+        Ok(self.variable_mut(name).unwrap())
     }
 
     /// Adds a variable with a basic type of string
@@ -248,15 +261,15 @@ impl Group {
         name: &str,
         dims: &[&str],
     ) -> error::Result<&mut Variable> {
-        if self.variables.get(name).is_some() {
+        if self.variable(name).is_some() {
             return Err(error::Error::AlreadyExists("variable".into()));
         }
 
         let d = self.find_dimensions(dims)?;
         let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, NC_STRING)?;
 
-        self.variables.insert(name.into(), var);
-        Ok(self.variables.get_mut(name).unwrap())
+        self.variables.push(var);
+        Ok(self.variable_mut(name).unwrap())
     }
 }
 

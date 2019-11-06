@@ -41,6 +41,8 @@ pub enum Error {
     Overflow,
     /// Conversion error
     Conversion(TryFromIntError),
+    /// Identifier belongs to another dataset
+    WrongDataset,
 }
 
 impl std::error::Error for Error {
@@ -105,6 +107,7 @@ impl fmt::Display for Error {
             Self::Ambiguous => write!(f, "Could not find an appropriate length of the slices"),
             Self::Overflow => write!(f, "slice would exceed maximum size of possible buffers"),
             Self::Conversion(e) => e.fmt(f),
+            Self::WrongDataset => write!(f, "This identifier does not belong in this dataset"),
         }
     }
 }

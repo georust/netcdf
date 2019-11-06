@@ -19,6 +19,7 @@ pub struct Dimension {
 /// names can not be used directly
 #[derive(Debug, Copy, Clone)]
 pub struct Identifier {
+    pub(crate) ncid: nc_type,
     pub(crate) identifier: nc_type,
 }
 
@@ -54,15 +55,16 @@ impl Dimension {
     /// Grabs a unique identifier for this dimension
     pub fn identifier(&self) -> Identifier {
         Identifier {
+            ncid: self.ncid,
             identifier: self.id,
         }
     }
 
-    pub(crate) fn new(grpid: nc_type, name: &str, len: usize) -> error::Result<Self> {
+    pub(crate) fn new(grpid: nc_type, name: String, len: usize) -> error::Result<Self> {
         use std::ffi::CString;
 
         let mut dimid = 0;
-        let cname = CString::new(name).unwrap();
+        let cname = CString::new(name.as_str()).unwrap();
 
         unsafe {
             let _l = LOCK.lock().unwrap();
@@ -70,7 +72,7 @@ impl Dimension {
         }
 
         Ok(Self {
-            name: name.into(),
+            name,
             len: core::num::NonZeroUsize::new(len),
             id: dimid,
             ncid: grpid,

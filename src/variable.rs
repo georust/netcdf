@@ -5,7 +5,6 @@ use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
-use super::HashMap;
 use super::LOCK;
 #[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
@@ -20,7 +19,7 @@ use std::marker::Sized;
 pub struct Variable {
     /// The variable name
     pub(crate) name: String,
-    pub(crate) attributes: HashMap<String, Attribute>,
+    pub(crate) attributes: Vec<Attribute>,
     pub(crate) dimensions: Vec<Dimension>,
     /// the netcdf variable type identifier (from netcdf-sys)
     pub(crate) vartype: nc_type,
@@ -47,11 +46,11 @@ impl Variable {
     }
     /// Get an attribute of this variable
     pub fn attribute(&self, name: &str) -> Option<&Attribute> {
-        self.attributes.get(name)
+        self.attributes().find(|x| x.name() == name)
     }
     /// Iterator over all the attributes of this variable
     pub fn attributes(&self) -> impl Iterator<Item = &Attribute> {
-        self.attributes.values()
+        self.attributes.iter()
     }
     /// Dimensions for a variable
     pub fn dimensions(&self) -> &[Dimension] {
@@ -579,7 +578,7 @@ impl Variable {
 
         Ok(Self {
             name: name.into(),
-            attributes: HashMap::new(),
+            attributes: Vec::new(),
             dimensions: dims,
             vartype,
             ncid: grp_id,
@@ -593,7 +592,12 @@ impl Variable {
         T: Into<AttrValue>,
     {
         let att = Attribute::put(self.ncid, self.varid, name, val.into())?;
-        self.attributes.insert(name.to_string(), att);
+        let pos = self.attributes().position(|x| x.name == name);
+        if let Some(i) = pos {
+            self.attributes[i] = att;
+        } else {
+            self.attributes.push(att);
+        }
         Ok(())
     }
 
@@ -799,7 +803,7 @@ impl Variable {
             ncid: self.ncid,
             varid: self.varid,
         };
-        self.attributes.insert("_FillValue".into(), a);
+        self.attributes.push(a);
         Ok(())
     }
 

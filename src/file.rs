@@ -3,7 +3,6 @@
 #![allow(clippy::similar_names)]
 use super::error;
 use super::group::Group;
-use super::HashMap;
 use super::LOCK;
 use netcdf_sys::*;
 use std::cell::UnsafeCell;
@@ -107,10 +106,10 @@ impl File {
             name: "root".to_string(),
             ncid,
             grpid: None,
-            variables: HashMap::default(),
-            attributes: HashMap::default(),
-            dimensions: HashMap::default(),
-            groups: HashMap::default(),
+            variables: Vec::default(),
+            attributes: Vec::default(),
+            dimensions: Vec::default(),
+            groups: Vec::default(),
             parent: None,
             this: None,
         }));
@@ -196,17 +195,14 @@ impl Drop for File {
 
 use super::dimension::Dimension;
 
-fn get_group_dimensions(
-    ncid: nc_type,
-    unlimited_dims: &[nc_type],
-) -> error::Result<HashMap<String, Dimension>> {
+fn get_group_dimensions(ncid: nc_type) -> error::Result<Vec<Dimension>> {
     let mut ndims: nc_type = 0;
     unsafe {
         error::checked(nc_inq_dimids(ncid, &mut ndims, std::ptr::null_mut(), 0))?;
     }
 
     if ndims == 0 {
-        return Ok(HashMap::new());
+        return Ok(Vec::new());
     }
     let mut dimids = vec![0 as nc_type; ndims.try_into()?];
     unsafe {
@@ -218,7 +214,8 @@ fn get_group_dimensions(
         ))?;
     }
 
-    let mut dimensions = HashMap::with_capacity(ndims.try_into()?);
+    let unlimited_dims = get_unlimited_dimensions(ncid)?;
+    let mut dimensions = Vec::with_capacity(ndims.try_into()?);
     let mut buf = [0_u8; NC_MAX_NAME as usize + 1];
     for dimid in dimids {
         for i in buf.iter_mut() {
@@ -245,30 +242,27 @@ fn get_group_dimensions(
         } else {
             Some(unsafe { core::num::NonZeroUsize::new_unchecked(len) })
         };
-        dimensions.insert(
-            name.clone(),
-            Dimension {
-                ncid,
-                name,
-                len,
-                id: dimid,
-            },
-        );
+        dimensions.push(Dimension {
+            ncid,
+            name,
+            len,
+            id: dimid,
+        });
     }
 
     Ok(dimensions)
 }
 
 use super::attribute::Attribute;
-fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String, Attribute>> {
+fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<Vec<Attribute>> {
     let mut natts = 0;
     unsafe {
         error::checked(nc_inq_varnatts(ncid, varid, &mut natts))?;
     }
     if natts == 0 {
-        return Ok(HashMap::new());
+        return Ok(Vec::new());
     }
-    let mut attributes = HashMap::with_capacity(natts.try_into()?);
+    let mut attributes = Vec::with_capacity(natts.try_into()?);
     let mut buf = [0_u8; NC_MAX_NAME as usize + 1];
     for i in 0..natts {
         for i in buf.iter_mut() {
@@ -286,7 +280,7 @@ fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String
             ncid,
             varid,
         };
-        attributes.insert(name, a);
+        attributes.push(a);
     }
 
     Ok(attributes)
@@ -295,7 +289,7 @@ fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String
 fn get_dimensions_of_var(
     ncid: nc_type,
     varid: nc_type,
-    unlimited_dims: &[nc_type],
+    g: &Group,
 ) -> error::Result<Vec<Dimension>> {
     let mut ndims = 0;
     unsafe {
@@ -326,56 +320,33 @@ fn get_dimensions_of_var(
     }
 
     let mut dimensions = Vec::with_capacity(ndims.try_into()?);
-    let mut name = [0_u8; NC_MAX_NAME as usize + 1];
     for dimid in dimids {
-        for i in name.iter_mut() {
-            *i = 0;
-        }
-        let mut dimlen = 0;
-        unsafe {
-            error::checked(nc_inq_dim(
-                ncid,
-                dimid,
-                name.as_mut_ptr() as *mut _,
-                &mut dimlen,
-            ))?;
-        }
-
-        let zero_pos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
-        let name = String::from(String::from_utf8_lossy(&name[..zero_pos]));
-
-        let unlimited = unlimited_dims.contains(&dimid);
-        let len = if unlimited {
-            None
+        let d = if let Some(d) = g.dimensions().find(|x| x.id == dimid) {
+            d
+        } else if let Some(d) = g
+            .parents()
+            .flat_map(Group::dimensions)
+            .find(|x| x.id == dimid)
+        {
+            d
         } else {
-            Some(unsafe { core::num::NonZeroUsize::new_unchecked(dimlen) })
+            return Err(error::Error::NotFound(format!("dimid {}", dimid)));
         };
-        let d = Dimension {
-            ncid,
-            name,
-            len,
-            id: dimid,
-        };
-        dimensions.push(d);
+
+        dimensions.push(d.clone());
     }
 
     Ok(dimensions)
 }
 
 use super::Variable;
-fn get_variables(
-    ncid: nc_type,
-    unlimited_dims: &[nc_type],
-) -> error::Result<HashMap<String, Variable>> {
+fn get_variables(ncid: nc_type, g: &Group) -> error::Result<Vec<Variable>> {
     let mut nvars = 0;
     unsafe {
         error::checked(nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut()))?;
     }
     if nvars == 0 {
-        return Ok(HashMap::new());
+        return Ok(Vec::new());
     }
     let mut varids = vec![0; nvars.try_into()?];
     unsafe {
@@ -386,7 +357,7 @@ fn get_variables(
         ))?;
     }
 
-    let mut variables = HashMap::with_capacity(nvars.try_into()?);
+    let mut variables = Vec::with_capacity(nvars.try_into()?);
     let mut name = [0_u8; NC_MAX_NAME as usize + 1];
     for varid in varids {
         for i in name.iter_mut() {
@@ -405,7 +376,7 @@ fn get_variables(
             ))?;
         }
         let attributes = get_attributes(ncid, varid)?;
-        let dimensions = get_dimensions_of_var(ncid, varid, unlimited_dims)?;
+        let dimensions = get_dimensions_of_var(ncid, varid, g)?;
 
         let zero_pos = name
             .iter()
@@ -417,12 +388,12 @@ fn get_variables(
             ncid,
             varid,
             dimensions,
-            name: name.clone(),
+            name,
             attributes,
             vartype,
         };
 
-        variables.insert(name, v);
+        variables.push(v);
     }
 
     Ok(variables)
@@ -430,32 +401,24 @@ fn get_variables(
 
 fn get_groups(
     ncid: nc_type,
-    parent_dim: &[&HashMap<String, Dimension>],
     parent: &Rc<UnsafeCell<Group>>,
-) -> error::Result<HashMap<String, Rc<UnsafeCell<Group>>>> {
+) -> error::Result<Vec<Rc<UnsafeCell<Group>>>> {
     let mut ngroups = 0;
 
     unsafe {
         error::checked(nc_inq_grps(ncid, &mut ngroups, std::ptr::null_mut()))?;
     }
     if ngroups == 0 {
-        return Ok(HashMap::new());
+        return Ok(Vec::new());
     }
     let mut grpids = vec![0; ngroups.try_into()?];
     unsafe {
         error::checked(nc_inq_grps(ncid, std::ptr::null_mut(), grpids.as_mut_ptr()))?;
     }
 
-    let mut groups = HashMap::with_capacity(ngroups.try_into()?);
+    let mut groups = Vec::with_capacity(ngroups.try_into()?);
     let mut cname = [0; NC_MAX_NAME as usize + 1];
     for grpid in grpids {
-        let unlim_dims = get_unlimited_dimensions(grpid)?;
-        let dimensions = get_group_dimensions(grpid, &unlim_dims)?;
-        let variables = get_variables(grpid, &unlim_dims)?;
-        let mut parent_dimensions = parent_dim.to_vec();
-        parent_dimensions.push(&dimensions);
-        let attributes = get_attributes(grpid, NC_GLOBAL)?;
-
         for i in cname.iter_mut() {
             *i = 0;
         }
@@ -471,23 +434,29 @@ fn get_groups(
             name: name.clone(),
             ncid,
             grpid: Some(grpid),
-            attributes,
-            dimensions: dimensions.clone(),
-            variables,
-            groups: HashMap::default(),
+            attributes: Vec::new(),
+            dimensions: Vec::new(),
+            variables: Vec::new(),
+            groups: Vec::new(),
             parent: Some(Rc::downgrade(parent)),
             this: None,
         }));
 
-        let subgroups = get_groups(grpid, &parent_dimensions, &g)?;
         let refcell = Rc::downgrade(&g);
-        {
-            let g = unsafe { &mut *g.get() };
-            g.this = Some(refcell);
-            g.groups = subgroups;
-        }
+        let gref = unsafe { &mut *g.get() };
+        gref.this = Some(refcell);
 
-        groups.insert(name, g);
+        let dimensions = get_group_dimensions(grpid)?;
+        gref.dimensions = dimensions;
+        let variables = get_variables(grpid, &gref)?;
+        gref.variables = variables;
+        let attributes = get_attributes(grpid, NC_GLOBAL)?;
+        gref.attributes = attributes;
+
+        let subgroups = get_groups(grpid, &g)?;
+        gref.groups = subgroups;
+
+        groups.push(g);
     }
 
     Ok(groups)
@@ -513,31 +482,35 @@ fn get_unlimited_dimensions(ncid: nc_type) -> error::Result<Vec<nc_type>> {
 fn parse_file(ncid: nc_type) -> error::Result<Rc<UnsafeCell<Group>>> {
     let _l = LOCK.lock().unwrap();
 
-    let unlimited_dimensions = get_unlimited_dimensions(ncid)?;
-    let dimensions = get_group_dimensions(ncid, &unlimited_dimensions)?;
-
-    let attributes = get_attributes(ncid, NC_GLOBAL)?;
-
-    let variables = get_variables(ncid, &unlimited_dimensions)?;
-
     let g = Rc::new(UnsafeCell::new(Group {
         ncid,
         grpid: None,
         name: "root".into(),
-        dimensions: dimensions.clone(),
-        attributes,
-        variables,
-        groups: HashMap::default(),
+        dimensions: Vec::new(),
+        attributes: Vec::new(),
+        variables: Vec::new(),
+        groups: Vec::new(),
         parent: None,
         this: None,
     }));
     let thisref = Some(Rc::downgrade(&g));
-    let groups = get_groups(ncid, &[&dimensions], &g)?;
     {
         let g = unsafe { &mut *g.get() };
         g.this = thisref;
-        g.groups = groups;
     }
+    let gref = unsafe { &mut *g.get() };
+
+    let dimensions = get_group_dimensions(ncid)?;
+    gref.dimensions = dimensions;
+
+    let attributes = get_attributes(ncid, NC_GLOBAL)?;
+    gref.attributes = attributes;
+
+    let variables = get_variables(ncid, gref)?;
+    gref.variables = variables;
+
+    let groups = get_groups(ncid, &g)?;
+    gref.groups = groups;
 
     Ok(g)
 }
