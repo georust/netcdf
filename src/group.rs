@@ -194,7 +194,7 @@ impl Group {
         Ok(d)
     }
 
-    fn parents(&self) -> impl Iterator<Item = &Self> {
+    pub(crate) fn parents(&self) -> impl Iterator<Item = &Self> {
         ParentIterator::new(self)
     }
 

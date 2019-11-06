@@ -1242,7 +1242,7 @@ fn add_confliciting_dimensions() {
     let e = file.add_dimension("x", 11).unwrap_err();
     assert_eq!(
         e,
-        netcdf::error::Error::AlreadyExists("dimension".to_string())
+        netcdf::error::Error::AlreadyExists("dimension x".to_string())
     );
     assert_eq!(file.dimension("x").unwrap().len(), 10);
 }
