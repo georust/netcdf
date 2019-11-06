@@ -107,7 +107,7 @@ impl File {
             name: "root".to_string(),
             ncid,
             grpid: None,
-            variables: HashMap::default(),
+            variables: Vec::default(),
             attributes: Vec::default(),
             dimensions: HashMap::default(),
             groups: HashMap::default(),
@@ -366,16 +366,13 @@ fn get_dimensions_of_var(
 }
 
 use super::Variable;
-fn get_variables(
-    ncid: nc_type,
-    unlimited_dims: &[nc_type],
-) -> error::Result<HashMap<String, Variable>> {
+fn get_variables(ncid: nc_type, unlimited_dims: &[nc_type]) -> error::Result<Vec<Variable>> {
     let mut nvars = 0;
     unsafe {
         error::checked(nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut()))?;
     }
     if nvars == 0 {
-        return Ok(HashMap::new());
+        return Ok(Vec::new());
     }
     let mut varids = vec![0; nvars.try_into()?];
     unsafe {
@@ -386,7 +383,7 @@ fn get_variables(
         ))?;
     }
 
-    let mut variables = HashMap::with_capacity(nvars.try_into()?);
+    let mut variables = Vec::with_capacity(nvars.try_into()?);
     let mut name = [0_u8; NC_MAX_NAME as usize + 1];
     for varid in varids {
         for i in name.iter_mut() {
@@ -422,7 +419,7 @@ fn get_variables(
             vartype,
         };
 
-        variables.insert(name, v);
+        variables.push(v);
     }
 
     Ok(variables)

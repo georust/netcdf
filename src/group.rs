@@ -19,7 +19,7 @@ pub struct Group {
     pub(crate) name: String,
     pub(crate) ncid: nc_type,
     pub(crate) grpid: Option<nc_type>,
-    pub(crate) variables: HashMap<String, Variable>,
+    pub(crate) variables: Vec<Variable>,
     pub(crate) attributes: Vec<Attribute>,
     pub(crate) dimensions: HashMap<String, Dimension>,
     pub(crate) groups: HashMap<String, Rc<UnsafeCell<Group>>>,
@@ -42,19 +42,19 @@ impl Group {
     }
     /// Get a variable from the group
     pub fn variable(&self, name: &str) -> Option<&Variable> {
-        self.variables.get(name)
+        self.variables().find(|x| x.name() == name)
     }
     /// Iterate over all variables in a group
     pub fn variables(&self) -> impl Iterator<Item = &Variable> {
-        self.variables.values()
+        self.variables.iter()
     }
     /// Get a mutable variable from the group
     pub fn variable_mut(&mut self, name: &str) -> Option<&mut Variable> {
-        self.variables.get_mut(name)
+        self.variables_mut().find(|x| x.name() == name)
     }
     /// Iterate over all variables in a group, with mutable access
     pub fn variables_mut(&mut self) -> impl Iterator<Item = &mut Variable> {
-        self.variables.values_mut()
+        self.variables.iter_mut()
     }
     /// Get a single attribute
     pub fn attribute(&self, name: &str) -> Option<&Attribute> {
@@ -139,7 +139,7 @@ impl Group {
             attributes: Vec::default(),
             dimensions: HashMap::default(),
             groups: HashMap::default(),
-            variables: HashMap::default(),
+            variables: Vec::default(),
             parent: Some(self.this.clone().unwrap()),
             this: None,
         }));
@@ -219,8 +219,8 @@ impl Group {
         }
 
         let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
-        self.variables.insert(name.into(), var);
-        Ok(self.variables.get_mut(name).unwrap())
+        self.variables.push(var);
+        Ok(self.variable_mut(name).unwrap())
     }
 
     /// Create a Variable into the dataset, with no data written into it
@@ -231,15 +231,15 @@ impl Group {
     where
         T: Numeric,
     {
-        if self.variables.get(name).is_some() {
+        if self.variable(name).is_some() {
             return Err(error::Error::AlreadyExists("variable".into()));
         }
 
         let d = self.find_dimensions(dims)?;
         let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
 
-        self.variables.insert(name.into(), var);
-        Ok(self.variables.get_mut(name).unwrap())
+        self.variables.push(var);
+        Ok(self.variable_mut(name).unwrap())
     }
 
     /// Adds a variable with a basic type of string
@@ -248,15 +248,15 @@ impl Group {
         name: &str,
         dims: &[&str],
     ) -> error::Result<&mut Variable> {
-        if self.variables.get(name).is_some() {
+        if self.variable(name).is_some() {
             return Err(error::Error::AlreadyExists("variable".into()));
         }
 
         let d = self.find_dimensions(dims)?;
         let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, NC_STRING)?;
 
-        self.variables.insert(name.into(), var);
-        Ok(self.variables.get_mut(name).unwrap())
+        self.variables.push(var);
+        Ok(self.variable_mut(name).unwrap())
     }
 }
 
