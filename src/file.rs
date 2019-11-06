@@ -323,16 +323,14 @@ fn get_dimensions_of_var(
     for dimid in dimids {
         let d = if let Some(d) = g.dimensions().find(|x| x.id == dimid) {
             d
+        } else if let Some(d) = g
+            .parents()
+            .flat_map(Group::dimensions)
+            .find(|x| x.id == dimid)
+        {
+            d
         } else {
-            if let Some(d) = g
-                .parents()
-                .flat_map(|x| x.dimensions())
-                .find(|x| x.id == dimid)
-            {
-                d
-            } else {
-                return Err(error::Error::NotFound(format!("dimid {}", dimid)));
-            }
+            return Err(error::Error::NotFound(format!("dimid {}", dimid)));
         };
 
         dimensions.push(d.clone());
