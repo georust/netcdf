@@ -206,6 +206,23 @@ fn attributes_read() {
 }
 
 #[test]
+/// Making sure attributes are updated correctly (replacing previous value)
+fn attribute_put() {
+    let d = tempfile::tempdir().expect("Could not create tempdir");
+    let p = d.path().join("attribute_put.nc");
+    let mut f = netcdf::create(p).unwrap();
+
+    f.add_attribute("a", "1").unwrap();
+    assert_eq!(f.attribute("a").unwrap().value().unwrap(), "1".into());
+    f.add_attribute("b", "2").unwrap();
+    assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
+    f.add_attribute("a", 2u32).unwrap();
+    assert_eq!(f.attribute("a").unwrap().value().unwrap(), 2u32.into());
+    f.add_attribute("b", "2").unwrap();
+    assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
+}
+
+#[test]
 fn dimension_lengths() {
     let d = tempfile::tempdir().expect("Could not create tempdir");
     let path = d.path().join("dimension_lengths");

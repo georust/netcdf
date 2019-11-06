@@ -592,7 +592,12 @@ impl Variable {
         T: Into<AttrValue>,
     {
         let att = Attribute::put(self.ncid, self.varid, name, val.into())?;
-        self.attributes.push(att);
+        let pos = self.attributes().position(|x| x.name == name);
+        if let Some(i) = pos {
+            self.attributes[i] = att;
+        } else {
+            self.attributes.push(att);
+        }
         Ok(())
     }
 

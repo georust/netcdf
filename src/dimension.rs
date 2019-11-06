@@ -19,6 +19,7 @@ pub struct Dimension {
 /// names can not be used directly
 #[derive(Debug, Copy, Clone)]
 pub struct Identifier {
+    pub(crate) ncid: nc_type,
     pub(crate) identifier: nc_type,
 }
 
@@ -54,6 +55,7 @@ impl Dimension {
     /// Grabs a unique identifier for this dimension
     pub fn identifier(&self) -> Identifier {
         Identifier {
+            ncid: self.ncid,
             identifier: self.id,
         }
     }

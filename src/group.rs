@@ -81,7 +81,6 @@ impl Group {
     }
     /// Mutable access to group
     pub fn group_mut(&mut self, name: &str) -> Option<&mut Self> {
-        // self is taken as &mut, can always unwrap safely
         self.groups_mut().find(|x| x.name() == name)
     }
     /// Iterator over all groups (mutable access)
@@ -98,7 +97,12 @@ impl Group {
         T: Into<AttrValue>,
     {
         let att = Attribute::put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name, val.into())?;
-        self.attributes.push(att);
+        let pos = self.attributes().position(|x| x.name() == name);
+        if let Some(i) = pos {
+            self.attributes[i] = att;
+        } else {
+            self.attributes.push(att);
+        }
         Ok(())
     }
 
@@ -157,11 +161,11 @@ impl Group {
         let (d, e): (Vec<_>, Vec<_>) = dims
             .iter()
             .map(|name| {
-                if let Some(x) = self.dimensions().find(|d| &d.name() == name) {
+                if let Some(x) = self.dimension(name) {
                     return Ok(x);
                 }
                 for pdim in self.parents() {
-                    if let Some(x) = pdim.dimensions().find(|d| &d.name() == name) {
+                    if let Some(x) = pdim.dimension(name) {
                         return Ok(x);
                     }
                 }
@@ -204,17 +208,21 @@ impl Group {
         let mut d: Vec<_> = Vec::default();
         for (i, dim) in dims.iter().enumerate() {
             let id = dim.identifier;
-            d.push(match self.dimensions().find(|&x| x.id == id) {
+            let found_dim = match self
+                .dimensions()
+                .find(|&x| x.ncid == dim.ncid && x.id == id)
+            {
                 Some(x) => x.clone(),
                 None => match self
                     .parents()
                     .flat_map(Self::dimensions)
-                    .find(|d| d.id == id)
+                    .find(|d| d.ncid == dim.ncid && d.id == id)
                 {
                     Some(d) => d.clone(),
                     None => return Err(error::Error::NotFound(format!("dimension #{}", i))),
                 },
-            });
+            };
+            d.push(found_dim);
         }
 
         let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
