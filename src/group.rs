@@ -20,7 +20,7 @@ pub struct Group {
     pub(crate) ncid: nc_type,
     pub(crate) grpid: Option<nc_type>,
     pub(crate) variables: HashMap<String, Variable>,
-    pub(crate) attributes: HashMap<String, Attribute>,
+    pub(crate) attributes: Vec<Attribute>,
     pub(crate) dimensions: HashMap<String, Dimension>,
     pub(crate) groups: HashMap<String, Rc<UnsafeCell<Group>>>,
     /// Do not mutate parent, only for walking and getting dimensions
@@ -58,11 +58,11 @@ impl Group {
     }
     /// Get a single attribute
     pub fn attribute(&self, name: &str) -> Option<&Attribute> {
-        self.attributes.get(name)
+        self.attributes().find(|x| x.name() == name)
     }
     /// Get all attributes
     pub fn attributes(&self) -> impl Iterator<Item = &Attribute> {
-        self.attributes.values()
+        self.attributes.iter()
     }
     /// Get a single dimension
     pub fn dimension(&self, name: &str) -> Option<&Dimension> {
@@ -99,7 +99,7 @@ impl Group {
         T: Into<AttrValue>,
     {
         let att = Attribute::put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name, val.into())?;
-        self.attributes.insert(name.to_string(), att);
+        self.attributes.push(att);
         Ok(())
     }
 
@@ -136,7 +136,7 @@ impl Group {
             ncid: self.grpid.unwrap_or(self.ncid),
             name: name.to_string(),
             grpid: Some(grpid),
-            attributes: HashMap::default(),
+            attributes: Vec::default(),
             dimensions: HashMap::default(),
             groups: HashMap::default(),
             variables: HashMap::default(),

@@ -108,7 +108,7 @@ impl File {
             ncid,
             grpid: None,
             variables: HashMap::default(),
-            attributes: HashMap::default(),
+            attributes: Vec::default(),
             dimensions: HashMap::default(),
             groups: HashMap::default(),
             parent: None,
@@ -260,15 +260,15 @@ fn get_group_dimensions(
 }
 
 use super::attribute::Attribute;
-fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String, Attribute>> {
+fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<Vec<Attribute>> {
     let mut natts = 0;
     unsafe {
         error::checked(nc_inq_varnatts(ncid, varid, &mut natts))?;
     }
     if natts == 0 {
-        return Ok(HashMap::new());
+        return Ok(Vec::new());
     }
-    let mut attributes = HashMap::with_capacity(natts.try_into()?);
+    let mut attributes = Vec::with_capacity(natts.try_into()?);
     let mut buf = [0_u8; NC_MAX_NAME as usize + 1];
     for i in 0..natts {
         for i in buf.iter_mut() {
@@ -286,7 +286,7 @@ fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<HashMap<String
             ncid,
             varid,
         };
-        attributes.insert(name, a);
+        attributes.push(a);
     }
 
     Ok(attributes)
