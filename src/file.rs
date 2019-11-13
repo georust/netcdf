@@ -588,6 +588,9 @@ fn parse_file(ncid: nc_type) -> error::Result<Rc<UnsafeCell<Group>>> {
     let attributes = get_attributes(ncid, NC_GLOBAL)?;
     gref.attributes = attributes;
 
+    let types = get_types(ncid)?;
+    gref.types = types;
+
     let variables = get_variables(ncid, gref)?;
     gref.variables = variables;
 

@@ -105,6 +105,14 @@ impl Type {
             Self::Simple(x) => nc_type::from(x),
         }
     }
+    /// Returns true if the type is opaque
+    pub fn is_opaque(&self) -> bool {
+        if let Self::Opaque(_) = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -134,6 +142,12 @@ impl Opaque {
     /// Size in bytes of type
     pub fn size(&self) -> usize {
         self.size
+    }
+}
+
+impl Into<Type> for Opaque {
+    fn into(self) -> Type {
+        Type::Opaque(self)
     }
 }
 

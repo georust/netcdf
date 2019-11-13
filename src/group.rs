@@ -5,7 +5,7 @@ use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
-use super::types::Type;
+use super::types::{Opaque, Type};
 use super::variable::{Numeric, Variable};
 use netcdf_sys::*;
 use std::cell::UnsafeCell;
@@ -127,6 +127,33 @@ impl Group {
     /// Adds a dimension with unbounded size
     pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<&Dimension> {
         self.add_dimension(name, 0)
+    }
+
+    /// Add an opaque type of `size` bytes
+    pub fn add_opaque_type(&mut self, name: &str, size: usize) -> error::Result<&Type> {
+        if let Some(_) = self.types().find(|x| x.name() == name) {
+            return Err(error::Error::AlreadyExists(format!("type {}", name)));
+        }
+        let cname = std::ffi::CString::new(name).unwrap();
+        let mut xtype = 0;
+        unsafe {
+            error::checked(nc_def_opaque(
+                self.grpid.unwrap_or(self.ncid),
+                size,
+                cname.as_ptr(),
+                &mut xtype,
+            ))?;
+        }
+
+        let opa = Opaque::new(
+            name.to_string(),
+            self.grpid.unwrap_or(self.ncid),
+            xtype,
+            size,
+        );
+
+        self.types.push(opa.into());
+        Ok(self.types().find(|x| x.name() == name).unwrap())
     }
 
     /// Add an empty group to the dataset

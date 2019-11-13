@@ -1618,3 +1618,22 @@ fn read_compound() {
         }
     }
 }
+
+#[test]
+fn add_read_opaque() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("add_read_opaque.nc");
+    {
+        let mut f = netcdf::create(&path).unwrap();
+        f.add_opaque_type("opa", 40).unwrap();
+        f.add_opaque_type("opb", 60).unwrap();
+    }
+    let f = netcdf::open(&path).unwrap();
+    println!("{:?}", f.root());
+    let opa = f.types().find(|x| x.name() == "opa").unwrap();
+    assert!(opa.is_opaque());
+    assert_eq!(opa.size().unwrap(), 40);
+    let opb = f.types().find(|x| x.name() == "opb").unwrap();
+    assert!(opb.is_opaque());
+    assert_eq!(opb.size().unwrap(), 60);
+}
