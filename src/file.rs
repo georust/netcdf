@@ -55,6 +55,10 @@ impl std::ops::DerefMut for File {
 impl File {
     #[allow(clippy::doc_markdown)]
     /// Open a netCDF file in read only mode.
+    ///
+    /// Consider using [`crate::open`] instead to open with
+    /// a generic `Path` object, and ensure read-only on
+    /// the `File`
     pub fn open(path: &path::Path) -> error::Result<Self> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
@@ -122,6 +126,37 @@ impl File {
             ncid,
             name: path.file_name().unwrap().to_string_lossy().to_string(),
             root,
+        })
+    }
+}
+
+/// File that does not allow writing to it, enforced by
+/// borrow rules (can not get `mut File`)
+///
+/// `Deref`s to `File`, but does not provide mutable access,
+/// so the following code will not compile:
+/// ```compile_fail
+/// # fn main() -> netcdf::Result<()>{
+/// let file = netcdf::open("file.nc")?;
+/// file.add_dimension("somedim", 10)?;
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct ReadOnlyFile {
+    file: File,
+}
+
+impl std::ops::Deref for ReadOnlyFile {
+    type Target = File;
+    fn deref(&self) -> &Self::Target {
+        &self.file
+    }
+}
+
+impl ReadOnlyFile {
+    pub(crate) fn open(path: &path::Path) -> error::Result<Self> {
+        Ok(Self {
+            file: File::open(path)?
         })
     }
 }

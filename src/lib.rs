@@ -100,11 +100,11 @@ where
 }
 
 /// Open a netcdf file in read mode
-pub fn open<P>(name: P) -> error::Result<File>
+pub fn open<P>(name: P) -> error::Result<ReadOnlyFile>
 where
     P: AsRef<std::path::Path>,
 {
-    File::open(name.as_ref())
+    ReadOnlyFile::open(name.as_ref())
 }
 
 #[cfg(feature = "memory")]

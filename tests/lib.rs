@@ -1591,8 +1591,8 @@ fn set_get_endian() {
         {
             // re-open it
             // and get "some variable" endian_value
-            let mut file_o = netcdf::open(&f).unwrap();
-            let var = &mut file_o.root_mut().variable("some_variable").unwrap();
+            let file_o = netcdf::open(&f).unwrap();
+            let var = &file_o.variable("some_variable").unwrap();
             assert_eq!(var.endian_value(), Ok(*i));
             // close it (done when `file_a` goes out of scope)
         }
