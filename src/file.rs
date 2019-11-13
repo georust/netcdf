@@ -344,6 +344,8 @@ fn get_dimensions_of_var(
 
 use super::Variable;
 fn get_variables(ncid: nc_type, g: &Group) -> error::Result<Vec<Variable>> {
+    use super::types::Simple;
+
     let mut nvars = 0;
     unsafe {
         error::checked(nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut()))?;
@@ -386,6 +388,22 @@ fn get_variables(ncid: nc_type, g: &Group) -> error::Result<Vec<Variable>> {
             .position(|&x| x == 0)
             .unwrap_or_else(|| name.len());
         let name = String::from(String::from_utf8_lossy(&name[..zero_pos]));
+
+        let vartype = if let Ok(simple) = Simple::try_from(vartype) {
+            Type::Simple(simple)
+        } else if vartype == NC_STRING {
+            Type::String
+        } else if let Some(x) = g.types().find(|x| x.id() == vartype) {
+            x.clone()
+        } else if let Some(x) = g
+            .parents()
+            .flat_map(Group::types)
+            .find(|x| x.id() == vartype)
+        {
+            x.clone()
+        } else {
+            panic!("Could not find type");
+        };
 
         let v = Variable {
             ncid,
@@ -515,7 +533,6 @@ fn get_groups(
         gref.variables = variables;
         let attributes = get_attributes(grpid, NC_GLOBAL)?;
         gref.attributes = attributes;
-
 
         let subgroups = get_groups(grpid, &g)?;
         gref.groups = subgroups;

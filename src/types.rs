@@ -1,5 +1,6 @@
 //! User derived types
 
+use super::error;
 use netcdf_sys::*;
 
 /// User defined types
@@ -19,6 +20,58 @@ pub enum Type {
     /// A string type
     String,
 }
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Opaque(x), Self::Opaque(y)) => {
+                let mut equal = 0;
+                let e;
+                unsafe {
+                    e = error::checked(nc_inq_type_equal(
+                        x.ncid, x.xtype, y.ncid, y.xtype, &mut equal,
+                    ));
+                }
+                !(e.is_err() || equal == 0)
+            }
+            (Self::Enum(x), Self::Enum(y)) => {
+                let mut equal = 0;
+                let e;
+                unsafe {
+                    e = error::checked(nc_inq_type_equal(
+                        x.ncid, x.xtype, y.ncid, y.xtype, &mut equal,
+                    ));
+                }
+                !(e.is_err() || equal == 0)
+            }
+            (Self::Compound(x), Self::Compound(y)) => {
+                let mut equal = 0;
+                let e;
+                unsafe {
+                    e = error::checked(nc_inq_type_equal(
+                        x.ncid, x.xtype, y.ncid, y.xtype, &mut equal,
+                    ));
+                }
+                !(e.is_err() || equal == 0)
+            }
+            (Self::VariableArray(x), Self::VariableArray(y)) => {
+                let mut equal = 0;
+                let e;
+                unsafe {
+                    e = error::checked(nc_inq_type_equal(
+                        x.ncid, x.varid, y.ncid, y.varid, &mut equal,
+                    ));
+                }
+                !(e.is_err() || equal == 0)
+            }
+            (Self::Simple(x), Self::Simple(y)) => nc_type::from(x) == nc_type::from(y),
+            (Self::String, Self::String) => true,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Type {}
 
 impl Type {
     /// Name of the type
@@ -40,6 +93,16 @@ impl Type {
             Self::Compound(x) => Some(x.size()),
             Self::VariableArray(_) | Self::String => None,
             Self::Simple(x) => Some(x.size()),
+        }
+    }
+    pub(crate) fn id(&self) -> nc_type {
+        match self {
+            Self::Opaque(o) => o.xtype,
+            Self::Enum(e) => e.xtype,
+            Self::Compound(c) => c.xtype,
+            Self::VariableArray(v) => v.varid,
+            Self::String => NC_STRING,
+            Self::Simple(x) => nc_type::from(x),
         }
     }
 }
@@ -187,6 +250,42 @@ impl Simple {
             Self::Short | Self::Ushort => size_of::<u16>(),
             Self::Int | Self::Uint | Self::Float => size_of::<u32>(),
             Self::Longlong | Self::Ulonglong | Self::Double => size_of::<u64>(),
+        }
+    }
+}
+
+impl std::convert::TryFrom<nc_type> for Simple {
+    type Error = ();
+
+    fn try_from(value: nc_type) -> Result<Self, Self::Error> {
+        match value {
+            NC_BYTE => Ok(Self::Schar),
+            NC_UBYTE => Ok(Self::Uchar),
+            NC_SHORT => Ok(Self::Short),
+            NC_USHORT => Ok(Self::Ushort),
+            NC_INT => Ok(Self::Int),
+            NC_UINT => Ok(Self::Uint),
+            NC_INT64 => Ok(Self::Longlong),
+            NC_UINT64 => Ok(Self::Ulonglong),
+            NC_FLOAT => Ok(Self::Float),
+            NC_DOUBLE => Ok(Self::Double),
+            _ => Err(()),
+        }
+    }
+}
+impl std::convert::From<&Simple> for nc_type {
+    fn from(value: &Simple) -> Self {
+        match value {
+            Simple::Schar => NC_BYTE,
+            Simple::Uchar => NC_UBYTE,
+            Simple::Short => NC_SHORT,
+            Simple::Ushort => NC_USHORT,
+            Simple::Int => NC_INT,
+            Simple::Uint => NC_UINT,
+            Simple::Longlong => NC_INT64,
+            Simple::Ulonglong => NC_UINT64,
+            Simple::Float => NC_FLOAT,
+            Simple::Double => NC_DOUBLE,
         }
     }
 }

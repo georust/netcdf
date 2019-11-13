@@ -198,7 +198,10 @@ fn attributes_read() {
         .expect("Could not add variable");
     var.add_attribute("att", "some attribute")
         .expect("Could not add attribute");
-    assert_eq!(var.vartype(), netcdf_sys::NC_FLOAT);
+    assert_eq!(
+        var.typ(),
+        netcdf::types::Type::Simple(netcdf::types::Simple::Float)
+    );
 
     for attr in var.attributes() {
         attr.value().unwrap();

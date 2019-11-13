@@ -215,6 +215,8 @@ impl Group {
     where
         T: Numeric,
     {
+        use std::convert::TryFrom;
+
         if self.variable(name).is_some() {
             return Err(error::Error::AlreadyExists(format!("variable {}", name)));
         }
@@ -238,7 +240,12 @@ impl Group {
             d.push(found_dim);
         }
 
-        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
+        let var = Variable::new(
+            self.grpid.unwrap_or(self.ncid),
+            name,
+            d,
+            Type::Simple(super::types::Simple::try_from(T::NCTYPE).unwrap()),
+        )?;
         self.variables.push(var);
         Ok(self.variable_mut(name).unwrap())
     }
@@ -251,12 +258,19 @@ impl Group {
     where
         T: Numeric,
     {
+        use std::convert::TryInto;
+
         if self.variable(name).is_some() {
             return Err(error::Error::AlreadyExists("variable".into()));
         }
 
         let d = self.find_dimensions(dims)?;
-        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
+        let var = Variable::new(
+            self.grpid.unwrap_or(self.ncid),
+            name,
+            d,
+            Type::Simple(T::NCTYPE.try_into().unwrap()),
+        )?;
 
         self.variables.push(var);
         Ok(self.variable_mut(name).unwrap())
@@ -273,7 +287,7 @@ impl Group {
         }
 
         let d = self.find_dimensions(dims)?;
-        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, NC_STRING)?;
+        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, Type::String)?;
 
         self.variables.push(var);
         Ok(self.variable_mut(name).unwrap())

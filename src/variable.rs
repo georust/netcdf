@@ -5,6 +5,7 @@ use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
+use super::types::Type;
 use super::LOCK;
 #[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
@@ -12,7 +13,6 @@ use netcdf_sys::*;
 use std::convert::TryInto;
 use std::ffi::CStr;
 use std::marker::Sized;
-use super::types::Type;
 
 #[allow(clippy::doc_markdown)]
 /// This struct defines a netCDF variable.
@@ -23,7 +23,7 @@ pub struct Variable {
     pub(crate) attributes: Vec<Attribute>,
     pub(crate) dimensions: Vec<Dimension>,
     /// the netcdf variable type identifier (from netcdf-sys)
-    pub(crate) vartype: nc_type,
+    pub(crate) vartype: Type,
     pub(crate) ncid: nc_type,
     pub(crate) varid: nc_type,
 }
@@ -57,15 +57,9 @@ impl Variable {
     pub fn dimensions(&self) -> &[Dimension] {
         &self.dimensions
     }
-    /// Get the type of this variable. This will be an integer
-    /// such as `NC_FLOAT`, `NC_DOUBLE`, `NC_INT` from
-    /// the `netcdf-sys` crate
-    pub fn vartype(&self) -> nc_type {
-        self.vartype
-    }
     /// Type of this variable
     pub fn typ(&self) -> Type {
-        unimplemented!();
+        self.vartype.clone()
     }
     /// Get current length of the variable
     pub fn len(&self) -> usize {
@@ -562,7 +556,7 @@ impl Variable {
         grp_id: nc_type,
         name: &str,
         dims: Vec<Dimension>,
-        vartype: nc_type,
+        vartype: Type,
     ) -> error::Result<Self> {
         use std::ffi::CString;
         let cname = CString::new(name).unwrap();
@@ -574,7 +568,7 @@ impl Variable {
             error::checked(nc_def_var(
                 grp_id,
                 cname.as_ptr(),
-                vartype,
+                vartype.id(),
                 dimids.len().try_into()?,
                 dimids.as_ptr(),
                 &mut id,
@@ -791,7 +785,7 @@ impl Variable {
     where
         T: Numeric,
     {
-        if T::NCTYPE != self.vartype {
+        if T::NCTYPE != self.vartype.id() {
             return Err(error::Error::TypeMismatch);
         }
         let _l = LOCK.lock().unwrap();
@@ -831,7 +825,7 @@ impl Variable {
 
     /// Get the fill value of a variable
     pub fn fill_value<T: Numeric>(&self) -> error::Result<Option<T>> {
-        if T::NCTYPE != self.vartype {
+        if T::NCTYPE != self.vartype.id() {
             return Err(error::Error::TypeMismatch);
         }
         let mut location = std::mem::MaybeUninit::uninit();
