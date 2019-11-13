@@ -12,6 +12,7 @@ use netcdf_sys::*;
 use std::convert::TryInto;
 use std::ffi::CStr;
 use std::marker::Sized;
+use super::types::Type;
 
 #[allow(clippy::doc_markdown)]
 /// This struct defines a netCDF variable.
@@ -61,6 +62,10 @@ impl Variable {
     /// the `netcdf-sys` crate
     pub fn vartype(&self) -> nc_type {
         self.vartype
+    }
+    /// Type of this variable
+    pub fn typ(&self) -> Type {
+        unimplemented!();
     }
     /// Get current length of the variable
     pub fn len(&self) -> usize {

@@ -49,6 +49,10 @@ fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error
             netcdf::types::Type::Compound(c) => {
                 println!("Compound {} : {} bytes", c.name(), c.size());
             }
+            netcdf::types::Type::VariableArray(v) => {
+                println!("VariableLengthArray {} ", v.name());
+            }
+            _ => unreachable!(),
         }
     }
     println!("Variables:");
