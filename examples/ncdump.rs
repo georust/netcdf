@@ -36,6 +36,21 @@ fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error
             println!("\t{} : ({})", d.name(), d.len());
         }
     }
+    println!("types:");
+    for t in g.types() {
+        print!("\t");
+        match t {
+            netcdf::types::Type::Opaque(o) => {
+                println!("Opaque {} : {} bytes", o.name(), o.size());
+            }
+            netcdf::types::Type::Enum(e) => {
+                println!("Enum {} : {} bytes", e.name(), e.size());
+            }
+            netcdf::types::Type::Compound(c) => {
+                println!("Compound {} : {} bytes", c.name(), c.size());
+            }
+        }
+    }
     println!("Variables:");
     for v in g.variables() {
         print!("\t{}", v.name());

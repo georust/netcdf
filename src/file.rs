@@ -3,9 +3,11 @@
 #![allow(clippy::similar_names)]
 use super::error;
 use super::group::Group;
+use super::types::{Compound, Enum, Opaque, Type};
 use super::LOCK;
 use netcdf_sys::*;
 use std::cell::UnsafeCell;
+use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::ffi::CString;
 use std::path;
@@ -110,6 +112,7 @@ impl File {
             attributes: Vec::default(),
             dimensions: Vec::default(),
             groups: Vec::default(),
+            types: Vec::default(),
             parent: None,
             this: None,
         }));
@@ -399,6 +402,63 @@ fn get_variables(ncid: nc_type, g: &Group) -> error::Result<Vec<Variable>> {
     Ok(variables)
 }
 
+fn get_types(ncid: nc_type) -> error::Result<Vec<Type>> {
+    let mut nelements = 0;
+    unsafe {
+        error::checked(nc_inq_typeids(ncid, &mut nelements, std::ptr::null_mut()))?;
+    }
+    let mut typeids = vec![0; usize::try_from(nelements)?];
+    unsafe {
+        error::checked(nc_inq_typeids(
+            ncid,
+            std::ptr::null_mut(),
+            typeids.as_mut_ptr(),
+        ))?;
+    }
+    let mut types = Vec::with_capacity(usize::try_from(nelements)?);
+    let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
+    for &typeid in &typeids {
+        for i in &mut name {
+            *i = 0;
+        }
+        let mut classp = 0;
+        let mut size = 0;
+        unsafe {
+            error::checked(nc_inq_user_type(
+                ncid,
+                typeid,
+                name.as_mut_ptr() as *mut _,
+                &mut size,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                &mut classp,
+            ))?;
+        }
+        let pos = name
+            .iter()
+            .position(|x| *x == 0)
+            .unwrap_or_else(|| name.len());
+        let name = String::from(String::from_utf8_lossy(&name[..pos]));
+
+        types.push(match classp {
+            NC_OPAQUE => {
+                let o = Opaque::new(name, ncid, typeid, size);
+                Type::Opaque(o)
+            }
+            NC_ENUM => {
+                let e = Enum::new(name, ncid, typeid, size);
+                Type::Enum(e)
+            }
+            NC_COMPOUND => {
+                let c = Compound::new(name, ncid, typeid, size);
+                Type::Compound(c)
+            }
+            x => unimplemented!("{} is not a known type", x),
+        })
+    }
+    Ok(types)
+}
+
 fn get_groups(
     ncid: nc_type,
     parent: &Rc<UnsafeCell<Group>>,
@@ -438,6 +498,7 @@ fn get_groups(
             dimensions: Vec::new(),
             variables: Vec::new(),
             groups: Vec::new(),
+            types: Vec::new(),
             parent: Some(Rc::downgrade(parent)),
             this: None,
         }));
@@ -448,10 +509,13 @@ fn get_groups(
 
         let dimensions = get_group_dimensions(grpid)?;
         gref.dimensions = dimensions;
+        let types = get_types(grpid)?;
+        gref.types = types;
         let variables = get_variables(grpid, &gref)?;
         gref.variables = variables;
         let attributes = get_attributes(grpid, NC_GLOBAL)?;
         gref.attributes = attributes;
+
 
         let subgroups = get_groups(grpid, &g)?;
         gref.groups = subgroups;
@@ -490,6 +554,7 @@ fn parse_file(ncid: nc_type) -> error::Result<Rc<UnsafeCell<Group>>> {
         attributes: Vec::new(),
         variables: Vec::new(),
         groups: Vec::new(),
+        types: Vec::new(),
         parent: None,
         this: None,
     }));

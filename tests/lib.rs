@@ -1598,3 +1598,20 @@ fn set_get_endian() {
         }
     }
 }
+
+#[test]
+fn read_compound() {
+    use netcdf::types::*;
+    let path = test_location().join("simple_nc4.nc");
+    let f = netcdf::open(path).unwrap();
+
+    assert_eq!(f.group("grp2").unwrap().types().count(), 1);
+    for typ in f.group("grp2").unwrap().types() {
+        if let Type::Compound(c) = typ {
+            assert_eq!(c.name(), "sample_compound_type");
+            assert_eq!(c.size(), 2 * std::mem::size_of::<i32>());
+        } else {
+            panic!("Unexpected type: {:?}", typ);
+        }
+    }
+}

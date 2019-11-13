@@ -5,6 +5,7 @@ use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
+use super::types::Type;
 use super::variable::{Numeric, Variable};
 use netcdf_sys::*;
 use std::cell::UnsafeCell;
@@ -22,6 +23,7 @@ pub struct Group {
     pub(crate) attributes: Vec<Attribute>,
     pub(crate) dimensions: Vec<Dimension>,
     pub(crate) groups: Vec<Rc<UnsafeCell<Group>>>,
+    pub(crate) types: Vec<Type>,
     /// Do not mutate parent, only for walking and getting dimensions
     /// and types. Use the `parents` iterator for walking upwards.
     ///
@@ -88,6 +90,10 @@ impl Group {
         // Takes self as &mut
         self.groups.iter_mut().map(|x| unsafe { &mut *x.get() })
     }
+    /// Iterate over all types in this group
+    pub fn types(&self) -> impl Iterator<Item = &Type> {
+        self.types.iter()
+    }
 }
 
 impl Group {
@@ -146,6 +152,7 @@ impl Group {
             dimensions: Vec::default(),
             groups: Vec::default(),
             variables: Vec::default(),
+            types: Vec::default(),
             parent: Some(self.this.clone().unwrap()),
             this: None,
         }));

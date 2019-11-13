@@ -73,6 +73,7 @@ pub mod dimension;
 pub mod error;
 pub mod file;
 pub mod group;
+pub mod types;
 pub mod variable;
 
 pub use attribute::*;
