@@ -156,7 +156,7 @@ impl std::ops::Deref for ReadOnlyFile {
 impl ReadOnlyFile {
     pub(crate) fn open(path: &path::Path) -> error::Result<Self> {
         Ok(Self {
-            file: File::open(path)?
+            file: File::open(path)?,
         })
     }
 }

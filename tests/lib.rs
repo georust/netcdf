@@ -1598,3 +1598,81 @@ fn set_get_endian() {
         }
     }
 }
+
+mod strided {
+    #[test]
+    fn get_to_buffer() {
+        let d = tempfile::tempdir().unwrap();
+        let name = d.path().join("strided_buffer.nc");
+        {
+            let mut file = netcdf::create(&name).unwrap();
+            file.add_dimension("z", 3).unwrap();
+            file.add_dimension("y", 5).unwrap();
+            file.add_dimension("x", 9).unwrap();
+            let var = file.add_variable::<i32>("data", &["z", "y", "x"]).unwrap();
+            let buffer = (0..3 * 5 * 9).collect::<Vec<_>>();
+            var.put_values(&buffer, None, None).unwrap();
+        }
+        let file = netcdf::open(name).unwrap();
+        let var = file.variable("data").unwrap();
+
+        let mut buffer = vec![0; 3 * 5 * 9];
+        var.values_strided_to(&mut buffer, None, None, &[1, 1, 1])
+            .unwrap();
+        assert_eq!(&buffer, &(0..3 * 5 * 9).collect::<Vec<_>>());
+        // Negative and zero strides seems not to be supported
+        // var.values_strided_to(&mut buffer, None, None, &[0, 0, 0]).unwrap();
+        // var.values_strided_to(&mut buffer, None, None, &[-1, -1, -1]).unwrap();
+        let mut buffer = vec![0; 3 * 5 * 2];
+        var.values_strided_to(&mut buffer, None, None, &[2, 1, 3])
+            .unwrap();
+        assert_eq!(
+            buffer,
+            &[
+                0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 90, 93, 96, 99, 102, 105,
+                108, 111, 114, 117, 120, 123, 126, 129, 132
+            ]
+        );
+
+        let mut buffer = vec![0; 3 * 5 * 2];
+        var.values_strided_to(&mut buffer, Some(&[0, 0, 0]), None, &[2, 1, 3])
+            .unwrap();
+        assert_eq!(
+            buffer,
+            &[
+                0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 90, 93, 96, 99, 102, 105,
+                108, 111, 114, 117, 120, 123, 126, 129, 132
+            ]
+        );
+
+        let mut buffer = vec![0; 3 * 5 * 2];
+        var.values_strided_to(&mut buffer, None, Some(&[2, 5, 3]), &[2, 1, 3])
+            .unwrap();
+        assert_eq!(
+            buffer,
+            &[
+                0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 90, 93, 96, 99, 102, 105,
+                108, 111, 114, 117, 120, 123, 126, 129, 132
+            ]
+        );
+
+        let mut buffer = vec![0; 3 * 5 * 2];
+        var.values_strided_to(&mut buffer, None, Some(&[2, 5, 4]), &[2, 1, 3])
+            .unwrap_err();
+
+        let mut buffer = vec![0; 3 * 5 * 2];
+        let l = var
+            .values_strided_to(&mut buffer, Some(&[2, 0, 4]), None, &[2, 1, 3])
+            .unwrap();
+        assert_eq!(
+            &buffer[..l],
+            &[94, 97, 103, 106, 112, 115, 121, 124, 130, 133]
+        );
+
+        let mut buffer = vec![0; 3 * 5 * 2];
+        let l = var
+            .values_strided_to(&mut buffer, Some(&[2, 0, 4]), Some(&[1, 2, 2]), &[2, 1, 3])
+            .unwrap();
+        assert_eq!(&buffer[..l], &[94, 97, 103, 106]);
+    }
+}

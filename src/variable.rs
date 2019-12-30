@@ -337,6 +337,26 @@ where
         slice_len: &[usize],
         values: &[Self],
     ) -> error::Result<()>;
+
+    /// get a SLICE of values into the variable, with the source
+    /// strided by `strides`
+    unsafe fn get_values_strided(
+        variable: &Variable,
+        indices: &[usize],
+        slice_len: &[usize],
+        strides: &[isize],
+        values: *mut Self,
+    ) -> error::Result<()>;
+
+    /// put a SLICE of values into the variable, with the destination
+    /// strided by `strides`
+    unsafe fn put_values_strided(
+        variable: &mut Variable,
+        indices: &[usize],
+        slice_len: &[usize],
+        strides: &[isize],
+        values: *const Self,
+    ) -> error::Result<()>;
 }
 
 #[allow(clippy::doc_markdown)]
@@ -353,7 +373,10 @@ macro_rules! impl_numeric {
         $nc_get_vara_type: ident,
         $nc_get_var1_type: ident,
         $nc_put_var1_type: ident,
-        $nc_put_vara_type: ident) => {
+        $nc_put_vara_type: ident,
+        $nc_get_vars_type: ident,
+        $nc_put_vars_type: ident,
+    ) => {
         #[allow(clippy::use_self)] // False positives
         unsafe impl Numeric for $sized_type {
             const NCTYPE: nc_type = $nc_type;
@@ -425,6 +448,42 @@ macro_rules! impl_numeric {
                     values.as_ptr(),
                 ))
             }
+
+            unsafe fn get_values_strided(
+                variable: &Variable,
+                indices: &[usize],
+                slice_len: &[usize],
+                strides: &[isize],
+                values: *mut Self,
+            ) -> error::Result<()> {
+                let _l = LOCK.lock().unwrap();
+                error::checked($nc_get_vars_type(
+                    variable.ncid,
+                    variable.varid,
+                    indices.as_ptr(),
+                    slice_len.as_ptr(),
+                    strides.as_ptr(),
+                    values,
+                ))
+            }
+
+            unsafe fn put_values_strided(
+                variable: &mut Variable,
+                indices: &[usize],
+                slice_len: &[usize],
+                strides: &[isize],
+                values: *const Self,
+            ) -> error::Result<()> {
+                let _l = LOCK.lock().unwrap();
+                error::checked($nc_put_vars_type(
+                    variable.ncid,
+                    variable.varid,
+                    indices.as_ptr(),
+                    slice_len.as_ptr(),
+                    strides.as_ptr(),
+                    values,
+                ))
+            }
         }
     };
 }
@@ -435,7 +494,9 @@ impl_numeric!(
     nc_get_vara_uchar,
     nc_get_var1_uchar,
     nc_put_var1_uchar,
-    nc_put_vara_uchar
+    nc_put_vara_uchar,
+    nc_get_vars_uchar,
+    nc_put_vars_uchar,
 );
 
 impl_numeric!(
@@ -445,7 +506,9 @@ impl_numeric!(
     nc_get_vara_schar,
     nc_get_var1_schar,
     nc_put_var1_schar,
-    nc_put_vara_schar
+    nc_put_vara_schar,
+    nc_get_vars_schar,
+    nc_put_vars_schar,
 );
 
 impl_numeric!(
@@ -455,7 +518,9 @@ impl_numeric!(
     nc_get_vara_short,
     nc_get_var1_short,
     nc_put_var1_short,
-    nc_put_vara_short
+    nc_put_vara_short,
+    nc_get_vars_short,
+    nc_put_vars_short,
 );
 
 impl_numeric!(
@@ -465,7 +530,9 @@ impl_numeric!(
     nc_get_vara_ushort,
     nc_get_var1_ushort,
     nc_put_var1_ushort,
-    nc_put_vara_ushort
+    nc_put_vara_ushort,
+    nc_get_vars_ushort,
+    nc_put_vars_ushort,
 );
 
 impl_numeric!(
@@ -475,7 +542,9 @@ impl_numeric!(
     nc_get_vara_int,
     nc_get_var1_int,
     nc_put_var1_int,
-    nc_put_vara_int
+    nc_put_vara_int,
+    nc_get_vars_int,
+    nc_put_vars_int,
 );
 
 impl_numeric!(
@@ -485,7 +554,9 @@ impl_numeric!(
     nc_get_vara_uint,
     nc_get_var1_uint,
     nc_put_var1_uint,
-    nc_put_vara_uint
+    nc_put_vara_uint,
+    nc_get_vars_uint,
+    nc_put_vars_uint,
 );
 
 impl_numeric!(
@@ -495,7 +566,9 @@ impl_numeric!(
     nc_get_vara_longlong,
     nc_get_var1_longlong,
     nc_put_var1_longlong,
-    nc_put_vara_longlong
+    nc_put_vara_longlong,
+    nc_get_vars_longlong,
+    nc_put_vars_longlong,
 );
 
 impl_numeric!(
@@ -505,7 +578,9 @@ impl_numeric!(
     nc_get_vara_ulonglong,
     nc_get_var1_ulonglong,
     nc_put_var1_ulonglong,
-    nc_put_vara_ulonglong
+    nc_put_vara_ulonglong,
+    nc_get_vars_ulonglong,
+    nc_put_vars_ulonglong,
 );
 
 impl_numeric!(
@@ -515,7 +590,9 @@ impl_numeric!(
     nc_get_vara_float,
     nc_get_var1_float,
     nc_put_var1_float,
-    nc_put_vara_float
+    nc_put_vara_float,
+    nc_get_vars_float,
+    nc_put_vars_float,
 );
 
 impl_numeric!(
@@ -525,7 +602,9 @@ impl_numeric!(
     nc_get_vara_double,
     nc_get_var1_double,
     nc_put_var1_double,
-    nc_put_vara_double
+    nc_put_vara_double,
+    nc_get_vars_double,
+    nc_put_vars_double,
 );
 
 /// Holds the contents of a netcdf string. Use deref to get a `CStr`
@@ -706,6 +785,74 @@ impl Variable {
         };
 
         unsafe { T::variable_to_ptr(self, indices, slice_len, buffer.as_mut_ptr()) }
+    }
+
+    /// Fetches variable into slice
+    /// buffer must be able to hold all the requested elements
+    pub fn values_strided_to<T: Numeric>(
+        &self,
+        buffer: &mut [T],
+        indices: Option<&[usize]>,
+        slice_len: Option<&[usize]>,
+        strides: &[isize],
+    ) -> error::Result<usize> {
+        if strides.len() != self.dimensions.len() {
+            return Err("stride_mismatch".into());
+        }
+        let indices_: Vec<usize>;
+        let indices = if let Some(x) = indices {
+            self.check_indices(x, false)?;
+            x
+        } else {
+            indices_ = self.default_indices(false)?;
+            &indices_
+        };
+
+        let slice_len_: Vec<usize>;
+        let slice_len = if let Some(slice_len) = slice_len {
+            if slice_len.len() != self.dimensions.len() {
+                return Err("slice mismatch".into());
+            }
+            for (((d, &start), &count), &stride) in self
+                .dimensions
+                .iter()
+                .zip(indices)
+                .zip(slice_len)
+                .zip(strides)
+            {
+                if start as isize + (count as isize - 1) * stride > d.len() as isize {
+                    return Err(error::Error::IndexMismatch);
+                }
+                if start as isize + count as isize * stride < 0 {
+                    return Err(error::Error::IndexMismatch);
+                }
+            }
+            slice_len
+        } else {
+            slice_len_ = self
+                .dimensions
+                .iter()
+                .zip(indices)
+                .zip(strides)
+                .map(|((d, &start), &stride)| {
+                    if stride == 0 {
+                        1
+                    } else if stride < 0 {
+                        start / stride.abs() as usize
+                    } else {
+                        let dlen = d.len();
+                        let round_up = stride.abs() as usize - 1;
+                        (dlen - start + round_up) / stride.abs() as usize
+                    }
+                })
+                .collect::<Vec<_>>();
+            &slice_len_
+        };
+        if buffer.len() < slice_len.iter().product() {
+            return Err("buffer too small".into());
+        }
+        unsafe { T::get_values_strided(self, indices, &slice_len, strides, buffer.as_mut_ptr())? };
+        Ok(slice_len.iter().product())
     }
 
     /// Put a single value at `indices`
