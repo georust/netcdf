@@ -1675,4 +1675,77 @@ mod strided {
             .unwrap();
         assert_eq!(&buffer[..l], &[94, 97, 103, 106]);
     }
+    #[test]
+    fn put_buffer() {
+        let d = tempfile::tempdir().unwrap();
+        let path = d.path().join("put_strided_buffer.nc");
+        let mut file = netcdf::create(path).unwrap();
+
+        file.add_dimension("d0", 7).unwrap();
+        file.add_dimension("d1", 9).unwrap();
+
+        let var = file.add_variable::<i32>("var", &["d0", "d1"]).unwrap();
+
+        let values = (0..7 * 9).collect::<Vec<i32>>();
+        let zeros = [0; 7 * 9];
+        var.put_values_strided(&values, None, None, &[1, 1])
+            .unwrap();
+
+        let mut buf = vec![0; 7 * 9];
+        var.values_to(&mut buf, None, None).unwrap();
+        assert_eq!(values, buf);
+
+        var.put_values(&zeros, None, None).unwrap();
+        var.put_values_strided(&values[1..][..12], Some(&[0, 0]), Some(&[4, 3]), &[2, 3])
+            .unwrap();
+        let mut buf = vec![0; 7 * 9];
+        var.values_to(&mut buf, None, None).unwrap();
+        assert_eq!(
+            &buf,
+            &vec![
+                1, 0, 0, 2, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 8, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10,
+                0, 0, 11, 0, 0, 12, 0, 0,
+            ]
+        );
+        var.put_values(&zeros, None, None).unwrap();
+        var.put_values_strided(&values[1..], None, None, &[2, 3])
+            .unwrap();
+        let mut buf = vec![0; 7 * 9];
+        var.values_to(&mut buf, None, None).unwrap();
+        assert_eq!(
+            &buf,
+            &vec![
+                1, 0, 0, 2, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 5, 0, 0, 6, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 8, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10,
+                0, 0, 11, 0, 0, 12, 0, 0,
+            ]
+        );
+        var.put_values(&zeros, None, None).unwrap();
+        var.put_values_strided(&values[1..], None, None, &[3, 2])
+            .unwrap();
+        let mut buf = vec![0; 7 * 9];
+        var.values_to(&mut buf, None, None).unwrap();
+        assert_eq!(
+            &buf,
+            &vec![
+                1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+                0, 7, 0, 8, 0, 9, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11,
+                0, 12, 0, 13, 0, 14, 0, 15
+            ]
+        );
+        var.put_values(&zeros, None, None).unwrap();
+        var.put_values_strided(&values[1..], Some(&[2, 3]), None, &[3, 2])
+            .unwrap();
+        let mut buf = vec![0; 7 * 9];
+        var.values_to(&mut buf, None, None).unwrap();
+        assert_eq!(
+            &buf,
+            &vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 3, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 5, 0, 6, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+    }
 }

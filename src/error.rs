@@ -27,6 +27,8 @@ pub enum Error {
     SliceMismatch,
     /// Requested a zero slice
     ZeroSlice,
+    /// Zero stride or matched with length != 1
+    StrideError,
     /// Supplied the wrong type of parameter
     TypeMismatch,
     /// Does not know the type (probably library error...)
@@ -85,6 +87,7 @@ impl fmt::Display for Error {
             Self::IndexMismatch => write!(f, "requested index is bigger than the dimension length"),
             Self::SliceMismatch => write!(f, "requested slice is bigger than the dimension length"),
             Self::ZeroSlice => write!(f, "must request a slice length larger than zero"),
+            Self::StrideError => write!(f, "invalid strides"),
             Self::BufferLen(has, need) => write!(
                 f,
                 "buffer size mismatch, has size {}, but needs size {}",
