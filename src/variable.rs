@@ -820,6 +820,12 @@ impl Variable {
                 .zip(slice_len)
                 .zip(strides)
             {
+                if stride == 0 && count != 1 {
+                    return Err(error::Error::StrideError);
+                }
+                if count == 0 {
+                    return Err(error::Error::ZeroSlice);
+                }
                 if start as isize + (count as isize - 1) * stride > d.len() as isize {
                     return Err(error::Error::IndexMismatch);
                 }
@@ -925,6 +931,80 @@ impl Variable {
             &slice_len_
         };
         unsafe { T::put_values_at(self, indices, slice_len, values) }
+    }
+
+    /// Put a slice of values at `indices`, with destination strided
+    pub fn put_values_strided<T: Numeric>(
+        &mut self,
+        values: &[T],
+        indices: Option<&[usize]>,
+        slice_len: Option<&[usize]>,
+        strides: &[isize],
+    ) -> error::Result<usize> {
+        let indices_: Vec<usize>;
+        let indices = if let Some(x) = indices {
+            self.check_indices(x, true)?;
+            x
+        } else {
+            indices_ = self.default_indices(true)?;
+            &indices_
+        };
+        if strides.len() != self.dimensions.len() {
+            return Err(error::Error::IndexMismatch);
+        }
+
+        let slice_len_: Vec<usize>;
+        let slice_len = if let Some(slice_len) = slice_len {
+            if slice_len.len() != self.dimensions.len() {
+                return Err(error::Error::SliceMismatch);
+            }
+            for (((d, &start), &count), &stride) in self
+                .dimensions
+                .iter()
+                .zip(indices)
+                .zip(slice_len)
+                .zip(strides)
+            {
+                if count == 0 {
+                    return Err(error::Error::ZeroSlice);
+                }
+                let end = start as isize + (count as isize - 1) * stride;
+                if end < 0 {
+                    return Err(error::Error::IndexMismatch);
+                }
+                if !d.is_unlimited() && end > d.len() as isize {
+                    return Err(error::Error::IndexMismatch);
+                }
+            }
+            slice_len
+        } else {
+            slice_len_ = self
+                .dimensions
+                .iter()
+                .zip(indices)
+                .zip(strides)
+                .map(|((d, &start), &stride)| {
+                    match stride {
+                        0 => 1,
+                        stride if stride > 0 => {
+                            let dlen = d.len();
+                            let nelems = (dlen - start + stride as usize - 1) / stride as usize;
+                            nelems
+                        }
+                        _stride => {
+                            // Negative stride
+                            1
+                        }
+                    }
+                })
+                .collect();
+            &slice_len_
+        };
+        if values.len() < slice_len.iter().product() {
+            return Err("not enough values".into());
+        }
+        unsafe { T::put_values_strided(self, indices, slice_len, strides, values.as_ptr())? };
+        Ok(slice_len.iter().product())
     }
 
     /// Set a Fill Value
