@@ -44,13 +44,15 @@ fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error
             print!(" {} ", d.name());
         }
         println!(")");
-        for a in v.attributes() {
-            println!("\t\t{} = {:?}", a.name(), a.value()?);
+        for a in v.attributes()? {
+            let a = a?;
+            println!("\t\t{} = {:?}", a.name().unwrap(), a.value()?);
         }
     }
     println!("Attributes:");
-    for a in g.attributes() {
-        println!("\t\t{} = {:?}", a.name(), a.value()?);
+    for a in g.attributes()? {
+        let a = a?;
+        println!("\t\t{} = {:?}", a.name().unwrap(), a.value()?);
     }
     for g in g.groups() {
         println!();

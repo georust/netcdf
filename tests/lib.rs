@@ -81,6 +81,7 @@ fn global_attrs() {
     let ch1_attr = &file
         .root()
         .attribute("CH1_DARK_COUNT")
+        .expect("netcdf error")
         .expect("Could not find attribute");
     let chi = ch1_attr.value().unwrap();
     let eps = 1e-6;
@@ -93,6 +94,7 @@ fn global_attrs() {
     let sensor_attr = &file
         .root()
         .attribute("sensor")
+        .expect("netcdf error")
         .expect("Could not find attribute");
     let sensor_data = sensor_attr.value().unwrap();
     if let AttrValue::Str(x) = sensor_data {
@@ -181,11 +183,13 @@ fn attributes_read() {
 
     let attr = &file
         .attribute("PROGLANG")
+        .expect("netcdf error")
         .expect("Could not find attribute");
 
-    assert_eq!(attr.name(), "PROGLANG");
+    assert_eq!(attr.name().unwrap(), "PROGLANG");
 
-    for attr in file.attributes() {
+    for attr in file.attributes().unwrap() {
+        let attr = attr.unwrap();
         let _val = attr.value().expect("Could not get value");
     }
 
@@ -200,7 +204,8 @@ fn attributes_read() {
         .expect("Could not add attribute");
     assert_eq!(var.vartype(), netcdf_sys::NC_FLOAT);
 
-    for attr in var.attributes() {
+    for attr in var.attributes().unwrap() {
+        let attr = attr.unwrap();
         attr.value().unwrap();
     }
 }
@@ -225,13 +230,25 @@ fn attribute_put() {
     let mut f = netcdf::create(p).unwrap();
 
     f.add_attribute("a", "1").unwrap();
-    assert_eq!(f.attribute("a").unwrap().value().unwrap(), "1".into());
+    assert_eq!(
+        f.attribute("a").unwrap().unwrap().value().unwrap(),
+        "1".into()
+    );
     f.add_attribute("b", "2").unwrap();
-    assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
+    assert_eq!(
+        f.attribute("b").unwrap().unwrap().value().unwrap(),
+        "2".into()
+    );
     f.add_attribute("a", 2u32).unwrap();
-    assert_eq!(f.attribute("a").unwrap().value().unwrap(), 2u32.into());
+    assert_eq!(
+        f.attribute("a").unwrap().unwrap().value().unwrap(),
+        2u32.into()
+    );
     f.add_attribute("b", "2").unwrap();
-    assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
+    assert_eq!(
+        f.attribute("b").unwrap().unwrap().value().unwrap(),
+        "2".into()
+    );
 }
 
 #[test]
@@ -298,6 +315,7 @@ fn open_pres_temp_4d() {
     // test var attributes
     assert_eq!(
         pres.attribute("units")
+            .expect("netcdf error")
             .expect("Could not find attribute")
             .value()
             .unwrap(),
@@ -534,6 +552,7 @@ fn def_dims_vars_attrs() {
             AttrValue::Int(3),
             file.root()
                 .attribute("testattr1")
+                .expect("netcdf error")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
@@ -542,6 +561,7 @@ fn def_dims_vars_attrs() {
             AttrValue::Str("Global string attr".into()),
             file.root()
                 .attribute("testattr2")
+                .expect("netcdf error")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
@@ -554,6 +574,7 @@ fn def_dims_vars_attrs() {
                 .variable(var_name)
                 .expect("Could not find variable")
                 .attribute("varattr1")
+                .expect("netcdf error occured")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
@@ -564,6 +585,7 @@ fn def_dims_vars_attrs() {
                 .variable(var_name)
                 .expect("Could not find variable")
                 .attribute("varattr2")
+                .expect("netcdf error occured")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
@@ -794,17 +816,24 @@ fn all_attr_types() {
             file.root()
                 .attribute("attr_ubyte")
                 .unwrap()
+                .unwrap()
                 .value()
                 .unwrap()
         );
         assert_eq!(
             AttrValue::Schar(3),
-            file.root().attribute("attr_byte").unwrap().value().unwrap()
+            file.root()
+                .attribute("attr_byte")
+                .unwrap()
+                .unwrap()
+                .value()
+                .unwrap()
         );
         assert_eq!(
             AttrValue::Ushort(3),
             file.root()
                 .attribute("attr_ushort")
+                .unwrap()
                 .unwrap()
                 .value()
                 .unwrap()
@@ -814,21 +843,33 @@ fn all_attr_types() {
             file.root()
                 .attribute("attr_short")
                 .unwrap()
+                .unwrap()
                 .value()
                 .unwrap()
         );
         assert_eq!(
             AttrValue::Int(3),
-            file.root().attribute("attr_int").unwrap().value().unwrap()
+            file.root()
+                .attribute("attr_int")
+                .unwrap()
+                .unwrap()
+                .value()
+                .unwrap()
         );
         assert_eq!(
             AttrValue::Uint(3),
-            file.root().attribute("attr_uint").unwrap().value().unwrap()
+            file.root()
+                .attribute("attr_uint")
+                .unwrap()
+                .unwrap()
+                .value()
+                .unwrap()
         );
         assert_eq!(
             AttrValue::Ulonglong(3),
             file.root()
                 .attribute("attr_uint64")
+                .unwrap()
                 .unwrap()
                 .value()
                 .unwrap()
@@ -838,6 +879,7 @@ fn all_attr_types() {
             file.root()
                 .attribute("attr_int64")
                 .unwrap()
+                .unwrap()
                 .value()
                 .unwrap()
         );
@@ -845,6 +887,7 @@ fn all_attr_types() {
             AttrValue::Float(3.2),
             file.root()
                 .attribute("attr_float")
+                .unwrap()
                 .unwrap()
                 .value()
                 .unwrap()
@@ -854,17 +897,24 @@ fn all_attr_types() {
             file.root()
                 .attribute("attr_double")
                 .unwrap()
+                .unwrap()
                 .value()
                 .unwrap()
         );
         assert_eq!(
             AttrValue::Str("Hello world!".into()),
-            file.root().attribute("attr_text").unwrap().value().unwrap()
+            file.root()
+                .attribute("attr_text")
+                .unwrap()
+                .unwrap()
+                .value()
+                .unwrap()
         );
         assert_eq!(
             AttrValue::Str(u8string.into()),
             file.root()
                 .attribute("attr_text_utf8")
+                .unwrap()
                 .unwrap()
                 .value()
                 .unwrap()
@@ -1040,6 +1090,7 @@ fn set_fill_value() {
         .expect("Could not find variable");
     let attr = var
         .attribute("_FillValue")
+        .expect("other error")
         .expect("could not find attribute")
         .value()
         .unwrap();
@@ -1078,17 +1129,25 @@ fn more_fill_values() {
 
     // assert_eq!(var.value::<i32>(Some(&[0])).unwrap(), GARBAGE);
     assert_eq!(var.value::<i32>(Some(&[1])).unwrap(), 6_i32);
-    assert!(var.attribute("_FillValue").is_none());
+    assert!(var.attribute("_FillValue").unwrap().is_none());
 
     let var = &mut file.add_variable::<i32>("v2", &["x"]).unwrap();
     var.set_fill_value(2_i32).unwrap();
     assert_eq!(
-        var.attribute("_FillValue").unwrap().value().unwrap(),
+        var.attribute("_FillValue")
+            .unwrap()
+            .unwrap()
+            .value()
+            .unwrap(),
         AttrValue::Int(2)
     );
     var.set_fill_value(3_i32).unwrap();
     assert_eq!(
-        var.attribute("_FillValue").unwrap().value().unwrap(),
+        var.attribute("_FillValue")
+            .unwrap()
+            .unwrap()
+            .value()
+            .unwrap(),
         AttrValue::Int(3)
     );
     unsafe { var.set_nofill().unwrap() };

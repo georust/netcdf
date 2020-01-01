@@ -111,7 +111,6 @@ impl File {
             ncid,
             grpid: None,
             variables: Vec::default(),
-            attributes: Vec::default(),
             dimensions: Vec::default(),
             groups: Vec::default(),
             parent: None,
@@ -288,39 +287,6 @@ fn get_group_dimensions(ncid: nc_type) -> error::Result<Vec<Dimension>> {
     Ok(dimensions)
 }
 
-use super::attribute::Attribute;
-fn get_attributes(ncid: nc_type, varid: nc_type) -> error::Result<Vec<Attribute>> {
-    let mut natts = 0;
-    unsafe {
-        error::checked(nc_inq_varnatts(ncid, varid, &mut natts))?;
-    }
-    if natts == 0 {
-        return Ok(Vec::new());
-    }
-    let mut attributes = Vec::with_capacity(natts.try_into()?);
-    let mut buf = [0_u8; NC_MAX_NAME as usize + 1];
-    for i in 0..natts {
-        for i in buf.iter_mut() {
-            *i = 0;
-        }
-        unsafe { error::checked(nc_inq_attname(ncid, varid, i, buf.as_mut_ptr() as *mut _))? };
-
-        let zero_pos = buf
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| buf.len());
-        let name = String::from(String::from_utf8_lossy(&buf[..zero_pos]));
-        let a = Attribute {
-            name: name.clone(),
-            ncid,
-            varid,
-        };
-        attributes.push(a);
-    }
-
-    Ok(attributes)
-}
-
 fn get_dimensions_of_var(
     ncid: nc_type,
     varid: nc_type,
@@ -410,7 +376,6 @@ fn get_variables(ncid: nc_type, g: &Group) -> error::Result<Vec<Variable>> {
                 std::ptr::null_mut(),
             ))?;
         }
-        let attributes = get_attributes(ncid, varid)?;
         let dimensions = get_dimensions_of_var(ncid, varid, g)?;
 
         let zero_pos = name
@@ -424,7 +389,6 @@ fn get_variables(ncid: nc_type, g: &Group) -> error::Result<Vec<Variable>> {
             varid,
             dimensions,
             name,
-            attributes,
             vartype,
         };
 
@@ -469,7 +433,6 @@ fn get_groups(
             name: name.clone(),
             ncid,
             grpid: Some(grpid),
-            attributes: Vec::new(),
             dimensions: Vec::new(),
             variables: Vec::new(),
             groups: Vec::new(),
@@ -485,8 +448,6 @@ fn get_groups(
         gref.dimensions = dimensions;
         let variables = get_variables(grpid, &gref)?;
         gref.variables = variables;
-        let attributes = get_attributes(grpid, NC_GLOBAL)?;
-        gref.attributes = attributes;
 
         let subgroups = get_groups(grpid, &g)?;
         gref.groups = subgroups;
@@ -522,7 +483,6 @@ fn parse_file(ncid: nc_type) -> error::Result<Rc<UnsafeCell<Group>>> {
         grpid: None,
         name: "root".into(),
         dimensions: Vec::new(),
-        attributes: Vec::new(),
         variables: Vec::new(),
         groups: Vec::new(),
         parent: None,
@@ -537,9 +497,6 @@ fn parse_file(ncid: nc_type) -> error::Result<Rc<UnsafeCell<Group>>> {
 
     let dimensions = get_group_dimensions(ncid)?;
     gref.dimensions = dimensions;
-
-    let attributes = get_attributes(ncid, NC_GLOBAL)?;
-    gref.attributes = attributes;
 
     let variables = get_variables(ncid, gref)?;
     gref.variables = variables;

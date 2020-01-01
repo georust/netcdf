@@ -4,36 +4,65 @@
 use super::error;
 use super::LOCK;
 use netcdf_sys::*;
-use std::ffi::CString;
+use std::marker::PhantomData;
 
-#[derive(Debug)]
 /// Extra properties of a variable or a group can be represented
 /// with attributes. Primarily added with `add_attribute` on
 /// the variable and group
-pub struct Attribute {
-    pub(crate) name: String,
+#[derive(Clone)]
+pub struct Attribute<'a> {
+    pub(crate) name: [u8; NC_MAX_NAME as usize + 1],
     /// Group or file this attribute is in
     pub(crate) ncid: nc_type,
     /// Variable/global this id is connected to
     pub(crate) varid: nc_type,
+    /// Attribute type
+    pub(crate) atttype: nc_type,
+    /// Vector length
+    pub(crate) attlen: nc_type,
+    /// Holds the variable/group to prevent the
+    /// attribute being deleted or modified
+    pub(crate) _marker: PhantomData<&'a nc_type>,
 }
 
-impl Attribute {
+impl<'a> std::fmt::Debug for Attribute<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "name: ")?;
+        if let Ok(name) = self.name() {
+            write!(f, "{}", name)?;
+        } else {
+            write!(f, "<<not utf8 name>>")?;
+        }
+        write!(f, "ncid: {}", self.ncid)?;
+        write!(f, "varid: {}", self.varid)?;
+        write!(f, "atttype: {}", self.atttype)?;
+        write!(f, "attlen: {}", self.attlen)
+    }
+}
+
+impl<'a> Attribute<'a> {
     /// Get the name of the attribute
-    pub fn name(&self) -> &str {
-        &self.name
+    ///
+    /// # Errors
+    /// attribute could have a name containing an invalid utf8-sequence
+    pub fn name(&self) -> Result<&str, std::str::Utf8Error> {
+        let zeropos = self
+            .name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or(self.name.len());
+        std::str::from_utf8(&self.name[..zeropos])
     }
     /// Get the value of the attribute
     #[allow(clippy::too_many_lines)]
     pub fn value(&self) -> error::Result<AttrValue> {
         let mut typ = 0;
-        let cname = std::ffi::CString::new(self.name.clone()).unwrap();
         let _l = LOCK.lock().unwrap();
         unsafe {
             error::checked(nc_inq_atttype(
                 self.ncid,
                 self.varid,
-                cname.as_ptr(),
+                self.name.as_ptr() as *const _,
                 &mut typ,
             ))?;
         }
@@ -45,7 +74,7 @@ impl Attribute {
                     error::checked(nc_get_att_uchar(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut value,
                     ))?;
                 }
@@ -57,7 +86,7 @@ impl Attribute {
                     error::checked(nc_get_att_schar(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut value,
                     ))?;
                 }
@@ -69,7 +98,7 @@ impl Attribute {
                     error::checked(nc_get_att_short(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut value,
                     ))?;
                 }
@@ -81,7 +110,7 @@ impl Attribute {
                     error::checked(nc_get_att_ushort(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut value,
                     ))?;
                 }
@@ -93,7 +122,7 @@ impl Attribute {
                     error::checked(nc_get_att_int(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut value,
                     ))?;
                 }
@@ -105,7 +134,7 @@ impl Attribute {
                     error::checked(nc_get_att_uint(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut value,
                     ))?;
                 }
@@ -117,7 +146,7 @@ impl Attribute {
                     error::checked(nc_get_att_longlong(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut value,
                     ))?;
                 }
@@ -129,7 +158,7 @@ impl Attribute {
                     error::checked(nc_get_att_ulonglong(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut value,
                     ))?;
                 }
@@ -141,7 +170,7 @@ impl Attribute {
                     error::checked(nc_get_att_float(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut value,
                     ))?;
                 }
@@ -153,7 +182,7 @@ impl Attribute {
                     error::checked(nc_get_att_double(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut value,
                     ))?;
                 }
@@ -165,7 +194,7 @@ impl Attribute {
                     error::checked(nc_inq_attlen(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         &mut lentext,
                     ))?;
                 }
@@ -174,7 +203,7 @@ impl Attribute {
                     error::checked(nc_get_att_text(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         buf.as_mut_ptr() as *mut _,
                     ))?;
                 }
@@ -188,6 +217,91 @@ impl Attribute {
             }
             x => Err(error::Error::TypeUnknown(x)),
         }
+    }
+}
+
+pub(crate) struct AttributeIterator<'a> {
+    ncid: nc_type,
+    varid: Option<nc_type>,
+    natts: usize,
+    current_natt: usize,
+    _marker: PhantomData<&'a nc_type>,
+}
+
+impl<'a> AttributeIterator<'a> {
+    pub(crate) fn new(ncid: nc_type, varid: Option<nc_type>) -> error::Result<Self> {
+        let _l = LOCK.lock().unwrap();
+        let mut natts = 0;
+        unsafe {
+            error::checked(nc_inq_varnatts(
+                ncid,
+                varid.unwrap_or(NC_GLOBAL),
+                &mut natts,
+            ))?;
+        }
+        Ok(Self {
+            ncid,
+            varid,
+            natts: natts as _,
+            current_natt: 0,
+            _marker: PhantomData,
+        })
+    }
+}
+
+impl<'a> Iterator for AttributeIterator<'a> {
+    type Item = error::Result<Attribute<'a>>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_natt >= self.natts {
+            return None;
+        }
+
+        let _l = LOCK.lock().unwrap();
+        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
+        unsafe {
+            if let Err(e) = error::checked(nc_inq_attname(
+                self.ncid,
+                self.varid.unwrap_or(NC_GLOBAL),
+                self.current_natt as _,
+                name.as_mut_ptr() as *mut _,
+            )) {
+                return Some(Err(e));
+            }
+        }
+        let mut atttype = 0;
+        unsafe {
+            if let Err(e) = error::checked(nc_inq_atttype(
+                self.ncid,
+                self.varid.unwrap_or(NC_GLOBAL),
+                name.as_ptr() as *const _,
+                &mut atttype,
+            )) {
+                return Some(Err(e));
+            }
+        }
+        let mut attlen = 0;
+        unsafe {
+            if let Err(e) = error::checked(nc_inq_attlen(
+                self.ncid,
+                self.varid.unwrap_or(NC_GLOBAL),
+                name.as_ptr() as *const _,
+                &mut attlen,
+            )) {
+                return Some(Err(e));
+            }
+        }
+
+        let att = Attribute {
+            name,
+            ncid: self.ncid,
+            varid: self.varid.unwrap_or(NC_GLOBAL),
+            attlen: attlen as _,
+            atttype,
+            _marker: PhantomData,
+        };
+
+        self.current_natt += 1;
+        Some(Ok(att))
     }
 }
 
@@ -209,7 +323,7 @@ pub enum AttrValue {
     Str(String),
 }
 
-impl Attribute {
+impl<'a> Attribute<'a> {
     #[allow(clippy::needless_pass_by_value)] // All values will be small
     pub(crate) fn put(
         ncid: nc_type,
@@ -217,48 +331,128 @@ impl Attribute {
         name: &str,
         val: AttrValue,
     ) -> error::Result<Self> {
-        let cname: CString = CString::new(name).unwrap();
+        let cname = {
+            if name.len() > NC_MAX_NAME as usize {
+                return Err(error::Error::Netcdf(NC_EMAXNAME));
+            }
+            let mut attname = [0_u8; NC_MAX_NAME as usize + 1];
+            attname[..name.len()].copy_from_slice(name.as_bytes());
+            attname
+        };
 
         let _l = LOCK.lock().unwrap();
+        let atttype;
         error::checked(unsafe {
             match val {
                 AttrValue::Uchar(x) => {
-                    nc_put_att_uchar(ncid, varid, cname.as_ptr(), NC_UBYTE, 1, &x)
+                    atttype = NC_UBYTE;
+                    nc_put_att_uchar(ncid, varid, cname.as_ptr() as *const _, atttype, 1, &x)
                 }
                 AttrValue::Schar(x) => {
-                    nc_put_att_schar(ncid, varid, cname.as_ptr(), NC_BYTE, 1, &x)
+                    atttype = NC_BYTE;
+                    nc_put_att_schar(ncid, varid, cname.as_ptr() as *const _, atttype, 1, &x)
                 }
                 AttrValue::Ushort(x) => {
-                    nc_put_att_ushort(ncid, varid, cname.as_ptr(), NC_USHORT, 1, &x)
+                    atttype = NC_USHORT;
+                    nc_put_att_ushort(ncid, varid, cname.as_ptr() as *const _, atttype, 1, &x)
                 }
                 AttrValue::Short(x) => {
-                    nc_put_att_short(ncid, varid, cname.as_ptr(), NC_SHORT, 1, &x)
+                    atttype = NC_SHORT;
+                    nc_put_att_short(ncid, varid, cname.as_ptr() as *const _, atttype, 1, &x)
                 }
-                AttrValue::Uint(x) => nc_put_att_uint(ncid, varid, cname.as_ptr(), NC_UINT, 1, &x),
-                AttrValue::Int(x) => nc_put_att_int(ncid, varid, cname.as_ptr(), NC_INT, 1, &x),
+                AttrValue::Uint(x) => {
+                    atttype = NC_UINT;
+                    nc_put_att_uint(ncid, varid, cname.as_ptr() as *const _, atttype, 1, &x)
+                }
+                AttrValue::Int(x) => {
+                    atttype = NC_INT;
+                    nc_put_att_int(ncid, varid, cname.as_ptr() as *const _, atttype, 1, &x)
+                }
                 AttrValue::Ulonglong(x) => {
-                    nc_put_att_ulonglong(ncid, varid, cname.as_ptr(), NC_UINT64, 1, &x)
+                    atttype = NC_UINT64;
+                    nc_put_att_ulonglong(ncid, varid, cname.as_ptr() as *const _, atttype, 1, &x)
                 }
                 AttrValue::Longlong(x) => {
-                    nc_put_att_longlong(ncid, varid, cname.as_ptr(), NC_INT64, 1, &x)
+                    atttype = NC_INT64;
+                    nc_put_att_longlong(ncid, varid, cname.as_ptr() as *const _, atttype, 1, &x)
                 }
                 AttrValue::Float(x) => {
-                    nc_put_att_float(ncid, varid, cname.as_ptr(), NC_FLOAT, 1, &x)
+                    atttype = NC_FLOAT;
+                    nc_put_att_float(ncid, varid, cname.as_ptr() as *const _, atttype, 1, &x)
                 }
                 AttrValue::Double(x) => {
-                    nc_put_att_double(ncid, varid, cname.as_ptr(), NC_DOUBLE, 1, &x)
+                    atttype = NC_DOUBLE;
+                    nc_put_att_double(ncid, varid, cname.as_ptr() as *const _, atttype, 1, &x)
                 }
                 AttrValue::Str(ref x) => {
-                    nc_put_att_text(ncid, varid, cname.as_ptr(), x.len(), x.as_ptr() as *const _)
+                    atttype = NC_STRING;
+                    nc_put_att_text(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        x.len(),
+                        x.as_ptr() as *const _,
+                    )
                 }
             }
         })?;
 
         Ok(Self {
-            name: name.to_string(),
+            name: cname,
             ncid,
             varid,
+            atttype,
+            attlen: 1,
+            _marker: PhantomData,
         })
+    }
+
+    pub(crate) fn find_from_name(
+        ncid: nc_type,
+        varid: Option<nc_type>,
+        name: &str,
+    ) -> error::Result<Option<Self>> {
+        let attname = {
+            if name.len() > NC_MAX_NAME as usize {
+                return Err(error::Error::Netcdf(NC_EMAXNAME));
+            }
+            let mut attname = [0_u8; NC_MAX_NAME as usize + 1];
+            attname[..name.len()].copy_from_slice(name.as_bytes());
+            attname
+        };
+        let _l = LOCK.lock().unwrap();
+        let e;
+        let mut xtype = 0;
+        unsafe {
+            e = nc_inq_atttype(
+                ncid,
+                varid.unwrap_or(NC_GLOBAL),
+                attname.as_ptr() as *const _,
+                &mut xtype,
+            );
+        }
+        if e == NC_ENOTATT {
+            return Ok(None);
+        }
+        error::checked(e)?;
+        let mut xlen = 0;
+        unsafe {
+            error::checked(nc_inq_attlen(
+                ncid,
+                varid.unwrap_or(NC_GLOBAL),
+                attname.as_ptr() as *const _,
+                &mut xlen,
+            ))?;
+        }
+
+        Ok(Some(Attribute {
+            name: attname,
+            ncid: ncid,
+            varid: varid.unwrap_or(NC_GLOBAL),
+            atttype: xtype,
+            attlen: xlen as _,
+            _marker: PhantomData,
+        }))
     }
 }
 

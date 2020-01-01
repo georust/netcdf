@@ -19,7 +19,6 @@ pub struct Group {
     pub(crate) ncid: nc_type,
     pub(crate) grpid: Option<nc_type>,
     pub(crate) variables: Vec<Variable>,
-    pub(crate) attributes: Vec<Attribute>,
     pub(crate) dimensions: Vec<Dimension>,
     pub(crate) groups: Vec<Rc<UnsafeCell<Group>>>,
     /// Do not mutate parent, only for walking and getting dimensions
@@ -56,12 +55,12 @@ impl Group {
         self.variables.iter_mut()
     }
     /// Get a single attribute
-    pub fn attribute(&self, name: &str) -> Option<&Attribute> {
-        self.attributes().find(|x| x.name() == name)
+    pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
+        Attribute::find_from_name(self.ncid, None, name)
     }
-    /// Get all attributes
-    pub fn attributes(&self) -> impl Iterator<Item = &Attribute> {
-        self.attributes.iter()
+    /// Get all attributes in the group
+    pub fn attributes(&self) -> error::Result<impl Iterator<Item = error::Result<Attribute>>> {
+        crate::attribute::AttributeIterator::new(self.grpid.unwrap_or(self.ncid), None)
     }
     /// Get a single dimension
     pub fn dimension(&self, name: &str) -> Option<&Dimension> {
@@ -92,18 +91,11 @@ impl Group {
 
 impl Group {
     /// Add an attribute to the group
-    pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<()>
+    pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where
         T: Into<AttrValue>,
     {
-        let att = Attribute::put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name, val.into())?;
-        let pos = self.attributes().position(|x| x.name() == name);
-        if let Some(i) = pos {
-            self.attributes[i] = att;
-        } else {
-            self.attributes.push(att);
-        }
-        Ok(())
+        Attribute::put(self.grpid.unwrap_or(self.ncid), NC_GLOBAL, name, val.into())
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
@@ -142,7 +134,6 @@ impl Group {
             ncid: self.grpid.unwrap_or(self.ncid),
             name: name.to_string(),
             grpid: Some(grpid),
-            attributes: Vec::default(),
             dimensions: Vec::default(),
             groups: Vec::default(),
             variables: Vec::default(),
