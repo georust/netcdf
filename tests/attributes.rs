@@ -276,3 +276,64 @@ fn all_attr_types() {
         );
     }
 }
+
+#[test]
+fn multi_attributes() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("multi_attributes");
+    {
+        let mut file = netcdf::create(&path).unwrap();
+        file.add_attribute("u8s", vec![1_u8, 2, 3, 4]).unwrap();
+        file.add_attribute("i8s", vec![1_i8, 2, 3, 4]).unwrap();
+        file.add_attribute("u16s", vec![1_u16, 2, 3, 4]).unwrap();
+        file.add_attribute("i16s", vec![1_i16, 2, 3, 4]).unwrap();
+        file.add_attribute("u32s", vec![1_u32, 2, 3, 4]).unwrap();
+        file.add_attribute("i32s", vec![1_i32, 2, 3, 4]).unwrap();
+        file.add_attribute("u64s", vec![1_u64, 2, 3, 4]).unwrap();
+        file.add_attribute("i64s", vec![1_i64, 2, 3, 4]).unwrap();
+        file.add_attribute("f32s", vec![1.0_f32, 2.0, 3.0, 4.0])
+            .unwrap();
+        file.add_attribute("f64s", vec![1.0_f64, 2.0, 3.0, 4.0])
+            .unwrap();
+    }
+    let file = netcdf::open(path).unwrap();
+    let mut atts = 0;
+    for att in file.attributes().unwrap() {
+        let att = att.unwrap();
+        match att.name().unwrap() {
+            "u8s" => {
+                assert_eq!(att.value().unwrap(), vec![1_u8, 2, 3, 4].into());
+            }
+            "i8s" => {
+                assert_eq!(att.value().unwrap(), vec![1_i8, 2, 3, 4].into());
+            }
+            "u16s" => {
+                assert_eq!(att.value().unwrap(), vec![1_u16, 2, 3, 4].into());
+            }
+            "i16s" => {
+                assert_eq!(att.value().unwrap(), vec![1_i16, 2, 3, 4].into());
+            }
+            "u32s" => {
+                assert_eq!(att.value().unwrap(), vec![1_u32, 2, 3, 4].into());
+            }
+            "i32s" => {
+                assert_eq!(att.value().unwrap(), vec![1_i32, 2, 3, 4].into());
+            }
+            "u64s" => {
+                assert_eq!(att.value().unwrap(), vec![1_u64, 2, 3, 4].into());
+            }
+            "i64s" => {
+                assert_eq!(att.value().unwrap(), vec![1_i64, 2, 3, 4].into());
+            }
+            "f32s" => {
+                assert_eq!(att.value().unwrap(), vec![1.0_f32, 2.0, 3.0, 4.0].into());
+            }
+            "f64s" => {
+                assert_eq!(att.value().unwrap(), vec![1.0_f64, 2.0, 3.0, 4.0].into());
+            }
+            name => panic!("{} not covered", name),
+        }
+        atts += 1;
+    }
+    assert_eq!(atts, 10);
+}
