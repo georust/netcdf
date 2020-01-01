@@ -45,12 +45,16 @@ impl Variable {
     }
     /// Get an attribute of this variable
     pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
+        // Need to lock when reading the first attribute (per variable)
+        let _l = super::LOCK.lock().unwrap();
         Attribute::find_from_name(self.ncid, Some(self.varid), name)
     }
     /// Iterator over all the attributes of this variable
     pub fn attributes<'a>(
         &'a self,
     ) -> error::Result<impl Iterator<Item = error::Result<Attribute<'a>>>> {
+        // Need to lock when reading the first attribute (per variable)
+        let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.ncid, Some(self.varid))
     }
     /// Dimensions for a variable

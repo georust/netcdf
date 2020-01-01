@@ -61,7 +61,6 @@ impl<'a> Attribute<'a> {
         Ok(nelems as _)
     }
     fn typ(&self) -> error::Result<nc_type> {
-        let _l = LOCK.lock().unwrap();
         let mut atttype = 0;
         unsafe {
             error::checked(nc_inq_atttype(
@@ -78,7 +77,6 @@ impl<'a> Attribute<'a> {
     pub fn value(&self) -> error::Result<AttrValue> {
         let attlen = self.num_elems()?;
         let typ = self.typ()?;
-        let _l = LOCK.lock().unwrap();
 
         match typ {
             NC_UBYTE => match attlen {
@@ -377,7 +375,6 @@ pub(crate) struct AttributeIterator<'a> {
 
 impl<'a> AttributeIterator<'a> {
     pub(crate) fn new(ncid: nc_type, varid: Option<nc_type>) -> error::Result<Self> {
-        let _l = LOCK.lock().unwrap();
         let mut natts = 0;
         unsafe {
             error::checked(nc_inq_varnatts(
@@ -403,7 +400,6 @@ impl<'a> Iterator for AttributeIterator<'a> {
             return None;
         }
 
-        let _l = LOCK.lock().unwrap();
         let mut name = [0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
             if let Err(e) = error::checked(nc_inq_attname(
@@ -617,7 +613,6 @@ impl<'a> Attribute<'a> {
             attname[..name.len()].copy_from_slice(name.as_bytes());
             attname
         };
-        let _l = LOCK.lock().unwrap();
         let e = unsafe {
             // Checking whether the variable exists by probing for its id
             nc_inq_attid(
@@ -631,15 +626,6 @@ impl<'a> Attribute<'a> {
             return Ok(None);
         }
         error::checked(e)?;
-        let mut xlen = 0;
-        unsafe {
-            error::checked(nc_inq_attlen(
-                ncid,
-                varid.unwrap_or(NC_GLOBAL),
-                attname.as_ptr() as *const _,
-                &mut xlen,
-            ))?;
-        }
 
         Ok(Some(Attribute {
             name: attname,

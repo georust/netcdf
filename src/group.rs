@@ -56,10 +56,13 @@ impl Group {
     }
     /// Get a single attribute
     pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
+        let _l = super::LOCK.lock().unwrap();
         Attribute::find_from_name(self.ncid, None, name)
     }
     /// Get all attributes in the group
     pub fn attributes(&self) -> error::Result<impl Iterator<Item = error::Result<Attribute>>> {
+        // Need to lock when reading the first attribute (per group)
+        let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.grpid.unwrap_or(self.ncid), None)
     }
     /// Get a single dimension
@@ -68,6 +71,7 @@ impl Group {
     }
     /// Iterator over all dimensions
     pub fn dimensions(&self) -> impl Iterator<Item = &Dimension> {
+        // Need to lock when reading the first attribute (per group)
         self.dimensions.iter()
     }
     /// Get a group
