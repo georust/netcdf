@@ -67,7 +67,7 @@ impl Group {
     }
     /// Get a single dimension
     pub fn dimension(&self, name: &str) -> Option<&Dimension> {
-        self.dimensions().find(|x| x.name() == name)
+        self.dimensions().find(|x| x.name().unwrap() == name)
     }
     /// Iterator over all dimensions
     pub fn dimensions(&self) -> impl Iterator<Item = &Dimension> {

@@ -8,7 +8,6 @@ use netcdf_sys::*;
 /// Represents a netcdf dimension
 #[derive(Debug, Clone)]
 pub struct Dimension {
-    pub(crate) name: String,
     /// None when unlimited (size = 0)
     pub(crate) len: Option<core::num::NonZeroUsize>,
     pub(crate) id: nc_type,
@@ -48,8 +47,15 @@ impl Dimension {
     }
 
     /// Gets the name of the dimension
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> error::Result<String> {
+        let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
+        unsafe {
+            error::checked(nc_inq_dimname(self.ncid, self.id, name.as_mut_ptr() as *mut _))?;
+        }
+
+        let zeropos = name.iter().position(|&x| x == 0).unwrap_or_else(|| name.len());
+        name.resize(zeropos, 0);
+        Ok(String::from_utf8(name)?)
     }
 
     /// Grabs a unique identifier for this dimension
@@ -72,7 +78,6 @@ impl Dimension {
         }
 
         Ok(Self {
-            name,
             len: core::num::NonZeroUsize::new(len),
             id: dimid,
             ncid: grpid,

@@ -256,26 +256,16 @@ fn get_group_dimensions(ncid: nc_type) -> error::Result<Vec<Dimension>> {
 
     let unlimited_dims = get_unlimited_dimensions(ncid)?;
     let mut dimensions = Vec::with_capacity(ndims.try_into()?);
-    let mut buf = [0_u8; NC_MAX_NAME as usize + 1];
     for dimid in dimids {
-        for i in buf.iter_mut() {
-            *i = 0
-        }
         let mut len = 0;
         unsafe {
             error::checked(nc_inq_dim(
                 ncid,
                 dimid as _,
-                buf.as_mut_ptr() as *mut _,
+                std::ptr::null_mut(),
                 &mut len,
             ))?;
         }
-
-        let zero_pos = buf
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| buf.len());
-        let name = String::from(String::from_utf8_lossy(&buf[..zero_pos]));
 
         let len = if unlimited_dims.contains(&dimid) {
             None
@@ -284,7 +274,6 @@ fn get_group_dimensions(ncid: nc_type) -> error::Result<Vec<Dimension>> {
         };
         dimensions.push(Dimension {
             ncid,
-            name,
             len,
             id: dimid,
         });

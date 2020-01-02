@@ -73,10 +73,10 @@ fn open_pres_temp_4d() {
     let file = netcdf::File::open(&f).unwrap();
 
     let pres = &file.root().variable("pressure").unwrap();
-    assert_eq!(pres.dimensions()[0].name(), "time");
-    assert_eq!(pres.dimensions()[1].name(), "level");
-    assert_eq!(pres.dimensions()[2].name(), "latitude");
-    assert_eq!(pres.dimensions()[3].name(), "longitude");
+    assert_eq!(pres.dimensions()[0].name().unwrap(), "time");
+    assert_eq!(pres.dimensions()[1].name().unwrap(), "level");
+    assert_eq!(pres.dimensions()[2].name().unwrap(), "latitude");
+    assert_eq!(pres.dimensions()[3].name().unwrap(), "longitude");
 
     // test var attributes
     assert_eq!(
