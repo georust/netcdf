@@ -27,7 +27,7 @@ fn run(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Group: {}", g.name());
+    println!("Group: {}", g.name()?);
     println!("Dimensions:");
     for d in g.dimensions() {
         if d.is_unlimited() {

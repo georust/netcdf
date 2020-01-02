@@ -240,7 +240,7 @@ fn nc4_groups() {
     let file = netcdf::File::open(&f).unwrap();
 
     let grp1 = &file.group("grp1").expect("Could not find group");
-    assert_eq!(grp1.name(), "grp1");
+    assert_eq!(grp1.name().unwrap(), "grp1");
 
     let mut data = vec![0i32; 6 * 12];
     let var = &grp1.variable("data").unwrap();

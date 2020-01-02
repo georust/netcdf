@@ -15,7 +15,6 @@ use std::rc::{Rc, Weak};
 /// but a parent can not access a childs items.
 #[derive(Debug)]
 pub struct Group {
-    pub(crate) name: String,
     pub(crate) ncid: nc_type,
     pub(crate) grpid: Option<nc_type>,
     pub(crate) variables: Vec<Variable>,
@@ -35,8 +34,21 @@ pub struct Group {
 
 impl Group {
     /// Name of the current group
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> error::Result<String> {
+        let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
+        unsafe {
+            error::checked(nc_inq_grpname(
+                self.grpid.unwrap_or(self.ncid),
+                name.as_mut_ptr() as *mut _,
+            ))?;
+        }
+        let zeropos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
+        name.resize(zeropos, 0);
+
+        Ok(String::from_utf8(name)?)
     }
     /// Get a variable from the group
     pub fn variable(&self, name: &str) -> Option<&Variable> {
@@ -76,7 +88,7 @@ impl Group {
     }
     /// Get a group
     pub fn group(&self, name: &str) -> Option<&Self> {
-        self.groups().find(|x| x.name() == name)
+        self.groups().find(|x| x.name().unwrap() == name)
     }
     /// Iterator over all groups
     pub fn groups(&self) -> impl Iterator<Item = &Self> {
@@ -84,7 +96,7 @@ impl Group {
     }
     /// Mutable access to group
     pub fn group_mut(&mut self, name: &str) -> Option<&mut Self> {
-        self.groups_mut().find(|x| x.name() == name)
+        self.groups_mut().find(|x| x.name().unwrap() == name)
     }
     /// Iterator over all groups (mutable access)
     pub fn groups_mut(&mut self) -> impl Iterator<Item = &mut Self> {
@@ -136,7 +148,6 @@ impl Group {
 
         let g = Rc::new(UnsafeCell::new(Self {
             ncid: self.grpid.unwrap_or(self.ncid),
-            name: name.to_string(),
             grpid: Some(grpid),
             dimensions: Vec::default(),
             groups: Vec::default(),

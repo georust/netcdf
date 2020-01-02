@@ -117,7 +117,6 @@ impl File {
         }
 
         let root = Rc::new(UnsafeCell::new(Group {
-            name: "root".to_string(),
             ncid,
             grpid: None,
             variables: Vec::default(),
@@ -394,21 +393,8 @@ fn get_groups(
     }
 
     let mut groups = Vec::with_capacity(ngroups.try_into()?);
-    let mut cname = [0; NC_MAX_NAME as usize + 1];
     for grpid in grpids {
-        for i in cname.iter_mut() {
-            *i = 0;
-        }
-        unsafe {
-            error::checked(nc_inq_grpname(grpid, cname.as_mut_ptr()))?;
-        }
-
-        let name = unsafe { std::ffi::CStr::from_ptr(cname.as_ptr()) }
-            .to_string_lossy()
-            .to_string();
-
         let g = Rc::new(UnsafeCell::new(Group {
-            name: name.clone(),
             ncid,
             grpid: Some(grpid),
             dimensions: Vec::new(),
@@ -459,7 +445,6 @@ fn parse_file(ncid: nc_type) -> error::Result<Rc<UnsafeCell<Group>>> {
     let g = Rc::new(UnsafeCell::new(Group {
         ncid,
         grpid: None,
-        name: "root".into(),
         dimensions: Vec::new(),
         variables: Vec::new(),
         groups: Vec::new(),
