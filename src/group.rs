@@ -208,16 +208,16 @@ impl Group {
         }
         let mut d: Vec<_> = Vec::default();
         for (i, dim) in dims.iter().enumerate() {
-            let id = dim.identifier;
+            let id = dim.dimid;
             let found_dim = match self
                 .dimensions()
-                .find(|&x| x.ncid == dim.ncid && x.id == id)
+                .find(|&x| x.id.ncid == dim.ncid && x.id.dimid == id)
             {
                 Some(x) => x.clone(),
                 None => match self
                     .parents()
                     .flat_map(Self::dimensions)
-                    .find(|d| d.ncid == dim.ncid && d.id == id)
+                    .find(|d| d.id.ncid == dim.ncid && d.id.dimid == id)
                 {
                     Some(d) => d.clone(),
                     None => return Err(error::Error::NotFound(format!("dimension #{}", i))),

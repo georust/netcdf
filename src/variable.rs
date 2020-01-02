@@ -656,7 +656,7 @@ impl Variable {
         use std::ffi::CString;
         let cname = CString::new(name).unwrap();
 
-        let dimids: Vec<nc_type> = dims.iter().map(|x| x.id).collect();
+        let dimids: Vec<nc_type> = dims.iter().map(|x| x.id.dimid).collect();
         let mut id = 0;
         unsafe {
             let _l = LOCK.lock().unwrap();

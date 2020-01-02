@@ -259,12 +259,7 @@ fn get_group_dimensions(ncid: nc_type) -> error::Result<Vec<Dimension>> {
     for dimid in dimids {
         let mut len = 0;
         unsafe {
-            error::checked(nc_inq_dim(
-                ncid,
-                dimid as _,
-                std::ptr::null_mut(),
-                &mut len,
-            ))?;
+            error::checked(nc_inq_dim(ncid, dimid as _, std::ptr::null_mut(), &mut len))?;
         }
 
         let len = if unlimited_dims.contains(&dimid) {
@@ -273,9 +268,8 @@ fn get_group_dimensions(ncid: nc_type) -> error::Result<Vec<Dimension>> {
             Some(unsafe { core::num::NonZeroUsize::new_unchecked(len) })
         };
         dimensions.push(Dimension {
-            ncid,
             len,
-            id: dimid,
+            id: super::dimension::Identifier { ncid, dimid },
         });
     }
 
@@ -317,12 +311,12 @@ fn get_dimensions_of_var(
 
     let mut dimensions = Vec::with_capacity(ndims.try_into()?);
     for dimid in dimids {
-        let d = if let Some(d) = g.dimensions().find(|x| x.id == dimid) {
+        let d = if let Some(d) = g.dimensions().find(|x| x.id.dimid == dimid) {
             d
         } else if let Some(d) = g
             .parents()
             .flat_map(Group::dimensions)
-            .find(|x| x.id == dimid)
+            .find(|x| x.id.dimid == dimid)
         {
             d
         } else {
