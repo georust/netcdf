@@ -22,7 +22,7 @@ fn main() {
 fn run(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
     let file = netcdf::open(path)?;
 
-    println!("{}", file.name());
+    println!("{}", file.path()?);
     print_group(&file)
 }
 

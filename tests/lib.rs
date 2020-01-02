@@ -27,7 +27,13 @@ fn use_string_to_open() {
 fn bad_filename() {
     let f = test_location().join("blah_stuff.nc");
     let res_file = netcdf::open(&f);
-    assert_eq!(res_file.unwrap_err(), netcdf::error::Error::Netcdf(2));
+    assert!(
+        if let netcdf::error::Error::Netcdf(2) = res_file.unwrap_err() {
+            true
+        } else {
+            false
+        }
+    );
 }
 
 // Read tests
@@ -36,7 +42,7 @@ fn root_dims() {
     let f = test_location().join("simple_xy.nc");
 
     let file = netcdf::File::open(&f).unwrap();
-    assert_eq!("simple_xy.nc", file.name());
+    assert_eq!(f.to_str().unwrap(), file.path().unwrap());
 
     assert_eq!(file.root().dimension("x").unwrap().len(), 6);
     assert_eq!(file.root().dimension("y").unwrap().len(), 12);
@@ -315,7 +321,7 @@ fn create() {
     let f = d.path().join("create.nc");
 
     let file = netcdf::File::create(&f).unwrap();
-    assert_eq!("create.nc", file.name());
+    assert_eq!(f.to_str().unwrap(), file.path().unwrap());
 }
 
 #[test]
@@ -732,7 +738,7 @@ fn put_single_value() {
         .root()
         .variable(var_name)
         .expect("Could not find variable");
-    assert_eq!(var.value(Some(&indices)), Ok(100.0));
+    assert_eq!(100.0, var.value(Some(&indices)).unwrap());
 }
 
 #[test]
@@ -762,7 +768,7 @@ fn put_values() {
         let mut file_a = netcdf::append(&f).unwrap();
         let var = &mut file_a.root_mut().variable_mut(var_name).unwrap();
         let res = var.put_values(values, Some(indices), Some(len));
-        assert_eq!(res, Ok(()));
+        assert_eq!(res.unwrap(), ());
         // close it (done when `file_a` goes out of scope)
     }
     // finally open  the file in read only mode
@@ -945,9 +951,12 @@ fn use_compression_chunking() {
         .unwrap();
 
     let var = &mut file.add_variable::<i32>("chunked3", &["x"]).unwrap();
-    assert_eq!(
-        var.chunking(&[2, 2]).unwrap_err(),
-        netcdf::error::Error::SliceLen
+    assert!(
+        if let netcdf::error::Error::SliceLen = var.chunking(&[2, 2]).unwrap_err() {
+            true
+        } else {
+            false
+        }
     );
 
     file.add_dimension("y", 0).unwrap();
@@ -1018,10 +1027,11 @@ fn add_confliciting_dimensions() {
 
     file.add_dimension("x", 10).unwrap();
     let e = file.add_dimension("x", 11).unwrap_err();
-    assert_eq!(
-        e,
-        netcdf::error::Error::AlreadyExists("dimension x".to_string())
-    );
+    assert!(if let netcdf::error::Error::AlreadyExists(x) = e {
+        x == "dimension x"
+    } else {
+        false
+    });
     assert_eq!(file.dimension("x").unwrap().len(), 10);
 }
 
@@ -1036,10 +1046,11 @@ fn add_conflicting_variables() {
     file.add_variable::<i32>("x", &["x"]).unwrap();
 
     let e = file.add_variable::<f32>("x", &["y"]).unwrap_err();
-    assert_eq!(
-        e,
-        netcdf::error::Error::AlreadyExists("variable".to_string())
-    );
+    assert!(if let netcdf::error::Error::AlreadyExists(x) = e {
+        x == "variable"
+    } else {
+        false
+    });
     assert_eq!(10, file.variable("x").unwrap().dimensions()[0].len());
 }
 
@@ -1114,7 +1125,11 @@ fn unlimited_dimension_multi_putting() {
     let var = &mut file.add_variable::<u8>("two_unlim", &["x3", "x4"]).unwrap();
     var.set_fill_value(0u8).unwrap();
     let e = var.put_values(&[0u8, 1, 2, 3], None, None);
-    assert_eq!(e.unwrap_err(), netcdf::error::Error::Ambiguous);
+    assert!(if let netcdf::error::Error::Ambiguous = e.unwrap_err() {
+        true
+    } else {
+        false
+    });
     var.put_values(&[0u8, 1, 2, 3], None, Some(&[1, 4]))
         .unwrap();
     let mut v = vec![0; 4];
@@ -1154,21 +1169,21 @@ fn single_length_variable() {
     let var = &mut file.add_variable::<u8>("x", &[]).unwrap();
 
     var.put_value(3u8, None).unwrap();
-    assert_eq!(var.value(Some(&[])), Ok(3u8));
+    assert_eq!(var.value::<u8>(Some(&[])).unwrap(), 3_u8);
 
     var.put_values::<u8>(&[], None, None).unwrap_err();
-    assert_eq!(var.value(None), Ok(3u8));
+    assert_eq!(var.value::<u8>(None).unwrap(), 3_u8);
 
     var.put_values::<u8>(&[2, 3], None, None).unwrap_err();
 
     var.put_values::<u8>(&[6], None, None).unwrap();
-    assert_eq!(var.value(None), Ok(6u8));
+    assert_eq!(var.value::<u8>(None).unwrap(), 6_u8);
 
     var.put_values::<u8>(&[8], Some(&[]), Some(&[])).unwrap();
-    assert_eq!(var.value(None), Ok(8u8));
+    assert_eq!(var.value::<u8>(None).unwrap(), 8_u8);
 
     var.put_values::<u8>(&[10], Some(&[1]), None).unwrap_err();
-    assert_eq!(var.value(None), Ok(8u8));
+    assert_eq!(var.value::<u8>(None).unwrap(), 8_u8);
 
     std::mem::drop(file);
 
@@ -1362,7 +1377,7 @@ fn set_get_endian() {
                 .add_variable::<i32>("some_variable", &[dim_name])
                 .unwrap();
             var.endian(*i).unwrap();
-            assert_eq!(var.endian_value(), Ok(*i));
+            assert_eq!(var.endian_value().unwrap(), *i);
             var.put_values::<i32>(&[1, 2, 3], None, None).unwrap();
             // close it (done when `file_w` goes out of scope)
         }
@@ -1371,7 +1386,7 @@ fn set_get_endian() {
             // and get "some variable" endian_value
             let file_o = netcdf::open(&f).unwrap();
             let var = &file_o.variable("some_variable").unwrap();
-            assert_eq!(var.endian_value(), Ok(*i));
+            assert_eq!(var.endian_value().unwrap(), *i);
             // close it (done when `file_a` goes out of scope)
         }
     }

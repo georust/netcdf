@@ -9,7 +9,7 @@ use netcdf_sys::nc_strerror;
 use std::num::TryFromIntError;
 
 /// Various error types that can occur in this crate
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Error {
     /// Errors from the wrapped netcdf library
     Netcdf(nc_type),
@@ -45,6 +45,20 @@ pub enum Error {
     Conversion(TryFromIntError),
     /// Identifier belongs to another dataset
     WrongDataset,
+    /// Name is not valid utf-8
+    Utf8Conversion(std::string::FromUtf8Error),
+}
+
+impl Error {
+    /// Was the error due to ambiguity of the
+    /// indices or lengths?
+    pub fn is_ambigous(&self) -> bool {
+        if let Error::Ambiguous = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl std::error::Error for Error {
@@ -74,6 +88,12 @@ impl From<nc_type> for Error {
 impl From<TryFromIntError> for Error {
     fn from(e: TryFromIntError) -> Self {
         Self::Conversion(e)
+    }
+}
+
+impl From<std::string::FromUtf8Error> for Error {
+    fn from(e: std::string::FromUtf8Error) -> Self {
+        Self::Utf8Conversion(e)
     }
 }
 
@@ -111,6 +131,7 @@ impl fmt::Display for Error {
             Self::Overflow => write!(f, "slice would exceed maximum size of possible buffers"),
             Self::Conversion(e) => e.fmt(f),
             Self::WrongDataset => write!(f, "This identifier does not belong in this dataset"),
+            Self::Utf8Conversion(e) => write!(f, "{}", e),
         }
     }
 }

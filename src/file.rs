@@ -15,16 +15,34 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub struct File {
     pub(crate) ncid: nc_type,
-    pub(crate) name: String,
     pub(crate) root: Rc<UnsafeCell<Group>>,
 }
 
 impl File {
-    /// Current name of the file. This name sometimes gives the name
-    /// of the file used to open it, or some arbitrary name when
-    /// opened through a memory buffer
-    pub fn name(&self) -> &str {
-        &self.name
+    /// path used ot open/create the file
+    ///
+    /// #Errors
+    ///
+    /// Netcdf layer could fail, and the resulting path
+    /// could contain an invalid UTF8 sequence
+    pub fn path(&self) -> error::Result<String> {
+        let name = {
+            let mut pathlen = 0;
+            unsafe {
+                error::checked(nc_inq_path(self.ncid, &mut pathlen, std::ptr::null_mut()))?;
+            }
+            let mut name = vec![0_u8; pathlen as _];
+            unsafe {
+                error::checked(nc_inq_path(
+                    self.ncid,
+                    std::ptr::null_mut(),
+                    name.as_mut_ptr() as *mut _,
+                ))?;
+            }
+            name
+        };
+
+        String::from_utf8(name).map_err(|e| e.into())
     }
 
     /// Main entrypoint for interacting with the netcdf file. Also accessible
@@ -69,11 +87,7 @@ impl File {
 
         let root = parse_file(ncid)?;
 
-        Ok(Self {
-            ncid,
-            name: path.file_name().unwrap().to_string_lossy().to_string(),
-            root,
-        })
+        Ok(Self { ncid, root })
     }
     #[allow(clippy::doc_markdown)]
     /// Open a netCDF file in append mode (read/write).
@@ -88,11 +102,7 @@ impl File {
 
         let root = parse_file(ncid)?;
 
-        Ok(Self {
-            ncid,
-            name: path.file_name().unwrap().to_string_lossy().to_string(),
-            root,
-        })
+        Ok(Self { ncid, root })
     }
     #[allow(clippy::doc_markdown)]
     /// Open a netCDF file in creation mode.
@@ -121,11 +131,7 @@ impl File {
             let root = unsafe { &mut *root.get() };
             root.this = rootref;
         }
-        Ok(Self {
-            ncid,
-            name: path.file_name().unwrap().to_string_lossy().to_string(),
-            root,
-        })
+        Ok(Self { ncid, root })
     }
 }
 
