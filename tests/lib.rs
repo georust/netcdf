@@ -1,14 +1,7 @@
 #![cfg(test)]
 
-use netcdf::attribute::AttrValue;
-
-/// Get location of the test files
-fn test_location() -> std::path::PathBuf {
-    use std::path::Path;
-
-    let mnf_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into());
-    Path::new(&mnf_dir).join("tests").join("testdata")
-}
+mod common;
+use common::test_location;
 
 #[test]
 /// Use a path to open the netcdf file
@@ -70,36 +63,6 @@ fn access_through_deref() {
             .len(),
         10
     );
-}
-
-#[test]
-fn global_attrs() {
-    let f = test_location().join("patmosx_v05r03-preliminary_NOAA-19_asc_d20130630_c20140325.nc");
-
-    let file = netcdf::File::open(&f).unwrap();
-
-    let ch1_attr = &file
-        .root()
-        .attribute("CH1_DARK_COUNT")
-        .expect("Could not find attribute");
-    let chi = ch1_attr.value().unwrap();
-    let eps = 1e-6;
-    if let AttrValue::Float(x) = chi {
-        assert!((x - 40.65863).abs() < eps);
-    } else {
-        panic!("Did not get the expected attr type");
-    }
-
-    let sensor_attr = &file
-        .root()
-        .attribute("sensor")
-        .expect("Could not find attribute");
-    let sensor_data = sensor_attr.value().unwrap();
-    if let AttrValue::Str(x) = sensor_data {
-        assert_eq!("AVHRR/3", x);
-    } else {
-        panic!("Did not get the expected attr type");
-    }
 }
 
 #[test]
@@ -175,37 +138,6 @@ fn last_dim_varies_fastest() {
 }
 
 #[test]
-fn attributes_read() {
-    let f = test_location().join("patmosx_v05r03-preliminary_NOAA-19_asc_d20130630_c20140325.nc");
-    let file = netcdf::open(&f).unwrap();
-
-    let attr = &file
-        .attribute("PROGLANG")
-        .expect("Could not find attribute");
-
-    assert_eq!(attr.name(), "PROGLANG");
-
-    for attr in file.attributes() {
-        let _val = attr.value().expect("Could not get value");
-    }
-
-    let d = tempfile::tempdir().expect("Could not get tempdir");
-    let path = d.path().join("attributes_read.nc");
-    let mut file = netcdf::create(path).expect("Could not create file");
-
-    let var = &mut file
-        .add_variable::<f32>("var", &[])
-        .expect("Could not add variable");
-    var.add_attribute("att", "some attribute")
-        .expect("Could not add attribute");
-    assert_eq!(var.vartype(), netcdf_sys::NC_FLOAT);
-
-    for attr in var.attributes() {
-        attr.value().unwrap();
-    }
-}
-
-#[test]
 fn variable_not_replacing() {
     let d = tempfile::tempdir().unwrap();
     let p = d.path().join("variable_not_replacing.nc");
@@ -215,23 +147,6 @@ fn variable_not_replacing() {
     f.add_variable::<i16>("b", &[]).unwrap();
     f.add_variable::<u8>("a", &[]).unwrap_err();
     f.add_variable_from_identifiers::<i8>("b", &[]).unwrap_err();
-}
-
-#[test]
-/// Making sure attributes are updated correctly (replacing previous value)
-fn attribute_put() {
-    let d = tempfile::tempdir().expect("Could not create tempdir");
-    let p = d.path().join("attribute_put.nc");
-    let mut f = netcdf::create(p).unwrap();
-
-    f.add_attribute("a", "1").unwrap();
-    assert_eq!(f.attribute("a").unwrap().value().unwrap(), "1".into());
-    f.add_attribute("b", "2").unwrap();
-    assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
-    f.add_attribute("a", 2u32).unwrap();
-    assert_eq!(f.attribute("a").unwrap().value().unwrap(), 2u32.into());
-    f.add_attribute("b", "2").unwrap();
-    assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
 }
 
 #[test]
@@ -280,29 +195,6 @@ fn netcdf_error() {
 
     file.add_dimension("v", 2).unwrap_err();
     file.add_unlimited_dimension("v").unwrap_err();
-}
-
-#[test]
-#[cfg(feature = "ndarray")]
-fn open_pres_temp_4d() {
-    let f = test_location().join("pres_temp_4D.nc");
-
-    let file = netcdf::File::open(&f).unwrap();
-
-    let pres = &file.root().variable("pressure").unwrap();
-    assert_eq!(pres.dimensions()[0].name(), "time");
-    assert_eq!(pres.dimensions()[1].name(), "level");
-    assert_eq!(pres.dimensions()[2].name(), "latitude");
-    assert_eq!(pres.dimensions()[3].name(), "longitude");
-
-    // test var attributes
-    assert_eq!(
-        pres.attribute("units")
-            .expect("Could not find attribute")
-            .value()
-            .unwrap(),
-        AttrValue::Str("hPa".to_string())
-    );
 }
 
 #[test]
@@ -429,6 +321,7 @@ fn create() {
 #[test]
 #[cfg(feature = "ndarray")]
 fn def_dims_vars_attrs() {
+    use netcdf::attribute::AttrValue;
     let d = tempfile::tempdir().unwrap();
     {
         let f = d.path().join("def_dims_vars_attrs.nc");
@@ -534,6 +427,7 @@ fn def_dims_vars_attrs() {
             AttrValue::Int(3),
             file.root()
                 .attribute("testattr1")
+                .expect("netcdf error")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
@@ -542,6 +436,7 @@ fn def_dims_vars_attrs() {
             AttrValue::Str("Global string attr".into()),
             file.root()
                 .attribute("testattr2")
+                .expect("netcdf error")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
@@ -554,6 +449,7 @@ fn def_dims_vars_attrs() {
                 .variable(var_name)
                 .expect("Could not find variable")
                 .attribute("varattr1")
+                .expect("netcdf error occured")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
@@ -564,6 +460,7 @@ fn def_dims_vars_attrs() {
                 .variable(var_name)
                 .expect("Could not find variable")
                 .attribute("varattr2")
+                .expect("netcdf error occured")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
@@ -743,136 +640,6 @@ fn all_var_types() {
 }
 
 #[test]
-fn all_attr_types() {
-    let d = tempfile::tempdir().unwrap();
-    let u8string = "Testing utf8 with æøå and even 😀";
-    {
-        let f = d.path().join("all_attr_types.nc");
-        let mut file = netcdf::File::create(&f).unwrap();
-
-        file.root_mut().add_attribute("attr_byte", 3 as i8).unwrap();
-        file.root_mut()
-            .add_attribute("attr_ubyte", 3 as u8)
-            .unwrap();
-        file.root_mut()
-            .add_attribute("attr_short", 3 as i16)
-            .unwrap();
-        file.root_mut()
-            .add_attribute("attr_ushort", 3 as u16)
-            .unwrap();
-        file.root_mut().add_attribute("attr_int", 3 as i32).unwrap();
-        file.root_mut()
-            .add_attribute("attr_uint", 3 as u32)
-            .unwrap();
-        file.root_mut()
-            .add_attribute("attr_int64", 3 as i64)
-            .unwrap();
-        file.root_mut()
-            .add_attribute("attr_uint64", 3 as u64)
-            .unwrap();
-        file.root_mut()
-            .add_attribute("attr_float", 3.2 as f32)
-            .unwrap();
-        file.root_mut()
-            .add_attribute("attr_double", 3.2 as f64)
-            .unwrap();
-        file.root_mut()
-            .add_attribute("attr_text", "Hello world!")
-            .unwrap();
-
-        file.root_mut()
-            .add_attribute("attr_text_utf8", u8string)
-            .unwrap();
-    }
-
-    {
-        let f = d.path().join("all_attr_types.nc");
-        let file = netcdf::File::open(&f).unwrap();
-
-        assert_eq!(
-            AttrValue::Uchar(3),
-            file.root()
-                .attribute("attr_ubyte")
-                .unwrap()
-                .value()
-                .unwrap()
-        );
-        assert_eq!(
-            AttrValue::Schar(3),
-            file.root().attribute("attr_byte").unwrap().value().unwrap()
-        );
-        assert_eq!(
-            AttrValue::Ushort(3),
-            file.root()
-                .attribute("attr_ushort")
-                .unwrap()
-                .value()
-                .unwrap()
-        );
-        assert_eq!(
-            AttrValue::Short(3),
-            file.root()
-                .attribute("attr_short")
-                .unwrap()
-                .value()
-                .unwrap()
-        );
-        assert_eq!(
-            AttrValue::Int(3),
-            file.root().attribute("attr_int").unwrap().value().unwrap()
-        );
-        assert_eq!(
-            AttrValue::Uint(3),
-            file.root().attribute("attr_uint").unwrap().value().unwrap()
-        );
-        assert_eq!(
-            AttrValue::Ulonglong(3),
-            file.root()
-                .attribute("attr_uint64")
-                .unwrap()
-                .value()
-                .unwrap()
-        );
-        assert_eq!(
-            AttrValue::Longlong(3),
-            file.root()
-                .attribute("attr_int64")
-                .unwrap()
-                .value()
-                .unwrap()
-        );
-        assert_eq!(
-            AttrValue::Float(3.2),
-            file.root()
-                .attribute("attr_float")
-                .unwrap()
-                .value()
-                .unwrap()
-        );
-        assert_eq!(
-            AttrValue::Double(3.2),
-            file.root()
-                .attribute("attr_double")
-                .unwrap()
-                .value()
-                .unwrap()
-        );
-        assert_eq!(
-            AttrValue::Str("Hello world!".into()),
-            file.root().attribute("attr_text").unwrap().value().unwrap()
-        );
-        assert_eq!(
-            AttrValue::Str(u8string.into()),
-            file.root()
-                .attribute("attr_text_utf8")
-                .unwrap()
-                .value()
-                .unwrap()
-        );
-    }
-}
-
-#[test]
 #[cfg(feature = "ndarray")]
 /// Tests the shape of a variable
 /// when fetched using "Variable::as_array()"
@@ -1013,6 +780,7 @@ fn put_values() {
 #[test]
 /// Test setting a fill value when creating a Variable
 fn set_fill_value() {
+    use netcdf::attribute::AttrValue;
     let d = tempfile::tempdir().unwrap();
     let f = d.path().join("fill_value.nc");
     let dim_name = "some_dimension";
@@ -1040,6 +808,7 @@ fn set_fill_value() {
         .expect("Could not find variable");
     let attr = var
         .attribute("_FillValue")
+        .expect("other error")
         .expect("could not find attribute")
         .value()
         .unwrap();
@@ -1055,6 +824,7 @@ fn set_fill_value() {
 
 #[test]
 fn more_fill_values() {
+    use netcdf::attribute::AttrValue;
     let d = tempfile::tempdir().expect("Could not create tempdir");
     let path = d.path().join("more_fill_values.nc");
     let mut file = netcdf::create(path).expect("Could not open file");
@@ -1078,17 +848,25 @@ fn more_fill_values() {
 
     // assert_eq!(var.value::<i32>(Some(&[0])).unwrap(), GARBAGE);
     assert_eq!(var.value::<i32>(Some(&[1])).unwrap(), 6_i32);
-    assert!(var.attribute("_FillValue").is_none());
+    assert!(var.attribute("_FillValue").unwrap().is_none());
 
     let var = &mut file.add_variable::<i32>("v2", &["x"]).unwrap();
     var.set_fill_value(2_i32).unwrap();
     assert_eq!(
-        var.attribute("_FillValue").unwrap().value().unwrap(),
+        var.attribute("_FillValue")
+            .unwrap()
+            .unwrap()
+            .value()
+            .unwrap(),
         AttrValue::Int(2)
     );
     var.set_fill_value(3_i32).unwrap();
     assert_eq!(
-        var.attribute("_FillValue").unwrap().value().unwrap(),
+        var.attribute("_FillValue")
+            .unwrap()
+            .unwrap()
+            .value()
+            .unwrap(),
         AttrValue::Int(3)
     );
     unsafe { var.set_nofill().unwrap() };

@@ -19,7 +19,6 @@ use std::marker::Sized;
 pub struct Variable {
     /// The variable name
     pub(crate) name: String,
-    pub(crate) attributes: Vec<Attribute>,
     pub(crate) dimensions: Vec<Dimension>,
     /// the netcdf variable type identifier (from netcdf-sys)
     pub(crate) vartype: nc_type,
@@ -45,12 +44,18 @@ impl Variable {
         &self.name
     }
     /// Get an attribute of this variable
-    pub fn attribute(&self, name: &str) -> Option<&Attribute> {
-        self.attributes().find(|x| x.name() == name)
+    pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
+        // Need to lock when reading the first attribute (per variable)
+        let _l = super::LOCK.lock().unwrap();
+        Attribute::find_from_name(self.ncid, Some(self.varid), name)
     }
     /// Iterator over all the attributes of this variable
-    pub fn attributes(&self) -> impl Iterator<Item = &Attribute> {
-        self.attributes.iter()
+    pub fn attributes<'a>(
+        &'a self,
+    ) -> error::Result<impl Iterator<Item = error::Result<Attribute<'a>>>> {
+        // Need to lock when reading the first attribute (per variable)
+        let _l = super::LOCK.lock().unwrap();
+        crate::attribute::AttributeIterator::new(self.ncid, Some(self.varid))
     }
     /// Dimensions for a variable
     pub fn dimensions(&self) -> &[Dimension] {
@@ -657,7 +662,6 @@ impl Variable {
 
         Ok(Self {
             name: name.into(),
-            attributes: Vec::new(),
             dimensions: dims,
             vartype,
             ncid: grp_id,
@@ -666,18 +670,11 @@ impl Variable {
     }
 
     /// Adds an attribute to the variable
-    pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<()>
+    pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<Attribute>
     where
         T: Into<AttrValue>,
     {
-        let att = Attribute::put(self.ncid, self.varid, name, val.into())?;
-        let pos = self.attributes().position(|x| x.name == name);
-        if let Some(i) = pos {
-            self.attributes[i] = att;
-        } else {
-            self.attributes.push(att);
-        }
-        Ok(())
+        Attribute::put(self.ncid, self.varid, name, val.into())
     }
 
     ///  Fetches one specific value at specific indices
@@ -1025,12 +1022,6 @@ impl Variable {
                 &fill_value as *const T as *const _,
             ))?;
         }
-        let a = Attribute {
-            name: "_FillValue".into(),
-            ncid: self.ncid,
-            varid: self.varid,
-        };
-        self.attributes.push(a);
         Ok(())
     }
 

@@ -4,177 +4,351 @@
 use super::error;
 use super::LOCK;
 use netcdf_sys::*;
-use std::ffi::CString;
+use std::marker::PhantomData;
 
-#[derive(Debug)]
 /// Extra properties of a variable or a group can be represented
 /// with attributes. Primarily added with `add_attribute` on
 /// the variable and group
-pub struct Attribute {
-    pub(crate) name: String,
+#[derive(Clone)]
+pub struct Attribute<'a> {
+    pub(crate) name: [u8; NC_MAX_NAME as usize + 1],
     /// Group or file this attribute is in
     pub(crate) ncid: nc_type,
     /// Variable/global this id is connected to
     pub(crate) varid: nc_type,
+    /// Holds the variable/group to prevent the
+    /// attribute being deleted or modified
+    pub(crate) _marker: PhantomData<&'a nc_type>,
 }
 
-impl Attribute {
-    /// Get the name of the attribute
-    pub fn name(&self) -> &str {
-        &self.name
+impl<'a> std::fmt::Debug for Attribute<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "name: ")?;
+        if let Ok(name) = self.name() {
+            write!(f, "{}", name)?;
+        } else {
+            write!(f, "<<not utf8 name>>")?;
+        }
+        write!(f, "ncid: {}", self.ncid)?;
+        write!(f, "varid: {}", self.varid)
     }
-    /// Get the value of the attribute
-    #[allow(clippy::too_many_lines)]
-    pub fn value(&self) -> error::Result<AttrValue> {
-        let mut typ = 0;
-        let cname = std::ffi::CString::new(self.name.clone()).unwrap();
+}
+
+impl<'a> Attribute<'a> {
+    /// Get the name of the attribute
+    ///
+    /// # Errors
+    /// attribute could have a name containing an invalid utf8-sequence
+    pub fn name(&self) -> Result<&str, std::str::Utf8Error> {
+        let zeropos = self
+            .name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or(self.name.len());
+        std::str::from_utf8(&self.name[..zeropos])
+    }
+    fn num_elems(&self) -> error::Result<usize> {
         let _l = LOCK.lock().unwrap();
+        let mut nelems = 0;
+        unsafe {
+            error::checked(nc_inq_attlen(
+                self.ncid,
+                self.varid,
+                self.name.as_ptr() as *const _,
+                &mut nelems,
+            ))?;
+        }
+        Ok(nelems as _)
+    }
+    fn typ(&self) -> error::Result<nc_type> {
+        let mut atttype = 0;
         unsafe {
             error::checked(nc_inq_atttype(
                 self.ncid,
                 self.varid,
-                cname.as_ptr(),
-                &mut typ,
+                self.name.as_ptr() as *const _,
+                &mut atttype,
             ))?;
         }
+        Ok(atttype)
+    }
+    /// Get the value of the attribute
+    #[allow(clippy::too_many_lines)]
+    pub fn value(&self) -> error::Result<AttrValue> {
+        let attlen = self.num_elems()?;
+        let typ = self.typ()?;
 
         match typ {
-            NC_UBYTE => {
-                let mut value = 0;
-                unsafe {
-                    error::checked(nc_get_att_uchar(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut value,
-                    ))?;
+            NC_UBYTE => match attlen {
+                1 => {
+                    let mut value = 0;
+                    unsafe {
+                        error::checked(nc_get_att_uchar(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            &mut value,
+                        ))?;
+                    }
+                    Ok(AttrValue::Uchar(value))
                 }
-                Ok(AttrValue::Uchar(value))
-            }
-            NC_BYTE => {
-                let mut value = 0;
-                unsafe {
-                    error::checked(nc_get_att_schar(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut value,
-                    ))?;
+                len => {
+                    let mut values = vec![0_u8; len as usize];
+                    unsafe {
+                        error::checked(nc_get_att_uchar(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            values.as_mut_ptr(),
+                        ))?;
+                    }
+                    Ok(AttrValue::Uchars(values))
                 }
-                Ok(AttrValue::Schar(value))
-            }
-            NC_SHORT => {
-                let mut value = 0;
-                unsafe {
-                    error::checked(nc_get_att_short(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut value,
-                    ))?;
+            },
+            NC_BYTE => match attlen {
+                1 => {
+                    let mut value = 0;
+                    unsafe {
+                        error::checked(nc_get_att_schar(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            &mut value,
+                        ))?;
+                    }
+                    Ok(AttrValue::Schar(value))
                 }
-                Ok(AttrValue::Short(value))
-            }
-            NC_USHORT => {
-                let mut value = 0;
-                unsafe {
-                    error::checked(nc_get_att_ushort(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut value,
-                    ))?;
+                len => {
+                    let mut values = vec![0; len as _];
+                    unsafe {
+                        error::checked(nc_get_att_schar(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            values.as_mut_ptr(),
+                        ))?;
+                    }
+                    Ok(AttrValue::Schars(values))
                 }
-                Ok(AttrValue::Ushort(value))
-            }
-            NC_INT => {
-                let mut value = 0;
-                unsafe {
-                    error::checked(nc_get_att_int(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut value,
-                    ))?;
+            },
+            NC_SHORT => match attlen {
+                1 => {
+                    let mut value = 0;
+                    unsafe {
+                        error::checked(nc_get_att_short(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            &mut value,
+                        ))?;
+                    }
+                    Ok(AttrValue::Short(value))
                 }
-                Ok(AttrValue::Int(value))
-            }
-            NC_UINT => {
-                let mut value = 0;
-                unsafe {
-                    error::checked(nc_get_att_uint(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut value,
-                    ))?;
+                len => {
+                    let mut values = vec![0; len as _];
+                    unsafe {
+                        error::checked(nc_get_att_short(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            values.as_mut_ptr(),
+                        ))?;
+                    }
+                    Ok(AttrValue::Shorts(values))
                 }
-                Ok(AttrValue::Uint(value))
-            }
-            NC_INT64 => {
-                let mut value = 0;
-                unsafe {
-                    error::checked(nc_get_att_longlong(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut value,
-                    ))?;
+            },
+            NC_USHORT => match attlen {
+                1 => {
+                    let mut value = 0;
+                    unsafe {
+                        error::checked(nc_get_att_ushort(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            &mut value,
+                        ))?;
+                    }
+                    Ok(AttrValue::Ushort(value))
                 }
-                Ok(AttrValue::Longlong(value))
-            }
-            NC_UINT64 => {
-                let mut value = 0;
-                unsafe {
-                    error::checked(nc_get_att_ulonglong(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut value,
-                    ))?;
+                len => {
+                    let mut values = vec![0; len as _];
+                    unsafe {
+                        error::checked(nc_get_att_ushort(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            values.as_mut_ptr(),
+                        ))?;
+                    }
+                    Ok(AttrValue::Ushorts(values))
                 }
-                Ok(AttrValue::Ulonglong(value))
-            }
-            NC_FLOAT => {
-                let mut value = 0.0;
-                unsafe {
-                    error::checked(nc_get_att_float(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut value,
-                    ))?;
+            },
+            NC_INT => match attlen {
+                1 => {
+                    let mut value = 0;
+                    unsafe {
+                        error::checked(nc_get_att_int(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            &mut value,
+                        ))?;
+                    }
+                    Ok(AttrValue::Int(value))
                 }
-                Ok(AttrValue::Float(value))
-            }
-            NC_DOUBLE => {
-                let mut value = 0.0;
-                unsafe {
-                    error::checked(nc_get_att_double(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut value,
-                    ))?;
+                len => {
+                    let mut values = vec![0; len as _];
+                    unsafe {
+                        error::checked(nc_get_att_int(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            values.as_mut_ptr(),
+                        ))?;
+                    }
+                    Ok(AttrValue::Ints(values))
                 }
-                Ok(AttrValue::Double(value))
-            }
+            },
+            NC_UINT => match attlen {
+                1 => {
+                    let mut value = 0;
+                    unsafe {
+                        error::checked(nc_get_att_uint(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            &mut value,
+                        ))?;
+                    }
+                    Ok(AttrValue::Uint(value))
+                }
+                len => {
+                    let mut values = vec![0; len as _];
+                    unsafe {
+                        error::checked(nc_get_att_uint(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            values.as_mut_ptr(),
+                        ))?;
+                    }
+                    Ok(AttrValue::Uints(values))
+                }
+            },
+            NC_INT64 => match attlen {
+                1 => {
+                    let mut value = 0;
+                    unsafe {
+                        error::checked(nc_get_att_longlong(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            &mut value,
+                        ))?;
+                    }
+                    Ok(AttrValue::Longlong(value))
+                }
+                len => {
+                    let mut values = vec![0; len as _];
+                    unsafe {
+                        error::checked(nc_get_att_longlong(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            values.as_mut_ptr(),
+                        ))?;
+                    }
+
+                    Ok(AttrValue::Longlongs(values))
+                }
+            },
+            NC_UINT64 => match attlen {
+                1 => {
+                    let mut value = 0;
+                    unsafe {
+                        error::checked(nc_get_att_ulonglong(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            &mut value,
+                        ))?;
+                    }
+                    Ok(AttrValue::Ulonglong(value))
+                }
+                len => {
+                    let mut values = vec![0; len as _];
+                    unsafe {
+                        error::checked(nc_get_att_ulonglong(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            values.as_mut_ptr(),
+                        ))?;
+                    }
+
+                    Ok(AttrValue::Ulonglongs(values))
+                }
+            },
+            NC_FLOAT => match attlen {
+                1 => {
+                    let mut value = 0.0;
+                    unsafe {
+                        error::checked(nc_get_att_float(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            &mut value,
+                        ))?;
+                    }
+                    Ok(AttrValue::Float(value))
+                }
+                len => {
+                    let mut values = vec![0.0; len as _];
+                    unsafe {
+                        error::checked(nc_get_att_float(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            values.as_mut_ptr(),
+                        ))?;
+                    }
+                    Ok(AttrValue::Floats(values))
+                }
+            },
+            NC_DOUBLE => match attlen {
+                1 => {
+                    let mut value = 0.0;
+                    unsafe {
+                        error::checked(nc_get_att_double(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            &mut value,
+                        ))?;
+                    }
+                    Ok(AttrValue::Double(value))
+                }
+                len => {
+                    let mut values = vec![0.0; len as _];
+                    unsafe {
+                        error::checked(nc_get_att_double(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            values.as_mut_ptr(),
+                        ))?;
+                    }
+                    Ok(AttrValue::Doubles(values))
+                }
+            },
             NC_CHAR => {
-                let mut lentext = 0;
-                unsafe {
-                    error::checked(nc_inq_attlen(
-                        self.ncid,
-                        self.varid,
-                        cname.as_ptr(),
-                        &mut lentext,
-                    ))?;
-                }
-                let mut buf: Vec<u8> = vec![0; lentext];
+                let lentext = attlen;
+                let mut buf: Vec<u8> = vec![0; lentext as _];
                 unsafe {
                     error::checked(nc_get_att_text(
                         self.ncid,
                         self.varid,
-                        cname.as_ptr(),
+                        self.name.as_ptr() as *const _,
                         buf.as_mut_ptr() as *mut _,
                     ))?;
                 }
@@ -191,25 +365,94 @@ impl Attribute {
     }
 }
 
+pub(crate) struct AttributeIterator<'a> {
+    ncid: nc_type,
+    varid: Option<nc_type>,
+    natts: usize,
+    current_natt: usize,
+    _marker: PhantomData<&'a nc_type>,
+}
+
+impl<'a> AttributeIterator<'a> {
+    pub(crate) fn new(ncid: nc_type, varid: Option<nc_type>) -> error::Result<Self> {
+        let mut natts = 0;
+        unsafe {
+            error::checked(nc_inq_varnatts(
+                ncid,
+                varid.unwrap_or(NC_GLOBAL),
+                &mut natts,
+            ))?;
+        }
+        Ok(Self {
+            ncid,
+            varid,
+            natts: natts as _,
+            current_natt: 0,
+            _marker: PhantomData,
+        })
+    }
+}
+
+impl<'a> Iterator for AttributeIterator<'a> {
+    type Item = error::Result<Attribute<'a>>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_natt >= self.natts {
+            return None;
+        }
+
+        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
+        unsafe {
+            if let Err(e) = error::checked(nc_inq_attname(
+                self.ncid,
+                self.varid.unwrap_or(NC_GLOBAL),
+                self.current_natt as _,
+                name.as_mut_ptr() as *mut _,
+            )) {
+                return Some(Err(e));
+            }
+        }
+
+        let att = Attribute {
+            name,
+            ncid: self.ncid,
+            varid: self.varid.unwrap_or(NC_GLOBAL),
+            _marker: PhantomData,
+        };
+
+        self.current_natt += 1;
+        Some(Ok(att))
+    }
+}
+
 /// Holds the attribute value which can be inserted and
 /// returned from the file
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AttrValue {
     Uchar(u8),
+    Uchars(Vec<u8>),
     Schar(i8),
+    Schars(Vec<i8>),
     Ushort(u16),
+    Ushorts(Vec<u16>),
     Short(i16),
+    Shorts(Vec<i16>),
     Uint(u32),
+    Uints(Vec<u32>),
     Int(i32),
+    Ints(Vec<i32>),
     Ulonglong(u64),
+    Ulonglongs(Vec<u64>),
     Longlong(i64),
+    Longlongs(Vec<i64>),
     Float(f32),
+    Floats(Vec<f32>),
     Double(f64),
+    Doubles(Vec<f64>),
     Str(String),
 }
 
-impl Attribute {
+impl<'a> Attribute<'a> {
     #[allow(clippy::needless_pass_by_value)] // All values will be small
     pub(crate) fn put(
         ncid: nc_type,
@@ -217,48 +460,179 @@ impl Attribute {
         name: &str,
         val: AttrValue,
     ) -> error::Result<Self> {
-        let cname: CString = CString::new(name).unwrap();
+        let cname = {
+            if name.len() > NC_MAX_NAME as usize {
+                return Err(error::Error::Netcdf(NC_EMAXNAME));
+            }
+            let mut attname = [0_u8; NC_MAX_NAME as usize + 1];
+            attname[..name.len()].copy_from_slice(name.as_bytes());
+            attname
+        };
 
         let _l = LOCK.lock().unwrap();
         error::checked(unsafe {
             match val {
                 AttrValue::Uchar(x) => {
-                    nc_put_att_uchar(ncid, varid, cname.as_ptr(), NC_UBYTE, 1, &x)
+                    nc_put_att_uchar(ncid, varid, cname.as_ptr() as *const _, NC_UBYTE, 1, &x)
                 }
+                AttrValue::Uchars(x) => nc_put_att_uchar(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    NC_UBYTE,
+                    x.len(),
+                    x.as_ptr(),
+                ),
                 AttrValue::Schar(x) => {
-                    nc_put_att_schar(ncid, varid, cname.as_ptr(), NC_BYTE, 1, &x)
+                    nc_put_att_schar(ncid, varid, cname.as_ptr() as *const _, NC_BYTE, 1, &x)
                 }
+                AttrValue::Schars(x) => nc_put_att_schar(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    NC_BYTE,
+                    x.len(),
+                    x.as_ptr(),
+                ),
                 AttrValue::Ushort(x) => {
-                    nc_put_att_ushort(ncid, varid, cname.as_ptr(), NC_USHORT, 1, &x)
+                    nc_put_att_ushort(ncid, varid, cname.as_ptr() as *const _, NC_USHORT, 1, &x)
                 }
+                AttrValue::Ushorts(x) => nc_put_att_ushort(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    NC_USHORT,
+                    x.len(),
+                    x.as_ptr(),
+                ),
                 AttrValue::Short(x) => {
-                    nc_put_att_short(ncid, varid, cname.as_ptr(), NC_SHORT, 1, &x)
+                    nc_put_att_short(ncid, varid, cname.as_ptr() as *const _, NC_SHORT, 1, &x)
                 }
-                AttrValue::Uint(x) => nc_put_att_uint(ncid, varid, cname.as_ptr(), NC_UINT, 1, &x),
-                AttrValue::Int(x) => nc_put_att_int(ncid, varid, cname.as_ptr(), NC_INT, 1, &x),
+                AttrValue::Shorts(x) => nc_put_att_short(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    NC_SHORT,
+                    x.len(),
+                    x.as_ptr(),
+                ),
+                AttrValue::Uint(x) => {
+                    nc_put_att_uint(ncid, varid, cname.as_ptr() as *const _, NC_UINT, 1, &x)
+                }
+                AttrValue::Uints(x) => nc_put_att_uint(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    NC_UINT,
+                    x.len(),
+                    x.as_ptr(),
+                ),
+                AttrValue::Int(x) => {
+                    nc_put_att_int(ncid, varid, cname.as_ptr() as *const _, NC_INT, 1, &x)
+                }
+                AttrValue::Ints(x) => nc_put_att_int(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    NC_INT,
+                    x.len(),
+                    x.as_ptr(),
+                ),
                 AttrValue::Ulonglong(x) => {
-                    nc_put_att_ulonglong(ncid, varid, cname.as_ptr(), NC_UINT64, 1, &x)
+                    nc_put_att_ulonglong(ncid, varid, cname.as_ptr() as *const _, NC_UINT64, 1, &x)
                 }
+                AttrValue::Ulonglongs(x) => nc_put_att_ulonglong(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    NC_UINT64,
+                    x.len(),
+                    x.as_ptr(),
+                ),
                 AttrValue::Longlong(x) => {
-                    nc_put_att_longlong(ncid, varid, cname.as_ptr(), NC_INT64, 1, &x)
+                    nc_put_att_longlong(ncid, varid, cname.as_ptr() as *const _, NC_INT64, 1, &x)
                 }
+                AttrValue::Longlongs(x) => nc_put_att_longlong(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    NC_INT64,
+                    x.len(),
+                    x.as_ptr(),
+                ),
                 AttrValue::Float(x) => {
-                    nc_put_att_float(ncid, varid, cname.as_ptr(), NC_FLOAT, 1, &x)
+                    nc_put_att_float(ncid, varid, cname.as_ptr() as *const _, NC_FLOAT, 1, &x)
                 }
+                AttrValue::Floats(x) => nc_put_att_float(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    NC_FLOAT,
+                    x.len(),
+                    x.as_ptr(),
+                ),
                 AttrValue::Double(x) => {
-                    nc_put_att_double(ncid, varid, cname.as_ptr(), NC_DOUBLE, 1, &x)
+                    nc_put_att_double(ncid, varid, cname.as_ptr() as *const _, NC_DOUBLE, 1, &x)
                 }
-                AttrValue::Str(ref x) => {
-                    nc_put_att_text(ncid, varid, cname.as_ptr(), x.len(), x.as_ptr() as *const _)
-                }
+                AttrValue::Doubles(x) => nc_put_att_double(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    NC_DOUBLE,
+                    x.len(),
+                    x.as_ptr(),
+                ),
+                AttrValue::Str(ref x) => nc_put_att_text(
+                    ncid,
+                    varid,
+                    cname.as_ptr() as *const _,
+                    x.len(),
+                    x.as_ptr() as *const _,
+                ),
             }
         })?;
 
         Ok(Self {
-            name: name.to_string(),
+            name: cname,
             ncid,
             varid,
+            _marker: PhantomData,
         })
+    }
+
+    pub(crate) fn find_from_name(
+        ncid: nc_type,
+        varid: Option<nc_type>,
+        name: &str,
+    ) -> error::Result<Option<Self>> {
+        let attname = {
+            if name.len() > NC_MAX_NAME as usize {
+                return Err(error::Error::Netcdf(NC_EMAXNAME));
+            }
+            let mut attname = [0_u8; NC_MAX_NAME as usize + 1];
+            attname[..name.len()].copy_from_slice(name.as_bytes());
+            attname
+        };
+        let e = unsafe {
+            // Checking whether the variable exists by probing for its id
+            nc_inq_attid(
+                ncid,
+                varid.unwrap_or(NC_GLOBAL),
+                attname.as_ptr() as *const _,
+                std::ptr::null_mut(),
+            )
+        };
+        if e == NC_ENOTATT {
+            return Ok(None);
+        }
+        error::checked(e)?;
+
+        Ok(Some(Attribute {
+            name: attname,
+            ncid: ncid,
+            varid: varid.unwrap_or(NC_GLOBAL),
+            _marker: PhantomData,
+        }))
     }
 }
 
@@ -268,9 +642,19 @@ impl From<u8> for AttrValue {
         Self::Uchar(x)
     }
 }
+impl From<Vec<u8>> for AttrValue {
+    fn from(x: Vec<u8>) -> Self {
+        Self::Uchars(x)
+    }
+}
 impl From<i8> for AttrValue {
     fn from(x: i8) -> Self {
         Self::Schar(x)
+    }
+}
+impl From<Vec<i8>> for AttrValue {
+    fn from(x: Vec<i8>) -> Self {
+        Self::Schars(x)
     }
 }
 impl From<u16> for AttrValue {
@@ -278,9 +662,19 @@ impl From<u16> for AttrValue {
         Self::Ushort(x)
     }
 }
+impl From<Vec<u16>> for AttrValue {
+    fn from(x: Vec<u16>) -> Self {
+        Self::Ushorts(x)
+    }
+}
 impl From<i16> for AttrValue {
     fn from(x: i16) -> Self {
         Self::Short(x)
+    }
+}
+impl From<Vec<i16>> for AttrValue {
+    fn from(x: Vec<i16>) -> Self {
+        Self::Shorts(x)
     }
 }
 impl From<u32> for AttrValue {
@@ -288,9 +682,19 @@ impl From<u32> for AttrValue {
         Self::Uint(x)
     }
 }
+impl From<Vec<u32>> for AttrValue {
+    fn from(x: Vec<u32>) -> Self {
+        Self::Uints(x)
+    }
+}
 impl From<i32> for AttrValue {
     fn from(x: i32) -> Self {
         Self::Int(x)
+    }
+}
+impl From<Vec<i32>> for AttrValue {
+    fn from(x: Vec<i32>) -> Self {
+        Self::Ints(x)
     }
 }
 impl From<u64> for AttrValue {
@@ -298,9 +702,19 @@ impl From<u64> for AttrValue {
         Self::Ulonglong(x)
     }
 }
+impl From<Vec<u64>> for AttrValue {
+    fn from(x: Vec<u64>) -> Self {
+        Self::Ulonglongs(x)
+    }
+}
 impl From<i64> for AttrValue {
     fn from(x: i64) -> Self {
         Self::Longlong(x)
+    }
+}
+impl From<Vec<i64>> for AttrValue {
+    fn from(x: Vec<i64>) -> Self {
+        Self::Longlongs(x)
     }
 }
 impl From<f32> for AttrValue {
@@ -308,9 +722,19 @@ impl From<f32> for AttrValue {
         Self::Float(x)
     }
 }
+impl From<Vec<f32>> for AttrValue {
+    fn from(x: Vec<f32>) -> Self {
+        Self::Floats(x)
+    }
+}
 impl From<f64> for AttrValue {
     fn from(x: f64) -> Self {
         Self::Double(x)
+    }
+}
+impl From<Vec<f64>> for AttrValue {
+    fn from(x: Vec<f64>) -> Self {
+        Self::Doubles(x)
     }
 }
 impl From<&str> for AttrValue {
