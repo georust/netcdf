@@ -40,7 +40,7 @@ impl Group {
     }
     /// Get a variable from the group
     pub fn variable(&self, name: &str) -> Option<&Variable> {
-        self.variables().find(|x| x.name() == name)
+        self.variables().find(|x| x.name().unwrap() == name)
     }
     /// Iterate over all variables in a group
     pub fn variables(&self) -> impl Iterator<Item = &Variable> {
@@ -48,7 +48,7 @@ impl Group {
     }
     /// Get a mutable variable from the group
     pub fn variable_mut(&mut self, name: &str) -> Option<&mut Variable> {
-        self.variables_mut().find(|x| x.name() == name)
+        self.variables_mut().find(|x| x.name().unwrap() == name)
     }
     /// Iterate over all variables in a group, with mutable access
     pub fn variables_mut(&mut self) -> impl Iterator<Item = &mut Variable> {

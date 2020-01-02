@@ -365,17 +365,13 @@ fn get_variables(ncid: nc_type, g: &Group) -> error::Result<Vec<Variable>> {
     }
 
     let mut variables = Vec::with_capacity(nvars.try_into()?);
-    let mut name = [0_u8; NC_MAX_NAME as usize + 1];
     for varid in varids {
-        for i in name.iter_mut() {
-            *i = 0;
-        }
         let mut vartype = 0;
         unsafe {
             error::checked(nc_inq_var(
                 ncid,
                 varid,
-                name.as_mut_ptr() as *mut _,
+                std::ptr::null_mut(),
                 &mut vartype,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
@@ -384,17 +380,10 @@ fn get_variables(ncid: nc_type, g: &Group) -> error::Result<Vec<Variable>> {
         }
         let dimensions = get_dimensions_of_var(ncid, varid, g)?;
 
-        let zero_pos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
-        let name = String::from(String::from_utf8_lossy(&name[..zero_pos]));
-
         let v = Variable {
             ncid,
             varid,
             dimensions,
-            name,
             vartype,
         };
 

@@ -18,7 +18,6 @@ use std::marker::Sized;
 #[derive(Debug)]
 pub struct Variable {
     /// The variable name
-    pub(crate) name: String,
     pub(crate) dimensions: Vec<Dimension>,
     /// the netcdf variable type identifier (from netcdf-sys)
     pub(crate) vartype: nc_type,
@@ -40,8 +39,19 @@ pub enum Endianness {
 #[allow(clippy::len_without_is_empty)]
 impl Variable {
     /// Get name of variable
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> error::Result<String> {
+        let mut name = vec![0; NC_MAX_NAME as usize + 1];
+        unsafe {
+            error::checked(nc_inq_varname(
+                self.ncid,
+                self.varid,
+                name.as_mut_ptr() as *mut _,
+            ))?;
+        }
+        let zeropos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
+        name.resize(zeropos, 0);
+
+        Ok(String::from_utf8(name)?)
     }
     /// Get an attribute of this variable
     pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
@@ -661,7 +671,6 @@ impl Variable {
         }
 
         Ok(Self {
-            name: name.into(),
             dimensions: dims,
             vartype,
             ncid: grp_id,

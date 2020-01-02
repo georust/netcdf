@@ -696,12 +696,12 @@ fn append() {
     assert!(file
         .root()
         .variables()
-        .find(|x| x.name() == "some_variable")
+        .find(|x| x.name().unwrap() == "some_variable")
         .is_some());
     assert!(file
         .root()
         .variables()
-        .find(|x| x.name() == "some_other_variable")
+        .find(|x| x.name().unwrap() == "some_other_variable")
         .is_some());
 }
 

@@ -38,7 +38,7 @@ fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error
     }
     println!("Variables:");
     for v in g.variables() {
-        print!("\t{}", v.name());
+        print!("\t{}", v.name()?);
         print!("(");
         for d in v.dimensions() {
             print!(" {} ", d.name());
