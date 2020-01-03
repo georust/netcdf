@@ -102,7 +102,7 @@ pub(crate) fn from_name<'f>(loc: nc_type, name: &str) -> error::Result<Dimension
     })
 }
 
-pub(crate) fn dimension_iterator<'g>(
+pub(crate) fn dimensions_from_location<'g>(
     ncid: nc_type,
 ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'g>>>> {
     let mut ndims = 0;
@@ -123,6 +123,32 @@ pub(crate) fn dimension_iterator<'g>(
             false as _,
         ))?;
     }
+    Ok(dimids.into_iter().map(move |dimid| {
+        let mut dimlen = 0;
+        unsafe {
+            error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
+        }
+        Ok(Dimension {
+            len: core::num::NonZeroUsize::new(dimlen),
+            id: Identifier { ncid: ncid, dimid },
+            _group: PhantomData,
+        })
+    }))
+}
+
+pub(crate) fn dimensions_from_variable<'g>(
+    ncid: nc_type,
+    varid: nc_type,
+) -> error::Result<impl Iterator<Item = error::Result<Dimension<'g>>>> {
+    let mut ndims = 0;
+    unsafe {
+        error::checked(nc_inq_varndims(ncid, varid, &mut ndims))?;
+    }
+    let mut dimids = vec![0; ndims as _];
+    unsafe {
+        error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr()))?;
+    }
+
     Ok(dimids.into_iter().map(move |dimid| {
         let mut dimlen = 0;
         unsafe {

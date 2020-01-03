@@ -53,56 +53,7 @@ impl<'f> Group<'f> {
 
     /// Get a variable from the group
     pub fn variable<'g>(&'g self, name: &str) -> Option<Variable<'f, 'g>> {
-        let cname = std::ffi::CString::new(name).unwrap();
-        let mut varid = 0;
-        let e = unsafe { nc_inq_varid(self.id(), cname.as_ptr(), &mut varid) };
-        if e == NC_ENOTFOUND {
-            return None;
-        } else {
-            error::checked(e).unwrap();
-        }
-        let mut xtype = 0;
-        let mut ndims = 0;
-        unsafe {
-            error::checked(nc_inq_var(
-                self.id(),
-                varid,
-                std::ptr::null_mut(),
-                &mut xtype,
-                &mut ndims,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            ))
-            .unwrap();
-        }
-        let mut dimids = vec![0; ndims as _];
-        unsafe {
-            error::checked(nc_inq_vardimid(self.id(), varid, dimids.as_mut_ptr())).unwrap();
-        }
-        let dimensions = dimids
-            .into_iter()
-            .map(|id| {
-                let mut len = 0;
-                unsafe { error::checked(nc_inq_dimlen(self.id(), id, &mut len))? }
-                Ok(Dimension {
-                    len: core::num::NonZeroUsize::new(len),
-                    id: super::dimension::Identifier {
-                        ncid: self.id(),
-                        dimid: id,
-                    },
-                    _group: PhantomData,
-                })
-            })
-            .collect::<error::Result<Vec<_>>>()
-            .unwrap();
-
-        Some(Variable {
-            dimensions,
-            ncid: self.id(),
-            varid,
-            vartype: xtype,
-            _group: PhantomData,
-        })
+        Variable::find_from_name(self.id(), name).unwrap()
     }
     /// Iterate over all variables in a group
     pub fn variables<'g>(&'g self) -> impl Iterator<Item = Variable<'f, 'g>> {
@@ -144,7 +95,7 @@ impl<'f> Group<'f> {
     }
     /// Iterator over all dimensions
     pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>> {
-        super::dimension::dimension_iterator(self.id())
+        super::dimension::dimensions_from_location(self.id())
             .unwrap()
             .map(|x| x.unwrap())
     }

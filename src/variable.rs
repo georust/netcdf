@@ -53,6 +53,60 @@ pub enum Endianness {
 
 #[allow(clippy::len_without_is_empty)]
 impl<'f, 'g> Variable<'f, 'g> {
+    pub(crate) fn find_from_name(
+        ncid: nc_type,
+        name: &str,
+    ) -> error::Result<Option<Variable<'f, 'g>>> {
+        let cname = std::ffi::CString::new(name).unwrap();
+        let mut varid = 0;
+        let e = unsafe { nc_inq_varid(ncid, cname.as_ptr(), &mut varid) };
+        if e == NC_ENOTFOUND {
+            return Ok(None);
+        } else {
+            error::checked(e)?;
+        }
+        let mut xtype = 0;
+        let mut ndims = 0;
+        unsafe {
+            error::checked(nc_inq_var(
+                ncid,
+                varid,
+                std::ptr::null_mut(),
+                &mut xtype,
+                &mut ndims,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            ))?;
+        }
+        let mut dimids = vec![0; ndims as _];
+        unsafe {
+            error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr()))?;
+        }
+        let dimensions = dimids
+            .into_iter()
+            .map(|id| {
+                let mut len = 0;
+                unsafe { error::checked(nc_inq_dimlen(ncid, id, &mut len))? }
+                Ok(Dimension {
+                    len: core::num::NonZeroUsize::new(len),
+                    id: super::dimension::Identifier {
+                        ncid: ncid,
+                        dimid: id,
+                    },
+                    _group: PhantomData,
+                })
+            })
+            .collect::<error::Result<Vec<_>>>()?;
+
+        Ok(Some(Variable {
+            dimensions,
+            ncid: ncid,
+            varid,
+            vartype: xtype,
+            _group: PhantomData,
+        }))
+    }
+
     /// Get name of variable
     pub fn name(&self) -> error::Result<String> {
         let mut name = vec![0; NC_MAX_NAME as usize + 1];

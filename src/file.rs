@@ -132,54 +132,7 @@ impl ReadOnlyFile {
     }
 
     pub fn variable<'g>(&'g self, name: &str) -> error::Result<Option<Variable<'g, 'g>>> {
-        let cname = std::ffi::CString::new(name).unwrap();
-        let mut varid = 0;
-        let e = unsafe { nc_inq_varid(self.0.ncid, cname.as_ptr(), &mut varid) };
-        if e == NC_ENOTFOUND {
-            return Ok(None);
-        } else {
-            error::checked(e)?;
-        }
-        let mut xtype = 0;
-        let mut ndims = 0;
-        unsafe {
-            error::checked(nc_inq_var(
-                self.0.ncid,
-                varid,
-                std::ptr::null_mut(),
-                &mut xtype,
-                &mut ndims,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            ))?;
-        }
-        let mut dimids = vec![0; ndims as _];
-        unsafe {
-            error::checked(nc_inq_vardimid(self.0.ncid, varid, dimids.as_mut_ptr()))?;
-        }
-        let dimensions = dimids
-            .into_iter()
-            .map(|id| {
-                let mut len = 0;
-                unsafe { error::checked(nc_inq_dimlen(self.0.ncid, id, &mut len))? }
-                Ok(Dimension {
-                    len: core::num::NonZeroUsize::new(len),
-                    id: Identifier {
-                        ncid: self.0.ncid,
-                        dimid: id,
-                    },
-                    _group: PhantomData,
-                })
-            })
-            .collect::<error::Result<Vec<_>>>()?;
-
-        Ok(Some(Variable {
-            dimensions,
-            ncid: self.0.ncid,
-            varid,
-            vartype: xtype,
-            _group: PhantomData,
-        }))
+        Variable::find_from_name(self.ncid(), name)
     }
     pub fn group(&self, name: &str) -> Option<Group> {
         let cname = std::ffi::CString::new(name).unwrap();
@@ -218,7 +171,7 @@ impl ReadOnlyFile {
         })
     }
     pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>> {
-        super::dimension::dimension_iterator(self.ncid())
+        super::dimension::dimensions_from_location(self.ncid())
             .unwrap()
             .map(|x| x.unwrap())
     }
@@ -272,39 +225,12 @@ impl ReadOnlyFile {
         }
         let ncid = self.ncid();
         Ok(varids.into_iter().map(move |varid| {
-            let mut ndims = 0;
             let mut xtype = 0;
             unsafe {
-                error::checked(nc_inq_var(
-                    ncid,
-                    varid,
-                    std::ptr::null_mut(),
-                    &mut xtype,
-                    &mut ndims,
-                    std::ptr::null_mut(),
-                    std::ptr::null_mut(),
-                ))?;
+                error::checked(nc_inq_vartype(ncid, varid, &mut xtype))?;
             }
-            let mut dimids = vec![0; ndims as _];
-            unsafe {
-                error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr()))?;
-            }
-
-            let dimensions = dimids
-                .into_iter()
-                .map(|dimid| {
-                    let mut dimlen = 0;
-                    unsafe {
-                        error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
-                    }
-                    Ok(Dimension {
-                        len: core::num::NonZeroUsize::new(dimlen),
-                        id: Identifier { ncid: ncid, dimid },
-                        _group: PhantomData,
-                    })
-                })
+            let dimensions = super::dimension::dimensions_from_variable(self.ncid(), varid)?
                 .collect::<error::Result<Vec<_>>>()?;
-
             Ok(Variable {
                 ncid: self.ncid(),
                 varid,
