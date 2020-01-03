@@ -144,7 +144,9 @@ impl<'f> Group<'f> {
     }
     /// Iterator over all dimensions
     pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>> {
-        (0..).into_iter().map(|_| todo!())
+        super::dimension::dimension_iterator(self.id())
+            .unwrap()
+            .map(|x| x.unwrap())
     }
     /// Get a group
     pub fn group(&self, name: &str) -> Option<Self> {

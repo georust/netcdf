@@ -218,40 +218,9 @@ impl ReadOnlyFile {
         })
     }
     pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>> {
-        let mut ndims = 0;
-        unsafe {
-            error::checked(nc_inq_dimids(
-                self.ncid(),
-                &mut ndims,
-                std::ptr::null_mut(),
-                false as _,
-            ))
-            .unwrap();
-        }
-        let mut dimids = vec![0; ndims as _];
-        unsafe {
-            error::checked(nc_inq_dimids(
-                self.ncid(),
-                std::ptr::null_mut(),
-                dimids.as_mut_ptr(),
-                false as _,
-            ))
-            .unwrap();
-        }
-        dimids.into_iter().map(move |dimid| {
-            let mut dimlen = 0;
-            unsafe {
-                error::checked(nc_inq_dimlen(self.ncid(), dimid, &mut dimlen)).unwrap();
-            }
-            Dimension {
-                len: core::num::NonZeroUsize::new(dimlen),
-                id: Identifier {
-                    ncid: self.ncid(),
-                    dimid,
-                },
-                _group: PhantomData,
-            }
-        })
+        super::dimension::dimension_iterator(self.ncid())
+            .unwrap()
+            .map(|x| x.unwrap())
     }
     pub fn attribute<'f>(&'f self, name: &str) -> error::Result<Option<Attribute<'f>>> {
         if name.len() > NC_MAX_NAME as _ {
