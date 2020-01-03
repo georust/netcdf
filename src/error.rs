@@ -34,7 +34,7 @@ pub enum Error {
     /// Does not know the type (probably library error...)
     TypeUnknown(nc_type),
     /// Variable/dimension already exists
-    AlreadyExists(String),
+    AlreadyExists,
     /// Could not find variable/attribute/etc
     NotFound(String),
     /// Slice lengths are ambiguous
@@ -81,7 +81,11 @@ impl From<String> for Error {
 
 impl From<nc_type> for Error {
     fn from(nc: nc_type) -> Self {
-        Self::Netcdf(nc)
+        if nc == netcdf_sys::NC_EEXIST || nc == netcdf_sys::NC_EATTEXISTS || nc == netcdf_sys::NC_ENAMEINUSE {
+            Self::AlreadyExists
+        } else {
+            Self::Netcdf(nc)
+        }
     }
 }
 
@@ -115,7 +119,7 @@ impl fmt::Display for Error {
             ),
             Self::TypeMismatch => write!(f, "netcdf types does not correspond to what is defined"),
             Self::TypeUnknown(t) => write!(f, "netcdf type {} is not known", t),
-            Self::AlreadyExists(x) => write!(f, "{} already exists", x),
+            Self::AlreadyExists => write!(f, "variable/group/dimension already exists"),
             Self::NotFound(x) => write!(f, "Could not find {}", x),
             Self::Netcdf(x) => {
                 let _l = LOCK.lock().unwrap();

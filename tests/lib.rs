@@ -994,17 +994,16 @@ fn read_from_memory() {
 }
 
 #[test]
-fn add_confliciting_dimensions() {
+fn add_conflicting_dimensions() {
     let d = tempfile::tempdir().unwrap();
 
     let mut file = netcdf::create(d.path().join("conflict_dim.nc")).unwrap();
 
     file.add_dimension("x", 10).unwrap();
     let e = file.add_dimension("x", 11).unwrap_err();
-    assert!(if let netcdf::error::Error::AlreadyExists(x) = e {
-        x == "dimension x"
-    } else {
-        false
+    assert!(match e {
+        netcdf::error::Error::AlreadyExists => true,
+        _ => false
     });
     assert_eq!(file.dimension("x").unwrap().len(), 10);
 }
@@ -1020,11 +1019,13 @@ fn add_conflicting_variables() {
     file.add_variable::<i32>("x", &["x"]).unwrap();
 
     let e = file.add_variable::<f32>("x", &["y"]).unwrap_err();
-    assert!(if let netcdf::error::Error::AlreadyExists(x) = e {
-        x == "variable"
-    } else {
-        false
-    });
+    assert!(match e {
+        netcdf::error::Error::AlreadyExists => {
+            true
+        }
+        e => {
+            panic!(e)
+        }});
     assert_eq!(
         10,
         file.variable("x").unwrap().unwrap().dimensions()[0].len()

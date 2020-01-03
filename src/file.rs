@@ -109,8 +109,7 @@ impl ReadOnlyFile {
     /// Main entrypoint for interacting with the netcdf file.
     pub fn root<'f>(&'f self) -> Group<'f> {
         Group {
-            ncid: self.0.ncid,
-            grpid: None,
+            ncid: self.ncid(),
             _file: PhantomData,
         }
     }
@@ -166,7 +165,15 @@ impl ReadOnlyFile {
         }))
     }
     pub fn group(&self, name: &str) -> Option<Group> {
-        todo!()
+        let cname = std::ffi::CString::new(name).unwrap();
+        let mut grpid = 0;
+        unsafe {
+            error::checked(nc_inq_grp_ncid(self.ncid(), cname.as_ptr(), &mut grpid)).unwrap();
+        }
+        Some(Group {
+            ncid: grpid,
+            _file: PhantomData,
+        })
     }
     pub fn groups<'g>(&'g self) -> impl Iterator<Item = Group<'g>> {
         (0..).into_iter().map(|_| todo!())
@@ -196,7 +203,28 @@ impl ReadOnlyFile {
         })
     }
     pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>> {
-        (0..).into_iter().map(|_| todo!())
+        let mut ndims = 0;
+        unsafe {
+            error::checked(nc_inq_dimids(self.ncid(), &mut ndims, std::ptr::null_mut(), false as _)).unwrap();
+        }
+        let mut dimids = vec![0; ndims as _];
+        unsafe {
+            error::checked(nc_inq_dimids(self.ncid(), std::ptr::null_mut(), dimids.as_mut_ptr(), false as _)).unwrap();
+        }
+        dimids.into_iter().map(move |dimid| {
+            let mut dimlen = 0;
+            unsafe {
+                error::checked(nc_inq_dimlen(self.ncid(), dimid, &mut dimlen)).unwrap();
+            }
+            Dimension {
+                len : core::num::NonZeroUsize::new(dimlen),
+                id: Identifier {
+                    ncid: self.ncid(),
+                    dimid,
+                },
+                _group: PhantomData,
+            }
+        })
     }
     pub fn attribute<'f>(&'f self, name: &str) -> error::Result<Option<Attribute<'f>>> {
         if name.len() > NC_MAX_NAME as _ {
@@ -234,7 +262,49 @@ impl ReadOnlyFile {
     pub fn variables<'f>(
         &'f self,
     ) -> error::Result<impl Iterator<Item = error::Result<Variable<'f, 'f>>>> {
-        Ok((0..).into_iter().map(|_| todo!()))
+        let mut nvars = 0;
+        unsafe {
+            error::checked(nc_inq_varids(self.ncid(), &mut nvars, std::ptr::null_mut()))?;
+        }
+        let mut varids = vec![0; nvars as _];
+        unsafe {
+            error::checked(nc_inq_varids(self.ncid(), std::ptr::null_mut(), varids.as_mut_ptr()))?;
+        }
+        let ncid = self.ncid();
+        Ok(varids.into_iter().map(move |varid| {
+            let mut ndims = 0;
+            let mut xtype = 0;
+            unsafe {
+                error::checked(nc_inq_var(ncid, varid, std::ptr::null_mut(), &mut xtype, &mut ndims, std::ptr::null_mut(), std::ptr::null_mut()))?;
+            }
+            let mut dimids = vec![0; ndims as _];
+            unsafe {
+                error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr()))?;
+            }
+
+            let dimensions = dimids.into_iter().map(|dimid| {
+                let mut dimlen = 0;
+                unsafe {
+                    error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
+                }
+                Ok(Dimension {
+                    len: core::num::NonZeroUsize::new(dimlen),
+                    id: Identifier {
+                        ncid: ncid,
+                        dimid,
+                    },
+                    _group: PhantomData
+                })
+            }).collect::<error::Result<Vec<_>>>()?;
+
+            Ok(Variable {
+                ncid: self.ncid(),
+                varid,
+                dimensions,
+                vartype: xtype,
+                _group: PhantomData,
+            })
+        }))
     }
     fn ncid(&self) -> nc_type {
         self.0.ncid
@@ -298,17 +368,7 @@ impl MutableFile {
         self.add_dimension(name, 0)
     }
     pub fn group_mut<'f>(&'f mut self, name: &str) -> Option<GroupMut<'f>> {
-        let cname = std::ffi::CString::new(name).unwrap();
-        let mut grpid = 0;
-        unsafe {
-            error::checked(nc_inq_grp_ncid(self.ncid(), cname.as_ptr(), &mut grpid)).unwrap();
-        }
-
-        Some(GroupMut(Group {
-            ncid: self.ncid(),
-            grpid: Some(grpid),
-            _file: PhantomData,
-        }, PhantomData))
+        self.group(name).map(|g| GroupMut ( g, PhantomData))
     }
     pub fn add_variable_from_identifiers<T>(
         &mut self,
@@ -340,7 +400,7 @@ impl MutableFile {
         }).collect::<error::Result<Vec<_>>>()?;
 
         Ok(VariableMut(Variable {
-            ncid: (self.0).0.ncid,
+            ncid: self.ncid(),
             dimensions,
             varid,
             vartype: xtype,
@@ -355,8 +415,7 @@ impl MutableFile {
         }
 
         Ok(GroupMut(Group {
-            ncid: self.ncid(),
-            grpid: Some(grpid),
+            ncid: grpid,
             _file: PhantomData
         }, PhantomData))
     }
@@ -406,49 +465,7 @@ impl MutableFile {
     pub fn variables_mut<'f>(
         &'f mut self,
     ) -> error::Result<impl Iterator<Item = VariableMut<'f, 'f>>> {
-        let mut nvars = 0;
-        unsafe {
-            error::checked(nc_inq_varids(self.ncid(), &mut nvars, std::ptr::null_mut()))?;
-        }
-        let mut varids = vec![0; nvars as _];
-        unsafe {
-            error::checked(nc_inq_varids(self.ncid(), std::ptr::null_mut(), varids.as_mut_ptr()))?;
-        }
-        let ncid = self.ncid();
-        Ok(varids.into_iter().map(move |varid| {
-            let mut ndims = 0;
-            let mut xtype = 0;
-            unsafe {
-                error::checked(nc_inq_var(ncid, varid, std::ptr::null_mut(), &mut xtype, &mut ndims, std::ptr::null_mut(), std::ptr::null_mut())).unwrap();
-            }
-            let mut dimids = vec![0; ndims as _];
-            unsafe {
-                error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr())).unwrap();
-            }
-
-            let dimensions = dimids.into_iter().map(|dimid| {
-                let mut dimlen = 0;
-                unsafe {
-                    error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
-                }
-                Ok(Dimension {
-                    len: core::num::NonZeroUsize::new(dimlen),
-                    id: Identifier {
-                        ncid: ncid,
-                        dimid,
-                    },
-                    _group: PhantomData
-                })
-            }).collect::<error::Result<Vec<_>>>().unwrap();
-
-            VariableMut(Variable {
-                ncid: self.ncid(),
-                varid,
-                dimensions,
-                vartype: xtype,
-                _group: PhantomData,
-            }, PhantomData)
-        }))
+        self.variables().map(|v| v.map(|var| VariableMut(var.unwrap(), PhantomData)))
     }
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where

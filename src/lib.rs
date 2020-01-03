@@ -10,7 +10,7 @@
 //! let file = netcdf::open("simle_xy.nc")?;
 //!
 //! // Access any variable, attribute, or dimension through lookups on hashmaps
-//! let var = &file.variable("data").expect("Could not find variable 'data'");
+//! let var = &file.variable("data")?.expect("Could not find variable 'data'");
 //!
 //! // Read variable as numeric types
 //! let data_i32 = var.value::<i32>(None)?;
@@ -36,7 +36,7 @@
 //! let var_name = "crab_coolness_level";
 //! let data : Vec<i32> = vec![42; 10];
 //! // Variable type written to file
-//! let var = file.add_variable::<i32>(
+//! let mut var = file.add_variable::<i32>(
 //!             var_name,
 //!             &[dim_name],
 //! )?;
