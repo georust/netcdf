@@ -23,7 +23,7 @@ fn run(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
     let file = netcdf::open(path)?;
 
     println!("{}", file.path()?);
-    print_group(&file)
+    print_group(&file.root())
 }
 
 fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error>> {
@@ -56,7 +56,7 @@ fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error
     }
     for g in g.groups() {
         println!();
-        print_group(g)?;
+        print_group(&g)?;
     }
 
     Ok(())

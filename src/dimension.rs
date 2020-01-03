@@ -4,13 +4,15 @@
 use super::error;
 use super::LOCK;
 use netcdf_sys::*;
+use std::marker::PhantomData;
 
 /// Represents a netcdf dimension
 #[derive(Debug, Clone)]
-pub struct Dimension {
+pub struct Dimension<'g> {
     /// None when unlimited (size = 0)
     pub(crate) len: Option<core::num::NonZeroUsize>,
     pub(crate) id: Identifier,
+    pub(crate) _group: PhantomData<&'g nc_type>,
 }
 
 /// Unique identifier for a dimensions in a file. Used when
@@ -22,7 +24,7 @@ pub struct Identifier {
 }
 
 #[allow(clippy::len_without_is_empty)]
-impl Dimension {
+impl<'g> Dimension<'g> {
     /// Get current length of the dimensions, which is
     /// the product of all dimensions in the variable
     pub fn len(&self) -> usize {
@@ -68,21 +70,34 @@ impl Dimension {
     pub fn identifier(&self) -> Identifier {
         self.id
     }
+}
 
-    pub(crate) fn new(grpid: nc_type, name: String, len: usize) -> error::Result<Self> {
-        use std::ffi::CString;
-
-        let mut dimid = 0;
-        let cname = CString::new(name.as_str()).unwrap();
-
-        unsafe {
-            let _l = LOCK.lock().unwrap();
-            error::checked(nc_def_dim(grpid, cname.as_ptr(), len, &mut dimid))?;
-        }
-
-        Ok(Self {
-            len: core::num::NonZeroUsize::new(len),
-            id: Identifier { ncid: grpid, dimid },
-        })
+pub(crate) fn from_name_toid<'f>(loc: nc_type, name: &str) -> error::Result<nc_type> {
+    let mut dimid = 0;
+    let cname = std::ffi::CString::new(name).unwrap();
+    unsafe {
+        error::checked(nc_inq_dimid(loc, cname.as_ptr(), &mut dimid))?;
     }
+    Ok(dimid)
+}
+
+pub(crate) fn from_name<'f>(loc: nc_type, name: &str) -> error::Result<Dimension<'f>> {
+    let mut dimid = 0;
+    let cname = std::ffi::CString::new(name).unwrap();
+    unsafe {
+        error::checked(nc_inq_dimid(loc, cname.as_ptr(), &mut dimid))?;
+    }
+    let mut dimlen = 0;
+    unsafe {
+        error::checked(nc_inq_dimlen(loc, dimid, &mut dimlen))?;
+    }
+
+    Ok(Dimension {
+        len: core::num::NonZeroUsize::new(dimlen),
+        id: Identifier {
+            ncid: loc,
+            dimid: dimid,
+        },
+        _group: PhantomData,
+    })
 }

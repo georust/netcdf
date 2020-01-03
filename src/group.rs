@@ -5,34 +5,35 @@ use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
-use super::variable::{Numeric, Variable};
+use super::variable::{Numeric, Variable, VariableMut};
 use netcdf_sys::*;
-use std::cell::UnsafeCell;
-use std::rc::{Rc, Weak};
+use std::marker::PhantomData;
 
 /// Main component of the netcdf format. Holds all variables,
 /// attributes, and dimensions. A group can always see the parents items,
 /// but a parent can not access a childs items.
-#[derive(Debug)]
-pub struct Group {
+#[derive(Debug, Clone)]
+pub struct Group<'f> {
     pub(crate) ncid: nc_type,
     pub(crate) grpid: Option<nc_type>,
-    pub(crate) variables: Vec<Variable>,
-    pub(crate) dimensions: Vec<Dimension>,
-    pub(crate) groups: Vec<Rc<UnsafeCell<Group>>>,
-    /// Do not mutate parent, only for walking and getting dimensions
-    /// and types. Use the `parents` iterator for walking upwards.
-    ///
-    /// Contains `None` only when `Group` is the root node
-    pub(crate) parent: Option<Weak<UnsafeCell<Group>>>,
-    /// Given as `parent` when supplying to child groups.
-    ///
-    /// Should never be `None` (this is just to be able
-    /// to get a `Weak` into itself
-    pub(crate) this: Option<Weak<UnsafeCell<Group>>>,
+    pub(crate) _file: PhantomData<&'f nc_type>,
 }
 
-impl Group {
+#[derive(Debug)]
+/// Mutable access to a group
+pub struct GroupMut<'f>(
+    pub(crate) Group<'f>,
+    pub(crate) PhantomData<&'f mut nc_type>,
+);
+
+impl<'f> std::ops::Deref for GroupMut<'f> {
+    type Target = Group<'f>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'f> Group<'f> {
     /// Name of the current group
     pub fn name(&self) -> error::Result<String> {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
@@ -51,20 +52,12 @@ impl Group {
         Ok(String::from_utf8(name)?)
     }
     /// Get a variable from the group
-    pub fn variable(&self, name: &str) -> Option<&Variable> {
-        self.variables().find(|x| x.name().unwrap() == name)
+    pub fn variable<'g>(&'g self, name: &str) -> Option<Variable<'f, 'g>> {
+        todo!()
     }
     /// Iterate over all variables in a group
-    pub fn variables(&self) -> impl Iterator<Item = &Variable> {
-        self.variables.iter()
-    }
-    /// Get a mutable variable from the group
-    pub fn variable_mut(&mut self, name: &str) -> Option<&mut Variable> {
-        self.variables_mut().find(|x| x.name().unwrap() == name)
-    }
-    /// Iterate over all variables in a group, with mutable access
-    pub fn variables_mut(&mut self) -> impl Iterator<Item = &mut Variable> {
-        self.variables.iter_mut()
+    pub fn variables<'g>(&'g self) -> impl Iterator<Item = Variable<'f, 'g>> {
+        (0..).into_iter().map(|_| todo!())
     }
     /// Get a single attribute
     pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
@@ -78,34 +71,53 @@ impl Group {
         crate::attribute::AttributeIterator::new(self.grpid.unwrap_or(self.ncid), None)
     }
     /// Get a single dimension
-    pub fn dimension(&self, name: &str) -> Option<&Dimension> {
-        self.dimensions().find(|x| x.name().unwrap() == name)
+    pub fn dimension(&self, name: &str) -> Option<Dimension> {
+        todo!()
     }
     /// Iterator over all dimensions
-    pub fn dimensions(&self) -> impl Iterator<Item = &Dimension> {
-        // Need to lock when reading the first attribute (per group)
-        self.dimensions.iter()
+    pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>> {
+        (0..).into_iter().map(|_| todo!())
     }
     /// Get a group
-    pub fn group(&self, name: &str) -> Option<&Self> {
-        self.groups().find(|x| x.name().unwrap() == name)
+    pub fn group(&self, name: &str) -> Option<Self> {
+        let cname = std::ffi::CString::new(name).unwrap();
+        let mut grpid = 0;
+        unsafe {
+            error::checked(nc_inq_grp_ncid(self.ncid, cname.as_ptr(), &mut grpid)).unwrap();
+        }
+
+        Some(Group {
+            ncid: self.ncid,
+            grpid: Some(grpid),
+            _file: PhantomData,
+        })
     }
-    /// Iterator over all groups
-    pub fn groups(&self) -> impl Iterator<Item = &Self> {
-        self.groups.iter().map(|x| unsafe { &*x.get() })
-    }
-    /// Mutable access to group
-    pub fn group_mut(&mut self, name: &str) -> Option<&mut Self> {
-        self.groups_mut().find(|x| x.name().unwrap() == name)
-    }
-    /// Iterator over all groups (mutable access)
-    pub fn groups_mut(&mut self) -> impl Iterator<Item = &mut Self> {
-        // Takes self as &mut
-        self.groups.iter_mut().map(|x| unsafe { &mut *x.get() })
+    /// Iterator over all subgroups in this group
+    pub fn groups<'g>(&'g self) -> impl Iterator<Item = Group<'g>> {
+        (0..).into_iter().map(|_| todo!())
     }
 }
 
-impl Group {
+impl<'f> GroupMut<'f> {
+    /// Get a mutable variable from the group
+    pub fn variable_mut<'g>(&'g mut self, name: &str) -> Option<VariableMut<'f, 'g>> {
+        todo!()
+    }
+    /// Iterate over all variables in a group, with mutable access
+    pub fn variables_mut<'g>(
+        &'g mut self,
+    ) -> error::Result<impl Iterator<Item = VariableMut<'f, 'g>>> {
+        Ok((0..10).into_iter().map(|_| todo!()))
+    }
+    /// Mutable access to group
+    pub fn group_mut(&'f mut self, name: &str) -> Option<Self> {
+        todo!()
+    }
+    /// Iterator over all groups (mutable access)
+    pub fn groups_mut(&'f mut self) -> error::Result<impl Iterator<Item = GroupMut<'f>>> {
+        Ok((0..10).into_iter().map(|_| todo!()))
+    }
+
     /// Add an attribute to the group
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where
@@ -115,24 +127,38 @@ impl Group {
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
-    pub fn add_dimension(&mut self, name: &str, len: usize) -> error::Result<&Dimension> {
-        if self.dimension(name).is_some() {
-            return Err(error::Error::AlreadyExists(format!("dimension {}", name)));
+    pub fn add_dimension<'g>(&'g mut self, name: &str, len: usize) -> error::Result<Dimension<'g>> {
+        use std::ffi::CString;
+
+        let mut dimid = 0;
+        let cname = CString::new(name).unwrap();
+
+        unsafe {
+            error::checked(nc_def_dim(
+                self.grpid.unwrap_or(self.ncid),
+                cname.as_ptr(),
+                len,
+                &mut dimid,
+            ))?;
         }
 
-        let d = Dimension::new(self.grpid.unwrap_or(self.ncid), name.to_string(), len)?;
-        self.dimensions.push(d);
-
-        Ok(self.dimension(name).unwrap())
+        Ok(Dimension {
+            len: core::num::NonZeroUsize::new(len),
+            id: super::dimension::Identifier {
+                ncid: self.grpid.unwrap_or(self.ncid),
+                dimid,
+            },
+            _group: PhantomData,
+        })
     }
 
     /// Adds a dimension with unbounded size
-    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<&Dimension> {
+    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<Dimension> {
         self.add_dimension(name, 0)
     }
 
     /// Add an empty group to the dataset
-    pub fn add_group(&mut self, name: &str) -> error::Result<&mut Self> {
+    pub fn add_group(&mut self, name: &str) -> error::Result<Self> {
         if self.group(name).is_some() {
             return Err(error::Error::AlreadyExists(name.to_string()));
         }
@@ -146,163 +172,61 @@ impl Group {
             ))?;
         }
 
-        let g = Rc::new(UnsafeCell::new(Self {
-            ncid: self.grpid.unwrap_or(self.ncid),
-            grpid: Some(grpid),
-            dimensions: Vec::default(),
-            groups: Vec::default(),
-            variables: Vec::default(),
-            parent: Some(self.this.clone().unwrap()),
-            this: None,
-        }));
-        {
-            let gref = Some(Rc::downgrade(&g));
-            let g = unsafe { &mut *g.get() };
-            g.this = gref;
-        }
-        self.groups.push(g);
-        Ok(self.group_mut(name).unwrap())
+        Ok(Self(
+            Group {
+                ncid: self.grpid.unwrap_or(self.ncid),
+                grpid: Some(grpid),
+                _file: PhantomData,
+            },
+            PhantomData,
+        ))
     }
-
-    /// Asserts all dimensions exists, and gets a copy of these
-    /// (will be moved into a Variable)
-    fn find_dimensions(&self, dims: &[&str]) -> error::Result<Vec<Dimension>> {
-        let (d, e): (Vec<_>, Vec<_>) = dims
-            .iter()
-            .map(|name| {
-                if let Some(x) = self.dimension(name) {
-                    return Ok(x);
-                }
-                for pdim in self.parents() {
-                    if let Some(x) = pdim.dimension(name) {
-                        return Ok(x);
-                    }
-                }
-                Err(*name)
-            })
-            .partition(Result::is_ok);
-
-        if !e.is_empty() {
-            let mut s = String::new();
-            s.push_str("dimension(s)");
-            for x in e {
-                s.push(' ');
-                s.push_str(x.unwrap_err());
-            }
-            return Err(error::Error::NotFound(s));
-        }
-
-        let d = d
-            .into_iter()
-            .map(Result::unwrap)
-            .cloned()
-            .collect::<Vec<_>>();
-        Ok(d)
-    }
-
-    pub(crate) fn parents(&self) -> impl Iterator<Item = &Self> {
-        ParentIterator::new(self)
-    }
-
     /// Adds a variable from a set of unique identifiers, recursing upwards
     /// from the current group if necessary.
     pub fn add_variable_from_identifiers<T>(
         &mut self,
         name: &str,
         dims: &[super::dimension::Identifier],
-    ) -> error::Result<&mut Variable>
+    ) -> error::Result<VariableMut>
     where
         T: Numeric,
     {
-        if self.variable(name).is_some() {
-            return Err(error::Error::AlreadyExists(format!("variable {}", name)));
-        }
-        let mut d: Vec<_> = Vec::default();
-        for (i, dim) in dims.iter().enumerate() {
-            let id = dim.dimid;
-            let found_dim = match self
-                .dimensions()
-                .find(|&x| x.id.ncid == dim.ncid && x.id.dimid == id)
-            {
-                Some(x) => x.clone(),
-                None => match self
-                    .parents()
-                    .flat_map(Self::dimensions)
-                    .find(|d| d.id.ncid == dim.ncid && d.id.dimid == id)
-                {
-                    Some(d) => d.clone(),
-                    None => return Err(error::Error::NotFound(format!("dimension #{}", i))),
-                },
-            };
-            d.push(found_dim);
-        }
-
-        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
-        self.variables.push(var);
-        Ok(self.variable_mut(name).unwrap())
+        todo!()
     }
 
     /// Create a Variable into the dataset, with no data written into it
     ///
     /// Dimensions are identified using the name of the dimension, and will recurse upwards
     /// if not found in the current group.
-    pub fn add_variable<T>(&mut self, name: &str, dims: &[&str]) -> error::Result<&mut Variable>
+    pub fn add_variable<'g, T>(
+        &'g mut self,
+        name: &str,
+        dims: &[&str],
+    ) -> error::Result<VariableMut<'f, 'g>>
     where
         T: Numeric,
     {
-        if self.variable(name).is_some() {
-            return Err(error::Error::AlreadyExists("variable".into()));
-        }
+        VariableMut::add_from_str(self.id(), T::NCTYPE, name, dims)
+    }
 
-        let d = self.find_dimensions(dims)?;
-        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, T::NCTYPE)?;
-
-        self.variables.push(var);
-        Ok(self.variable_mut(name).unwrap())
+    fn id(&self) -> nc_type {
+        self.grpid.unwrap_or(self.ncid)
     }
 
     /// Adds a variable with a basic type of string
-    pub fn add_string_variable(
-        &mut self,
-        name: &str,
-        dims: &[&str],
-    ) -> error::Result<&mut Variable> {
-        if self.variable(name).is_some() {
-            return Err(error::Error::AlreadyExists("variable".into()));
-        }
-
-        let d = self.find_dimensions(dims)?;
-        let var = Variable::new(self.grpid.unwrap_or(self.ncid), name, d, NC_STRING)?;
-
-        self.variables.push(var);
-        Ok(self.variable_mut(name).unwrap())
+    pub fn add_string_variable(&mut self, name: &str, dims: &[&str]) -> error::Result<VariableMut> {
+        VariableMut::add_from_str(self.id(), NC_STRING, name, dims)
     }
 }
 
-struct ParentIterator<'a> {
-    g: Weak<UnsafeCell<Group>>,
-    _phantom: std::marker::PhantomData<&'a Group>,
-}
-
-impl<'a> ParentIterator<'a> {
-    fn new(g: &Group) -> Self {
-        Self {
-            g: g.this.clone().unwrap(),
-            _phantom: std::marker::PhantomData,
-        }
+impl<'f> Group<'f> {
+    /// Asserts all dimensions exists, and gets a copy of these
+    /// (will be moved into a Variable)
+    fn find_dimensions(&self, dims: &[&str]) -> error::Result<Vec<Dimension>> {
+        todo!()
     }
-}
 
-impl<'a> Iterator for ParentIterator<'a> {
-    type Item = &'a Group;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let g: &Group = unsafe { &*self.g.upgrade().unwrap().get() };
-        let p = match &g.parent {
-            None => return None,
-            Some(p) => p,
-        };
-        self.g = p.clone();
-        Some(unsafe { &*self.g.upgrade().unwrap().get() })
+    pub(crate) fn parent(&self) -> Option<Self> {
+        unimplemented!()
     }
 }

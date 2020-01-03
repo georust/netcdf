@@ -61,7 +61,7 @@
 //! # Ok(()) }
 //! ```
 
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 #![allow(clippy::must_use_candidate)]
 
 use lazy_static::lazy_static;
@@ -84,19 +84,19 @@ pub use variable::*;
 /// Open a netcdf file in create mode
 ///
 /// Will overwrite exising file
-pub fn create<P>(name: P) -> error::Result<File>
+pub fn create<P>(name: P) -> error::Result<MutableFile>
 where
     P: AsRef<std::path::Path>,
 {
-    File::create(name.as_ref())
+    MutableFile::create(name.as_ref())
 }
 
 /// Open a netcdf file in append mode
-pub fn append<P>(name: P) -> error::Result<File>
+pub fn append<P>(name: P) -> error::Result<MutableFile>
 where
     P: AsRef<std::path::Path>,
 {
-    File::append(name.as_ref())
+    MutableFile::append(name.as_ref())
 }
 
 /// Open a netcdf file in read mode
