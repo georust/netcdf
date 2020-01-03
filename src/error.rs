@@ -81,7 +81,10 @@ impl From<String> for Error {
 
 impl From<nc_type> for Error {
     fn from(nc: nc_type) -> Self {
-        if nc == netcdf_sys::NC_EEXIST || nc == netcdf_sys::NC_EATTEXISTS || nc == netcdf_sys::NC_ENAMEINUSE {
+        if nc == netcdf_sys::NC_EEXIST
+            || nc == netcdf_sys::NC_EATTEXISTS
+            || nc == netcdf_sys::NC_ENAMEINUSE
+        {
             Self::AlreadyExists
         } else {
             Self::Netcdf(nc)

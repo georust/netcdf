@@ -1102,7 +1102,12 @@ impl<'f, 'g> VariableMut<'f, 'g> {
 }
 
 impl<'f, 'g> VariableMut<'f, 'g> {
-    pub(crate) fn add_from_str(ncid: nc_type, xtype: nc_type, name: &str, dims: &[&str]) -> error::Result<Self> {
+    pub(crate) fn add_from_str(
+        ncid: nc_type,
+        xtype: nc_type,
+        name: &str,
+        dims: &[&str],
+    ) -> error::Result<Self> {
         let dimensions = dims
             .iter()
             .map(|dimname| super::dimension::from_name_toid(ncid, dimname))
@@ -1111,7 +1116,14 @@ impl<'f, 'g> VariableMut<'f, 'g> {
         let cname = std::ffi::CString::new(name).unwrap();
         let mut varid = 0;
         unsafe {
-            error::checked(nc_def_var(ncid, cname.as_ptr(), xtype, dimensions.len() as _, dimensions.as_ptr(), &mut varid))?;
+            error::checked(nc_def_var(
+                ncid,
+                cname.as_ptr(),
+                xtype,
+                dimensions.len() as _,
+                dimensions.as_ptr(),
+                &mut varid,
+            ))?;
         }
 
         let dimensions = dims
@@ -1119,14 +1131,15 @@ impl<'f, 'g> VariableMut<'f, 'g> {
             .map(|dimname| super::dimension::from_name(ncid, dimname))
             .collect::<error::Result<Vec<_>>>()?;
 
-        Ok( VariableMut (
-                Variable {
-                    ncid: ncid,
-                    varid: varid,
-                    vartype: xtype,
-                    dimensions: dimensions,
-                    _group: PhantomData,
-            }, PhantomData)
-        )
+        Ok(VariableMut(
+            Variable {
+                ncid: ncid,
+                varid: varid,
+                vartype: xtype,
+                dimensions: dimensions,
+                _group: PhantomData,
+            },
+            PhantomData,
+        ))
     }
 }

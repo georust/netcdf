@@ -17,46 +17,6 @@ pub(crate) struct File {
     ncid: nc_type,
 }
 
-impl File {
-    fn open(path: &path::Path) -> error::Result<Self> {
-        let f = CString::new(path.to_str().unwrap()).unwrap();
-        let mut ncid: nc_type = -1;
-        unsafe {
-            let _l = LOCK.lock().unwrap();
-            error::checked(nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid))?;
-        }
-        Ok(Self { ncid })
-    }
-
-    #[allow(clippy::doc_markdown)]
-    /// Open a netCDF file in append mode (read/write).
-    /// The file must already exist.
-    fn append(path: &path::Path) -> error::Result<Self> {
-        let f = CString::new(path.to_str().unwrap()).unwrap();
-        let mut ncid: nc_type = -1;
-        unsafe {
-            let _g = LOCK.lock().unwrap();
-            error::checked(nc_open(f.as_ptr(), NC_WRITE, &mut ncid))?;
-        }
-
-        Ok(Self { ncid })
-    }
-    #[allow(clippy::doc_markdown)]
-    /// Open a netCDF file in creation mode.
-    ///
-    /// Will overwrite existing file if any
-    pub(crate) fn create(path: &path::Path) -> error::Result<Self> {
-        let f = CString::new(path.to_str().unwrap()).unwrap();
-        let mut ncid: nc_type = -1;
-        unsafe {
-            let _g = LOCK.lock().unwrap();
-            error::checked(nc_create(f.as_ptr(), NC_NETCDF4 | NC_CLOBBER, &mut ncid))?;
-        }
-
-        Ok(Self { ncid })
-    }
-}
-
 impl Drop for File {
     fn drop(&mut self) {
         unsafe {
@@ -67,19 +27,76 @@ impl Drop for File {
     }
 }
 
+impl File {
+    /// Open a netCDF file in read only mode.
+    ///
+    /// Consider using [`netcdf::open`] instead to open with
+    /// a generic `Path` object, and ensure read-only on
+    /// the `File`
+    pub(crate) fn open(path: &path::Path) -> error::Result<ReadOnlyFile> {
+        let f = CString::new(path.to_str().unwrap()).unwrap();
+        let mut ncid: nc_type = 0;
+        unsafe {
+            let _l = LOCK.lock().unwrap();
+            error::checked(nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid))?;
+        }
+        Ok(ReadOnlyFile(Self { ncid }))
+    }
+
+    #[allow(clippy::doc_markdown)]
+    /// Open a netCDF file in append mode (read/write).
+    /// The file must already exist.
+    pub(crate) fn append(path: &path::Path) -> error::Result<MutableFile> {
+        let f = CString::new(path.to_str().unwrap()).unwrap();
+        let mut ncid: nc_type = -1;
+        unsafe {
+            let _g = LOCK.lock().unwrap();
+            error::checked(nc_open(f.as_ptr(), NC_WRITE, &mut ncid))?;
+        }
+
+        Ok(MutableFile(ReadOnlyFile(Self { ncid })))
+    }
+    #[allow(clippy::doc_markdown)]
+    /// Open a netCDF file in creation mode.
+    ///
+    /// Will overwrite existing file if any
+    pub(crate) fn create(path: &path::Path) -> error::Result<MutableFile> {
+        let f = CString::new(path.to_str().unwrap()).unwrap();
+        let mut ncid: nc_type = -1;
+        unsafe {
+            let _g = LOCK.lock().unwrap();
+            error::checked(nc_create(f.as_ptr(), NC_NETCDF4 | NC_CLOBBER, &mut ncid))?;
+        }
+
+        Ok(MutableFile(ReadOnlyFile(Self { ncid })))
+    }
+
+    #[cfg(feature = "memory")]
+    pub(crate) fn open_from_memory<'buffer>(
+        name: Option<&str>,
+        mem: &'buffer [u8],
+    ) -> error::Result<MemFile<'buffer>> {
+        let cstr = std::ffi::CString::new(name.unwrap_or("/")).unwrap();
+        let mut ncid = 0;
+        unsafe {
+            let _l = LOCK.lock().unwrap();
+            error::checked(nc_open_mem(
+                cstr.as_ptr(),
+                NC_NOWRITE,
+                mem.len(),
+                mem.as_ptr() as *const u8 as *mut _,
+                &mut ncid,
+            ))?;
+        }
+
+        Ok(MemFile(ReadOnlyFile(Self { ncid }), PhantomData))
+    }
+}
+
 #[derive(Debug)]
 pub struct ReadOnlyFile(File);
 
 impl ReadOnlyFile {
-    /// Open a netCDF file in read only mode.
-    ///
-    /// Consider using [`crate::open`] instead to open with
-    /// a generic `Path` object, and ensure read-only on
-    /// the `File`
-    pub(crate) fn open(path: &path::Path) -> error::Result<Self> {
-        let file = File::open(path)?;
-        Ok(Self(file))
-    }
     /// path used ot open/create the file
     ///
     /// #Errors
@@ -181,9 +198,7 @@ impl ReadOnlyFile {
     pub fn dimension(&self, name: &str) -> Option<Dimension> {
         let cname = std::ffi::CString::new(name).unwrap();
         let mut dimid = 0;
-        let e = unsafe {
-            nc_inq_dimid(self.0.ncid, cname.as_ptr(), &mut dimid)
-        };
+        let e = unsafe { nc_inq_dimid(self.0.ncid, cname.as_ptr(), &mut dimid) };
         if e == NC_ENOTFOUND {
             return None;
         } else {
@@ -205,11 +220,23 @@ impl ReadOnlyFile {
     pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>> {
         let mut ndims = 0;
         unsafe {
-            error::checked(nc_inq_dimids(self.ncid(), &mut ndims, std::ptr::null_mut(), false as _)).unwrap();
+            error::checked(nc_inq_dimids(
+                self.ncid(),
+                &mut ndims,
+                std::ptr::null_mut(),
+                false as _,
+            ))
+            .unwrap();
         }
         let mut dimids = vec![0; ndims as _];
         unsafe {
-            error::checked(nc_inq_dimids(self.ncid(), std::ptr::null_mut(), dimids.as_mut_ptr(), false as _)).unwrap();
+            error::checked(nc_inq_dimids(
+                self.ncid(),
+                std::ptr::null_mut(),
+                dimids.as_mut_ptr(),
+                false as _,
+            ))
+            .unwrap();
         }
         dimids.into_iter().map(move |dimid| {
             let mut dimlen = 0;
@@ -217,7 +244,7 @@ impl ReadOnlyFile {
                 error::checked(nc_inq_dimlen(self.ncid(), dimid, &mut dimlen)).unwrap();
             }
             Dimension {
-                len : core::num::NonZeroUsize::new(dimlen),
+                len: core::num::NonZeroUsize::new(dimlen),
                 id: Identifier {
                     ncid: self.ncid(),
                     dimid,
@@ -268,34 +295,46 @@ impl ReadOnlyFile {
         }
         let mut varids = vec![0; nvars as _];
         unsafe {
-            error::checked(nc_inq_varids(self.ncid(), std::ptr::null_mut(), varids.as_mut_ptr()))?;
+            error::checked(nc_inq_varids(
+                self.ncid(),
+                std::ptr::null_mut(),
+                varids.as_mut_ptr(),
+            ))?;
         }
         let ncid = self.ncid();
         Ok(varids.into_iter().map(move |varid| {
             let mut ndims = 0;
             let mut xtype = 0;
             unsafe {
-                error::checked(nc_inq_var(ncid, varid, std::ptr::null_mut(), &mut xtype, &mut ndims, std::ptr::null_mut(), std::ptr::null_mut()))?;
+                error::checked(nc_inq_var(
+                    ncid,
+                    varid,
+                    std::ptr::null_mut(),
+                    &mut xtype,
+                    &mut ndims,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                ))?;
             }
             let mut dimids = vec![0; ndims as _];
             unsafe {
                 error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr()))?;
             }
 
-            let dimensions = dimids.into_iter().map(|dimid| {
-                let mut dimlen = 0;
-                unsafe {
-                    error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
-                }
-                Ok(Dimension {
-                    len: core::num::NonZeroUsize::new(dimlen),
-                    id: Identifier {
-                        ncid: ncid,
-                        dimid,
-                    },
-                    _group: PhantomData
+            let dimensions = dimids
+                .into_iter()
+                .map(|dimid| {
+                    let mut dimlen = 0;
+                    unsafe {
+                        error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
+                    }
+                    Ok(Dimension {
+                        len: core::num::NonZeroUsize::new(dimlen),
+                        id: Identifier { ncid: ncid, dimid },
+                        _group: PhantomData,
+                    })
                 })
-            }).collect::<error::Result<Vec<_>>>()?;
+                .collect::<error::Result<Vec<_>>>()?;
 
             Ok(Variable {
                 ncid: self.ncid(),
@@ -323,16 +362,6 @@ impl std::ops::Deref for MutableFile {
 }
 
 impl MutableFile {
-    /// Creates a file
-    pub fn create(name: &std::path::Path) -> error::Result<Self> {
-        let file = File::create(name)?;
-        Ok(Self(ReadOnlyFile(file)))
-    }
-    /// Open file in append mode
-    pub fn append(name: &std::path::Path) -> error::Result<Self> {
-        let file = File::append(name)?;
-        Ok(Self(ReadOnlyFile(file)))
-    }
     /// Mutable access to the root group
     pub fn root_mut<'f>(&'f mut self) -> GroupMut<'f> {
         GroupMut(self.root(), PhantomData)
@@ -361,14 +390,14 @@ impl MutableFile {
                 ncid: self.ncid(),
                 dimid,
             },
-            _group: PhantomData
+            _group: PhantomData,
         })
     }
     pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<Dimension> {
         self.add_dimension(name, 0)
     }
     pub fn group_mut<'f>(&'f mut self, name: &str) -> Option<GroupMut<'f>> {
-        self.group(name).map(|g| GroupMut ( g, PhantomData))
+        self.group(name).map(|g| GroupMut(g, PhantomData))
     }
     pub fn add_variable_from_identifiers<T>(
         &mut self,
@@ -385,27 +414,40 @@ impl MutableFile {
 
         let mut varid = 0;
         unsafe {
-            error::checked(nc_def_var((self.0).0.ncid, cname.as_ptr(), xtype, dims.len() as _, dims.as_ptr(), &mut varid))?;
+            error::checked(nc_def_var(
+                (self.0).0.ncid,
+                cname.as_ptr(),
+                xtype,
+                dims.len() as _,
+                dims.as_ptr(),
+                &mut varid,
+            ))?;
         }
-        let dimensions = odims.into_iter().map(|id|  {
-            let mut dimlen = 0;
-            unsafe {
-                error::checked(nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen))?;
-            }
-            Ok(Dimension {
-                len: core::num::NonZeroUsize::new(dimlen),
-                id: id.clone(),
-                _group: PhantomData,
+        let dimensions = odims
+            .into_iter()
+            .map(|id| {
+                let mut dimlen = 0;
+                unsafe {
+                    error::checked(nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen))?;
+                }
+                Ok(Dimension {
+                    len: core::num::NonZeroUsize::new(dimlen),
+                    id: id.clone(),
+                    _group: PhantomData,
+                })
             })
-        }).collect::<error::Result<Vec<_>>>()?;
+            .collect::<error::Result<Vec<_>>>()?;
 
-        Ok(VariableMut(Variable {
-            ncid: self.ncid(),
-            dimensions,
-            varid,
-            vartype: xtype,
-            _group: PhantomData,
-        }, PhantomData))
+        Ok(VariableMut(
+            Variable {
+                ncid: self.ncid(),
+                dimensions,
+                varid,
+                vartype: xtype,
+                _group: PhantomData,
+            },
+            PhantomData,
+        ))
     }
     pub fn add_group<'f>(&'f mut self, name: &str) -> error::Result<GroupMut<'f>> {
         let cname = std::ffi::CString::new(name).unwrap();
@@ -414,10 +456,13 @@ impl MutableFile {
             error::checked(nc_def_grp(self.ncid(), cname.as_ptr(), &mut grpid))?;
         }
 
-        Ok(GroupMut(Group {
-            ncid: grpid,
-            _file: PhantomData
-        }, PhantomData))
+        Ok(GroupMut(
+            Group {
+                ncid: grpid,
+                _file: PhantomData,
+            },
+            PhantomData,
+        ))
     }
     pub fn add_string_variable(&mut self, name: &str, dims: &[&str]) -> error::Result<VariableMut> {
         VariableMut::add_from_str((self.0).0.ncid, NC_STRING, name, dims)
@@ -432,40 +477,54 @@ impl MutableFile {
         let mut xtype = 0;
         let ncid = self.ncid();
         unsafe {
-            error::checked(nc_inq_var(ncid, varid, std::ptr::null_mut(), &mut xtype, &mut ndims, std::ptr::null_mut(), std::ptr::null_mut())).unwrap();
+            error::checked(nc_inq_var(
+                ncid,
+                varid,
+                std::ptr::null_mut(),
+                &mut xtype,
+                &mut ndims,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            ))
+            .unwrap();
         }
         let mut dimids = vec![0; ndims as _];
         unsafe {
             error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr())).unwrap();
         }
 
-        let dimensions = dimids.into_iter().map(|dimid| {
-            let mut dimlen = 0;
-            unsafe {
-                error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
-            }
-            Ok(Dimension {
-                len: core::num::NonZeroUsize::new(dimlen),
-                id: Identifier {
-                    ncid: ncid,
-                    dimid,
-                },
-                _group: PhantomData
+        let dimensions = dimids
+            .into_iter()
+            .map(|dimid| {
+                let mut dimlen = 0;
+                unsafe {
+                    error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
+                }
+                Ok(Dimension {
+                    len: core::num::NonZeroUsize::new(dimlen),
+                    id: Identifier { ncid: ncid, dimid },
+                    _group: PhantomData,
+                })
             })
-        }).collect::<error::Result<Vec<_>>>().unwrap();
+            .collect::<error::Result<Vec<_>>>()
+            .unwrap();
 
-        Some(VariableMut(Variable {
-            ncid: self.ncid(),
-            varid,
-            dimensions,
-            vartype: xtype,
-            _group: PhantomData,
-        }, PhantomData))
+        Some(VariableMut(
+            Variable {
+                ncid: self.ncid(),
+                varid,
+                dimensions,
+                vartype: xtype,
+                _group: PhantomData,
+            },
+            PhantomData,
+        ))
     }
     pub fn variables_mut<'f>(
         &'f mut self,
     ) -> error::Result<impl Iterator<Item = VariableMut<'f, 'f>>> {
-        self.variables().map(|v| v.map(|var| VariableMut(var.unwrap(), PhantomData)))
+        self.variables()
+            .map(|v| v.map(|var| VariableMut(var.unwrap(), PhantomData)))
     }
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where
@@ -479,49 +538,22 @@ impl MutableFile {
 /// The memory mapped file is kept in this structure to keep the
 /// lifetime of the buffer longer than the file.
 ///
-/// Access the [`File`] through the `Deref` trait,
+/// Access a [`ReadOnlyFile`] through the `Deref` trait,
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let buffer = &[0, 42, 1, 2];
-/// let file = &netcdf::MemFile::new(None, buffer)?;
+/// let file = &netcdf::open_mem(None, buffer)?;
 ///
-/// let variables = file.variables();
+/// let variables = file.variables()?;
 /// # Ok(()) }
 /// ```
 #[allow(clippy::module_name_repetitions)]
-pub struct MemFile<'a> {
-    file: ReadOnlyFile,
-    _buffer: std::marker::PhantomData<&'a [u8]>,
-}
+pub struct MemFile<'buffer>(ReadOnlyFile, std::marker::PhantomData<&'buffer [u8]>);
 
 #[cfg(feature = "memory")]
 impl<'a> std::ops::Deref for MemFile<'a> {
     type Target = ReadOnlyFile;
     fn deref(&self) -> &Self::Target {
-        &self.file
-    }
-}
-
-#[cfg(feature = "memory")]
-impl<'a> MemFile<'a> {
-    /// Open a file from the given buffer
-    pub fn new(name: Option<&str>, mem: &'a [u8]) -> error::Result<Self> {
-        let cstr = std::ffi::CString::new(name.unwrap_or("/")).unwrap();
-        let mut ncid = 0;
-        unsafe {
-            let _l = LOCK.lock().unwrap();
-            error::checked(nc_open_mem(
-                cstr.as_ptr(),
-                NC_NOWRITE,
-                mem.len(),
-                mem.as_ptr() as *const u8 as *mut _,
-                &mut ncid,
-            ))?;
-        }
-
-        Ok(Self {
-            file: File { ncid },
-            _buffer: std::marker::PhantomData,
-        })
+        &self.0
     }
 }

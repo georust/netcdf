@@ -985,6 +985,7 @@ fn read_from_memory() {
     let mut v = vec![0i32; 6 * 12];
     (*file)
         .variable("data")
+        .unwrap()
         .expect("Could not find variable")
         .values_to(&mut v, None, None)
         .unwrap();
@@ -1003,7 +1004,7 @@ fn add_conflicting_dimensions() {
     let e = file.add_dimension("x", 11).unwrap_err();
     assert!(match e {
         netcdf::error::Error::AlreadyExists => true,
-        _ => false
+        _ => false,
     });
     assert_eq!(file.dimension("x").unwrap().len(), 10);
 }
@@ -1025,7 +1026,8 @@ fn add_conflicting_variables() {
         }
         e => {
             panic!(e)
-        }});
+        }
+    });
     assert_eq!(
         10,
         file.variable("x").unwrap().unwrap().dimensions()[0].len()

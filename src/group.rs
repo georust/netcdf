@@ -37,10 +37,7 @@ impl<'f> Group<'f> {
     pub fn name(&self) -> error::Result<String> {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
-            error::checked(nc_inq_grpname(
-                self.ncid,
-                name.as_mut_ptr() as *mut _,
-            ))?;
+            error::checked(nc_inq_grpname(self.ncid, name.as_mut_ptr() as *mut _))?;
         }
         let zeropos = name
             .iter()
@@ -75,7 +72,8 @@ impl<'f> Group<'f> {
                 &mut ndims,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
-            )).unwrap();
+            ))
+            .unwrap();
         }
         let mut dimids = vec![0; ndims as _];
         unsafe {
@@ -95,7 +93,8 @@ impl<'f> Group<'f> {
                     _group: PhantomData,
                 })
             })
-            .collect::<error::Result<Vec<_>>>().unwrap();
+            .collect::<error::Result<Vec<_>>>()
+            .unwrap();
 
         Some(Variable {
             dimensions,
@@ -124,9 +123,7 @@ impl<'f> Group<'f> {
     pub fn dimension(&self, name: &str) -> Option<Dimension> {
         let cname = std::ffi::CString::new(name).unwrap();
         let mut dimid = 0;
-        let e = unsafe {
-            nc_inq_dimid(self.id(), cname.as_ptr(), &mut dimid)
-        };
+        let e = unsafe { nc_inq_dimid(self.id(), cname.as_ptr(), &mut dimid) };
         if e == NC_ENOTFOUND {
             return None;
         } else {
@@ -204,12 +201,7 @@ impl<'f> GroupMut<'f> {
         let cname = CString::new(name).unwrap();
 
         unsafe {
-            error::checked(nc_def_dim(
-                self.ncid,
-                cname.as_ptr(),
-                len,
-                &mut dimid,
-            ))?;
+            error::checked(nc_def_dim(self.ncid, cname.as_ptr(), len, &mut dimid))?;
         }
 
         Ok(Dimension {
@@ -232,11 +224,7 @@ impl<'f> GroupMut<'f> {
         let cstr = std::ffi::CString::new(name).unwrap();
         let mut grpid = 0;
         unsafe {
-            error::checked(nc_def_grp(
-                self.ncid,
-                cstr.as_ptr(),
-                &mut grpid,
-            ))?;
+            error::checked(nc_def_grp(self.ncid, cstr.as_ptr(), &mut grpid))?;
         }
 
         Ok(Self(
@@ -264,27 +252,40 @@ impl<'f> GroupMut<'f> {
 
         let mut varid = 0;
         unsafe {
-            error::checked(nc_def_var(self.id(), cname.as_ptr(), xtype, dims.len() as _, dims.as_ptr(), &mut varid))?;
+            error::checked(nc_def_var(
+                self.id(),
+                cname.as_ptr(),
+                xtype,
+                dims.len() as _,
+                dims.as_ptr(),
+                &mut varid,
+            ))?;
         }
-        let dimensions = odims.into_iter().map(|id|  {
-            let mut dimlen = 0;
-            unsafe {
-                error::checked(nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen))?;
-            }
-            Ok(Dimension {
-                len: core::num::NonZeroUsize::new(dimlen),
-                id: id.clone(),
-                _group: PhantomData,
+        let dimensions = odims
+            .into_iter()
+            .map(|id| {
+                let mut dimlen = 0;
+                unsafe {
+                    error::checked(nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen))?;
+                }
+                Ok(Dimension {
+                    len: core::num::NonZeroUsize::new(dimlen),
+                    id: id.clone(),
+                    _group: PhantomData,
+                })
             })
-        }).collect::<error::Result<Vec<_>>>()?;
+            .collect::<error::Result<Vec<_>>>()?;
 
-        Ok(VariableMut(Variable {
-            ncid: self.id(),
-            dimensions,
-            varid,
-            vartype: xtype,
-            _group: PhantomData,
-        }, PhantomData))
+        Ok(VariableMut(
+            Variable {
+                ncid: self.id(),
+                dimensions,
+                varid,
+                vartype: xtype,
+                _group: PhantomData,
+            },
+            PhantomData,
+        ))
     }
 
     /// Create a Variable into the dataset, with no data written into it
