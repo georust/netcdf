@@ -53,14 +53,14 @@ impl<'f> Group<'f> {
     }
 
     /// Get a variable from the group
-    pub fn variable<'g>(&'g self, name: &str) -> Option<Variable<'f, 'g>> {
-        Variable::find_from_name(self.id(), name).unwrap()
+    pub fn variable<'g>(&'g self, name: &str) -> error::Result<Option<Variable<'f, 'g>>> {
+        Variable::find_from_name(self.id(), name)
     }
     /// Iterate over all variables in a group
-    pub fn variables<'g>(&'g self) -> impl Iterator<Item = Variable<'f, 'g>> {
+    pub fn variables<'g>(
+        &'g self,
+    ) -> error::Result<impl Iterator<Item = error::Result<Variable<'f, 'g>>>> {
         super::variable::variables_at_ncid(self.id())
-            .unwrap()
-            .map(|var| var.unwrap())
     }
     /// Get a single attribute
     pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
@@ -74,35 +74,40 @@ impl<'f> Group<'f> {
         crate::attribute::AttributeIterator::new(self.ncid, None)
     }
     /// Get a single dimension
-    pub fn dimension(&self, name: &str) -> Option<Dimension> {
-        super::dimension::dimension_from_name(self.id(), name).unwrap()
+    pub fn dimension(&self, name: &str) -> error::Result<Option<Dimension>> {
+        super::dimension::dimension_from_name(self.id(), name)
     }
     /// Iterator over all dimensions
-    pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>> {
+    pub fn dimensions<'g>(
+        &'g self,
+    ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'g>>>> {
         super::dimension::dimensions_from_location(self.id())
-            .unwrap()
-            .map(|x| x.unwrap())
     }
     /// Get a group
     pub fn group(&self, name: &str) -> error::Result<Option<Self>> {
         group_from_name(self.id(), name)
     }
     /// Iterator over all subgroups in this group
-    pub fn groups<'g>(&'g self) -> impl Iterator<Item = Group<'g>> {
-        groups_at_ncid(self.id()).unwrap()
+    pub fn groups<'g>(&'g self) -> error::Result<impl Iterator<Item = Group<'g>>> {
+        groups_at_ncid(self.id())
     }
 }
 
 impl<'f> GroupMut<'f> {
     /// Get a mutable variable from the group
-    pub fn variable_mut<'g>(&'g mut self, name: &str) -> Option<VariableMut<'f, 'g>> {
-        self.variable(name).map(|v| VariableMut(v, PhantomData))
+    pub fn variable_mut<'g>(
+        &'g mut self,
+        name: &str,
+    ) -> error::Result<Option<VariableMut<'f, 'g>>> {
+        self.variable(name)
+            .map(|v| v.map(|v| VariableMut(v, PhantomData)))
     }
     /// Iterate over all variables in a group, with mutable access
     pub fn variables_mut<'g>(
         &'g mut self,
-    ) -> error::Result<impl Iterator<Item = VariableMut<'f, 'g>>> {
-        Ok((0..10).into_iter().map(|_| todo!()))
+    ) -> error::Result<impl Iterator<Item = error::Result<VariableMut<'f, 'g>>>> {
+        self.variables()
+            .map(|var| var.map(|var| var.map(|var| VariableMut(var, PhantomData))))
     }
     /// Mutable access to group
     pub fn group_mut(&'f mut self, name: &str) -> error::Result<Option<Self>> {
@@ -111,7 +116,7 @@ impl<'f> GroupMut<'f> {
     }
     /// Iterator over all groups (mutable access)
     pub fn groups_mut(&'f mut self) -> error::Result<impl Iterator<Item = GroupMut<'f>>> {
-        Ok((0..10).into_iter().map(|_| todo!()))
+        self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
 
     /// Add an attribute to the group
@@ -239,18 +244,6 @@ impl<'f> GroupMut<'f> {
     /// Adds a variable with a basic type of string
     pub fn add_string_variable(&mut self, name: &str, dims: &[&str]) -> error::Result<VariableMut> {
         VariableMut::add_from_str(self.id(), NC_STRING, name, dims)
-    }
-}
-
-impl<'f> Group<'f> {
-    /// Asserts all dimensions exists, and gets a copy of these
-    /// (will be moved into a Variable)
-    fn find_dimensions(&self, dims: &[&str]) -> error::Result<Vec<Dimension>> {
-        todo!()
-    }
-
-    pub(crate) fn parent(&self) -> Option<Self> {
-        unimplemented!()
     }
 }
 

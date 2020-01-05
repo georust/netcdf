@@ -44,8 +44,8 @@ fn root_dims() {
     let file = netcdf::open(&f).unwrap();
     assert_eq!(f.to_str().unwrap(), file.path().unwrap());
 
-    assert_eq!(file.dimension("x").unwrap().len(), 6);
-    assert_eq!(file.dimension("y").unwrap().len(), 12);
+    assert_eq!(file.dimension("x").unwrap().unwrap().len(), 6);
+    assert_eq!(file.dimension("y").unwrap().unwrap().len(), 12);
 }
 
 #[test]
@@ -54,8 +54,8 @@ fn access_through_deref() {
 
     let file = netcdf::open(&f).unwrap();
 
-    assert_eq!(file.dimension("x").unwrap().len(), 6);
-    assert_eq!(file.dimension("y").unwrap().len(), 12);
+    assert_eq!(file.dimension("x").unwrap().unwrap().len(), 6);
+    assert_eq!(file.dimension("y").unwrap().unwrap().len(), 12);
 
     let d = tempfile::tempdir().unwrap();
     let f = d.path().join("derefmut.nc");
@@ -65,6 +65,7 @@ fn access_through_deref() {
 
     assert_eq!(
         file.dimension("time")
+            .unwrap()
             .expect("Could not find dimension")
             .len(),
         10
@@ -166,13 +167,17 @@ fn dimension_lengths() {
     file.add_dimension("lim", 10)
         .expect("Could not create dimension");
 
-    let dim = &file.dimension("unlim").expect("Could not find dim");
+    let dim = &file
+        .dimension("unlim")
+        .unwrap()
+        .expect("Could not find dim");
     assert_eq!(dim.len(), 0);
 
-    let dim = &file.dimension("lim").expect("Could not find dim");
+    let dim = &file.dimension("lim").unwrap().expect("Could not find dim");
     assert_eq!(dim.len(), 10);
 
-    for dim in file.dimensions() {
+    for dim in file.dimensions().unwrap() {
+        let dim = dim.unwrap();
         assert!(dim.len() == 0 || dim.len() == 10);
     }
 }
@@ -243,7 +248,7 @@ fn nc4_groups() {
     assert_eq!(grp1.name().unwrap(), "grp1");
 
     let mut data = vec![0i32; 6 * 12];
-    let var = &grp1.variable("data").unwrap();
+    let var = &grp1.variable("data").unwrap().unwrap();
     var.values_to(&mut data, None, None).unwrap();
     for (i, x) in data.iter().enumerate() {
         assert_eq!(*x, i as i32);
@@ -287,6 +292,7 @@ fn create_group_dimensions() {
             .expect("Could not find group")
             .variable("y")
             .unwrap()
+            .unwrap()
             .dimensions()[0]
             .len(),
         100
@@ -300,6 +306,7 @@ fn create_group_dimensions() {
             .expect("Could not find group")
             .variable("y")
             .unwrap()
+            .unwrap()
             .dimensions()[0]
             .len(),
         100
@@ -312,6 +319,7 @@ fn create_group_dimensions() {
             .unwrap()
             .expect("Could not find group")
             .variable("z")
+            .unwrap()
             .expect("Could not find variable")
             .dimensions()[0]
             .len(),
@@ -346,6 +354,7 @@ fn def_dims_vars_attrs() {
         assert_eq!(
             file.root()
                 .dimension(dim1_name)
+                .unwrap()
                 .expect("Could not find dimension")
                 .len(),
             10
@@ -353,6 +362,7 @@ fn def_dims_vars_attrs() {
         assert_eq!(
             file.root()
                 .dimension(dim2_name)
+                .unwrap()
                 .expect("Could not find dimension")
                 .len(),
             20
@@ -395,8 +405,14 @@ fn def_dims_vars_attrs() {
         // verify dimensions
         let dim1_name = "ljkdsjkldfs";
         let dim2_name = "dsfkdfskl";
-        let dim1 = &file.dimension(dim1_name).expect("Could not find dimension");
-        let dim2 = &file.dimension(dim2_name).expect("Could not find dimension");
+        let dim1 = &file
+            .dimension(dim1_name)
+            .unwrap()
+            .expect("Could not find dimension");
+        let dim2 = &file
+            .dimension(dim2_name)
+            .unwrap()
+            .expect("Could not find dimension");
         assert_eq!(dim1.len(), 10);
         assert_eq!(dim2.len(), 20);
 
@@ -406,6 +422,7 @@ fn def_dims_vars_attrs() {
         let data_file = file
             .root()
             .variable(var_name)
+            .unwrap()
             .expect("Could not find variable")
             .values::<i32>(None, None)
             .unwrap();
@@ -417,6 +434,7 @@ fn def_dims_vars_attrs() {
         let data_file = file
             .root()
             .variable(var_name)
+            .unwrap()
             .expect("Could not find variable")
             .values::<f32>(None, None)
             .unwrap();
@@ -447,6 +465,7 @@ fn def_dims_vars_attrs() {
             AttrValue::Int(5),
             file.root()
                 .variable(var_name)
+                .unwrap()
                 .expect("Could not find variable")
                 .attribute("varattr1")
                 .expect("netcdf error occured")
@@ -458,6 +477,7 @@ fn def_dims_vars_attrs() {
             AttrValue::Str("Variable string attr".into()),
             file.root()
                 .variable(var_name)
+                .unwrap()
                 .expect("Could not find variable")
                 .attribute("varattr2")
                 .expect("netcdf error occured")
@@ -964,7 +984,8 @@ fn set_compression_all_variables_in_a_group() {
     file.add_variable::<u8>("var3", &["x", "y"])
         .expect("Could not create variable");
 
-    for ref mut var in file.variables_mut().unwrap() {
+    for var in file.variables_mut().unwrap() {
+        let mut var = var.unwrap();
         var.compression(9).expect("Could not set compression level");
     }
 
@@ -1011,7 +1032,7 @@ fn add_conflicting_dimensions() {
         netcdf::error::Error::AlreadyExists => true,
         _ => false,
     });
-    assert_eq!(file.dimension("x").unwrap().len(), 10);
+    assert_eq!(file.dimension("x").unwrap().unwrap().len(), 10);
 }
 
 #[test]
@@ -1307,6 +1328,7 @@ fn dimension_identifiers() {
             .unwrap()
             .variable("v_root_id")
             .unwrap()
+            .unwrap()
             .len(),
         10
     );
@@ -1315,6 +1337,7 @@ fn dimension_identifiers() {
             .unwrap()
             .unwrap()
             .variable("v_self_id")
+            .unwrap()
             .unwrap()
             .len(),
         5
@@ -1327,6 +1350,7 @@ fn dimension_identifiers() {
             .unwrap()
             .unwrap()
             .variable("v_self_id")
+            .unwrap()
             .unwrap()
             .len(),
         7
@@ -1340,6 +1364,7 @@ fn dimension_identifiers() {
             .unwrap()
             .variable("v_up_id")
             .unwrap()
+            .unwrap()
             .len(),
         5
     );
@@ -1351,6 +1376,7 @@ fn dimension_identifiers() {
             .unwrap()
             .unwrap()
             .variable("v_root_id")
+            .unwrap()
             .unwrap()
             .len(),
         10

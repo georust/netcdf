@@ -137,16 +137,16 @@ impl ReadOnlyFile {
     pub fn group(&self, name: &str) -> error::Result<Option<Group>> {
         super::group::group_from_name(self.ncid(), name)
     }
-    pub fn groups<'g>(&'g self) -> impl Iterator<Item = Group<'g>> {
-        super::group::groups_at_ncid(self.ncid()).unwrap()
+    pub fn groups<'g>(&'g self) -> error::Result<impl Iterator<Item = Group<'g>>> {
+        super::group::groups_at_ncid(self.ncid())
     }
-    pub fn dimension<'f>(&self, name: &str) -> Option<Dimension<'f>> {
-        super::dimension::dimension_from_name(self.ncid(), name).unwrap()
+    pub fn dimension<'f>(&self, name: &str) -> error::Result<Option<Dimension<'f>>> {
+        super::dimension::dimension_from_name(self.ncid(), name)
     }
-    pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>> {
+    pub fn dimensions<'g>(
+        &'g self,
+    ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'g>>>> {
         super::dimension::dimensions_from_location(self.ncid())
-            .unwrap()
-            .map(|x| x.unwrap())
     }
     pub fn attribute<'f>(&'f self, name: &str) -> error::Result<Option<Attribute<'f>>> {
         Attribute::find_from_name(self.ncid(), None, name)
@@ -230,9 +230,9 @@ impl MutableFile {
     }
     pub fn variables_mut<'f>(
         &'f mut self,
-    ) -> error::Result<impl Iterator<Item = VariableMut<'f, 'f>>> {
+    ) -> error::Result<impl Iterator<Item = error::Result<VariableMut<'f, 'f>>>> {
         self.variables()
-            .map(|v| v.map(|var| VariableMut(var.unwrap(), PhantomData)))
+            .map(|v| v.map(|var| var.map(|var| VariableMut(var, PhantomData))))
     }
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where
