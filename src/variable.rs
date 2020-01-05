@@ -57,9 +57,9 @@ impl<'f, 'g> Variable<'f, 'g> {
         ncid: nc_type,
         name: &str,
     ) -> error::Result<Option<Variable<'f, 'g>>> {
-        let cname = std::ffi::CString::new(name).unwrap();
+        let cname = super::utils::short_name_to_bytes(name)?;
         let mut varid = 0;
-        let e = unsafe { nc_inq_varid(ncid, cname.as_ptr(), &mut varid) };
+        let e = unsafe { nc_inq_varid(ncid, cname.as_ptr() as *const _, &mut varid) };
         if e == NC_ENOTFOUND {
             return Ok(None);
         } else {
@@ -96,7 +96,7 @@ impl<'f, 'g> Variable<'f, 'g> {
 
     /// Get name of variable
     pub fn name(&self) -> error::Result<String> {
-        let mut name = vec![0; NC_MAX_NAME as usize + 1];
+        let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
             error::checked(nc_inq_varname(
                 self.ncid,
@@ -1110,12 +1110,12 @@ impl<'f, 'g> VariableMut<'f, 'g> {
             .map(|dimname| super::dimension::from_name_toid(ncid, dimname))
             .collect::<error::Result<Vec<_>>>()?;
 
-        let cname = std::ffi::CString::new(name).unwrap();
+        let cname = super::utils::short_name_to_bytes(name)?;
         let mut varid = 0;
         unsafe {
             error::checked(nc_def_var(
                 ncid,
-                cname.as_ptr(),
+                cname.as_ptr() as *const _,
                 xtype,
                 dimensions.len() as _,
                 dimensions.as_ptr(),
@@ -1182,7 +1182,7 @@ pub(crate) fn add_variable_from_identifiers<'f, 'g>(
     dims: &[super::dimension::Identifier],
     xtype: nc_type,
 ) -> error::Result<VariableMut<'f, 'g>> {
-    let cname = std::ffi::CString::new(name).unwrap();
+    let cname = super::utils::short_name_to_bytes(name)?;
 
     let dimensions = dims
         .into_iter()
@@ -1210,7 +1210,7 @@ pub(crate) fn add_variable_from_identifiers<'f, 'g>(
     unsafe {
         error::checked(nc_def_var(
             ncid,
-            cname.as_ptr(),
+            cname.as_ptr() as *const _,
             xtype,
             dims.len() as _,
             dims.as_ptr(),

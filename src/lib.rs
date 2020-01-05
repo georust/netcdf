@@ -117,3 +117,20 @@ lazy_static! {
     /// Use this when accessing netcdf functions
     pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());
 }
+
+pub(crate) mod utils {
+    use super::*;
+    use netcdf_sys::{NC_EMAXNAME, NC_MAX_NAME};
+    /// Use this function for short netcdf names to avoid the allocation
+    /// for a `CString`
+    pub(crate) fn short_name_to_bytes(name: &str) -> error::Result<[u8; NC_MAX_NAME as usize + 1]> {
+        if name.len() > NC_MAX_NAME as _ {
+            Err(NC_EMAXNAME.into())
+        } else {
+            let len = name.bytes().position(|x| x == 0).unwrap_or(name.len());
+            let mut bytes = [0_u8; NC_MAX_NAME as usize + 1];
+            bytes[..len].copy_from_slice(name.as_bytes());
+            Ok(bytes)
+        }
+    }
+}

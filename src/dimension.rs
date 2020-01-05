@@ -75,18 +75,18 @@ impl<'g> Dimension<'g> {
 
 pub(crate) fn from_name_toid<'f>(loc: nc_type, name: &str) -> error::Result<nc_type> {
     let mut dimid = 0;
-    let cname = std::ffi::CString::new(name).unwrap();
+    let cname = super::utils::short_name_to_bytes(name)?;
     unsafe {
-        error::checked(nc_inq_dimid(loc, cname.as_ptr(), &mut dimid))?;
+        error::checked(nc_inq_dimid(loc, cname.as_ptr() as *const _, &mut dimid))?;
     }
     Ok(dimid)
 }
 
 pub(crate) fn from_name<'f>(loc: nc_type, name: &str) -> error::Result<Dimension<'f>> {
     let mut dimid = 0;
-    let cname = std::ffi::CString::new(name).unwrap();
+    let cname = super::utils::short_name_to_bytes(name)?;
     unsafe {
-        error::checked(nc_inq_dimid(loc, cname.as_ptr(), &mut dimid))?;
+        error::checked(nc_inq_dimid(loc, cname.as_ptr() as *const _, &mut dimid))?;
     }
     let mut dimlen = 0;
     unsafe {
@@ -167,9 +167,9 @@ pub(crate) fn dimension_from_name<'f>(
     ncid: nc_type,
     name: &str,
 ) -> error::Result<Option<Dimension<'f>>> {
-    let cname = std::ffi::CString::new(name).unwrap();
+    let cname = super::utils::short_name_to_bytes(name)?;
     let mut dimid = 0;
-    let e = unsafe { nc_inq_dimid(ncid, cname.as_ptr(), &mut dimid) };
+    let e = unsafe { nc_inq_dimid(ncid, cname.as_ptr() as *const _, &mut dimid) };
     if e == NC_ENOTFOUND {
         return Ok(None);
     } else {
@@ -191,10 +191,15 @@ pub(crate) fn add_dimension_at<'f>(
     name: &str,
     len: usize,
 ) -> error::Result<Dimension<'f>> {
-    let cname = std::ffi::CString::new(name).unwrap();
+    let cname = super::utils::short_name_to_bytes(name)?;
     let mut dimid = 0;
     unsafe {
-        error::checked(nc_def_dim(ncid, cname.as_ptr(), len, &mut dimid))?;
+        error::checked(nc_def_dim(
+            ncid,
+            cname.as_ptr() as *const _,
+            len,
+            &mut dimid,
+        ))?;
     }
     Ok(Dimension {
         len: core::num::NonZeroUsize::new(dimid as _),

@@ -145,10 +145,10 @@ impl<'f> GroupMut<'f> {
     }
 
     pub(crate) fn add_group_at(ncid: nc_type, name: &str) -> error::Result<Self> {
-        let cstr = std::ffi::CString::new(name).unwrap();
+        let cname = super::utils::short_name_to_bytes(name)?;
         let mut grpid = 0;
         unsafe {
-            error::checked(nc_def_grp(ncid, cstr.as_ptr(), &mut grpid))?;
+            error::checked(nc_def_grp(ncid, cname.as_ptr() as *const _, &mut grpid))?;
         }
 
         Ok(Self(
@@ -217,9 +217,9 @@ pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<I
 }
 
 pub(crate) fn group_from_name<'f>(ncid: nc_type, name: &str) -> error::Result<Option<Group<'f>>> {
-    let cname = std::ffi::CString::new(name).unwrap();
+    let cname = super::utils::short_name_to_bytes(name)?;
     let mut grpid = 0;
-    let e = unsafe { nc_inq_grp_ncid(ncid, cname.as_ptr(), &mut grpid) };
+    let e = unsafe { nc_inq_grp_ncid(ncid, cname.as_ptr() as *const _, &mut grpid) };
     if e == NC_ENOTFOUND {
         return Ok(None);
     } else {

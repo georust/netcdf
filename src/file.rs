@@ -120,7 +120,7 @@ impl ReadOnlyFile {
             name
         };
 
-        String::from_utf8(name).map_err(|e| e.into())
+        Ok(String::from_utf8(name)?)
     }
 
     /// Main entrypoint for interacting with the netcdf file.

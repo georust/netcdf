@@ -469,14 +469,7 @@ impl<'a> Attribute<'a> {
         name: &str,
         val: AttrValue,
     ) -> error::Result<Self> {
-        let cname = {
-            if name.len() > NC_MAX_NAME as usize {
-                return Err(error::Error::Netcdf(NC_EMAXNAME));
-            }
-            let mut attname = [0_u8; NC_MAX_NAME as usize + 1];
-            attname[..name.len()].copy_from_slice(name.as_bytes());
-            attname
-        };
+        let cname = super::utils::short_name_to_bytes(name)?;
 
         error::checked(unsafe {
             match val {
