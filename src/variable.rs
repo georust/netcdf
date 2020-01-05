@@ -1190,9 +1190,29 @@ pub(crate) fn add_variable_from_identifiers<'f, 'g>(
     dims: &[super::dimension::Identifier],
     xtype: nc_type,
 ) -> error::Result<VariableMut<'f, 'g>> {
-    let odims = dims;
-    let dims = dims.iter().map(|x| x.dimid).collect::<Vec<_>>();
     let cname = std::ffi::CString::new(name).unwrap();
+
+    let dimensions = dims
+        .into_iter()
+        .map(|id| {
+            // Internal netcdf detail, the top 16 bits gives the corresponding
+            // file handle. This to ensure dimensions are not added from another
+            // file which is unrelated to self
+            if id.ncid >> 16 != ncid >> 16 {
+                Err(error::Error::WrongDataset)?;
+            }
+            let mut dimlen = 0;
+            unsafe {
+                error::checked(nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen))?;
+            }
+            Ok(Dimension {
+                len: core::num::NonZeroUsize::new(dimlen),
+                id: id.clone(),
+                _group: PhantomData,
+            })
+        })
+        .collect::<error::Result<Vec<_>>>()?;
+    let dims = dims.iter().map(|x| x.dimid).collect::<Vec<_>>();
 
     let mut varid = 0;
     unsafe {
@@ -1205,20 +1225,6 @@ pub(crate) fn add_variable_from_identifiers<'f, 'g>(
             &mut varid,
         ))?;
     }
-    let dimensions = odims
-        .into_iter()
-        .map(|id| {
-            let mut dimlen = 0;
-            unsafe {
-                error::checked(nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen))?;
-            }
-            Ok(Dimension {
-                len: core::num::NonZeroUsize::new(dimlen),
-                id: id.clone(),
-                _group: PhantomData,
-            })
-        })
-        .collect::<error::Result<Vec<_>>>()?;
 
     Ok(VariableMut(
         Variable {

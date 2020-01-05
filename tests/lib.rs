@@ -1565,3 +1565,37 @@ mod strided {
         );
     }
 }
+
+#[test]
+fn dimension_identifiers_from_different_ncids() {
+    let d = tempfile::tempdir().unwrap();
+    let path0 = d.path().join("lifetimes0.nc");
+    let path1 = d.path().join("lifetimes1.nc");
+    let mut file0 = netcdf::create(path0).unwrap();
+    let mut file1 = netcdf::create(path1).unwrap();
+
+    file0.add_dimension("d", 10).unwrap();
+    let mut g1 = file1.add_group("group").unwrap();
+    let d1 = g1.add_dimension("d", 11).unwrap();
+
+    match file0
+        .add_variable_from_identifiers::<u8>("var", &[d1.identifier()])
+        .unwrap_err()
+    {
+        netcdf::error::Error::WrongDataset => (),
+        _ => panic!(),
+    }
+
+    let d0 = file0.add_dimension("f", 20).unwrap();
+    let id = d0.identifier();
+    file0
+        .add_variable_from_identifiers::<u8>("var2", &[id])
+        .unwrap();
+
+    let mut g0 = file0.add_group("g").unwrap();
+    let dg = g0.add_dimension("h", 17).unwrap();
+    let idg = dg.identifier();
+
+    g0.add_variable_from_identifiers::<u8>("var3", &[id, idg])
+        .unwrap();
+}
