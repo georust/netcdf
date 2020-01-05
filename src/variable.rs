@@ -1197,3 +1197,86 @@ impl<'f, 'g> VariableMut<'f, 'g> {
         ))
     }
 }
+
+pub(crate) fn variables_at_ncid<'f, 'g>(
+    ncid: nc_type,
+) -> error::Result<impl Iterator<Item = error::Result<Variable<'f, 'g>>>>
+where
+    'f: 'g,
+{
+    let mut nvars = 0;
+    unsafe {
+        error::checked(nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut()))?;
+    }
+    let mut varids = vec![0; nvars as _];
+    unsafe {
+        error::checked(nc_inq_varids(
+            ncid,
+            std::ptr::null_mut(),
+            varids.as_mut_ptr(),
+        ))?;
+    }
+    Ok(varids.into_iter().map(move |varid| {
+        let mut xtype = 0;
+        unsafe {
+            error::checked(nc_inq_vartype(ncid, varid, &mut xtype))?;
+        }
+        let dimensions = super::dimension::dimensions_from_variable(ncid, varid)?
+            .collect::<error::Result<Vec<_>>>()?;
+        Ok(Variable {
+            ncid,
+            varid,
+            dimensions,
+            vartype: xtype,
+            _group: PhantomData,
+        })
+    }))
+}
+
+pub(crate) fn add_variable_from_identifiers<'f, 'g>(
+    ncid: nc_type,
+    name: &str,
+    dims: &[super::dimension::Identifier],
+    xtype: nc_type,
+) -> error::Result<VariableMut<'f, 'g>> {
+    let odims = dims;
+    let dims = dims.iter().map(|x| x.dimid).collect::<Vec<_>>();
+    let cname = std::ffi::CString::new(name).unwrap();
+
+    let mut varid = 0;
+    unsafe {
+        error::checked(nc_def_var(
+            ncid,
+            cname.as_ptr(),
+            xtype,
+            dims.len() as _,
+            dims.as_ptr(),
+            &mut varid,
+        ))?;
+    }
+    let dimensions = odims
+        .into_iter()
+        .map(|id| {
+            let mut dimlen = 0;
+            unsafe {
+                error::checked(nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen))?;
+            }
+            Ok(Dimension {
+                len: core::num::NonZeroUsize::new(dimlen),
+                id: id.clone(),
+                _group: PhantomData,
+            })
+        })
+        .collect::<error::Result<Vec<_>>>()?;
+
+    Ok(VariableMut(
+        Variable {
+            ncid,
+            dimensions,
+            varid,
+            vartype: xtype,
+            _group: PhantomData,
+        },
+        PhantomData,
+    ))
+}

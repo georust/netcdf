@@ -47,6 +47,7 @@ impl<'f> Group<'f> {
 
         Ok(String::from_utf8(name)?)
     }
+    /// Internal ncid of the group
     fn id(&self) -> nc_type {
         self.ncid
     }
@@ -57,7 +58,9 @@ impl<'f> Group<'f> {
     }
     /// Iterate over all variables in a group
     pub fn variables<'g>(&'g self) -> impl Iterator<Item = Variable<'f, 'g>> {
-        (0..).into_iter().map(|_| todo!())
+        super::variable::variables_at_ncid(self.id())
+            .unwrap()
+            .map(|var| var.unwrap())
     }
     /// Get a single attribute
     pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
@@ -72,26 +75,7 @@ impl<'f> Group<'f> {
     }
     /// Get a single dimension
     pub fn dimension(&self, name: &str) -> Option<Dimension> {
-        let cname = std::ffi::CString::new(name).unwrap();
-        let mut dimid = 0;
-        let e = unsafe { nc_inq_dimid(self.id(), cname.as_ptr(), &mut dimid) };
-        if e == NC_ENOTFOUND {
-            return None;
-        } else {
-            error::checked(e).unwrap();
-        }
-        let mut dimlen = 0;
-        unsafe {
-            error::checked(nc_inq_dimlen(self.id(), dimid, &mut dimlen)).unwrap();
-        }
-        Some(Dimension {
-            len: core::num::NonZeroUsize::new(dimlen),
-            id: super::dimension::Identifier {
-                ncid: self.id(),
-                dimid,
-            },
-            _group: PhantomData,
-        })
+        super::dimension::dimension_from_name(self.id(), name).unwrap()
     }
     /// Iterator over all dimensions
     pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>> {
@@ -100,28 +84,19 @@ impl<'f> Group<'f> {
             .map(|x| x.unwrap())
     }
     /// Get a group
-    pub fn group(&self, name: &str) -> Option<Self> {
-        let cname = std::ffi::CString::new(name).unwrap();
-        let mut grpid = 0;
-        unsafe {
-            error::checked(nc_inq_grp_ncid(self.ncid, cname.as_ptr(), &mut grpid)).unwrap();
-        }
-
-        Some(Group {
-            ncid: grpid,
-            _file: PhantomData,
-        })
+    pub fn group(&self, name: &str) -> error::Result<Option<Self>> {
+        group_from_name(self.id(), name)
     }
     /// Iterator over all subgroups in this group
     pub fn groups<'g>(&'g self) -> impl Iterator<Item = Group<'g>> {
-        (0..).into_iter().map(|_| todo!())
+        groups_at_ncid(self.id()).unwrap()
     }
 }
 
 impl<'f> GroupMut<'f> {
     /// Get a mutable variable from the group
     pub fn variable_mut<'g>(&'g mut self, name: &str) -> Option<VariableMut<'f, 'g>> {
-        todo!()
+        self.variable(name).map(|v| VariableMut(v, PhantomData))
     }
     /// Iterate over all variables in a group, with mutable access
     pub fn variables_mut<'g>(
@@ -130,8 +105,9 @@ impl<'f> GroupMut<'f> {
         Ok((0..10).into_iter().map(|_| todo!()))
     }
     /// Mutable access to group
-    pub fn group_mut(&'f mut self, name: &str) -> Option<Self> {
-        self.group(name).map(|g| GroupMut(g, PhantomData))
+    pub fn group_mut(&'f mut self, name: &str) -> error::Result<Option<Self>> {
+        self.group(name)
+            .map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
     /// Iterator over all groups (mutable access)
     pub fn groups_mut(&'f mut self) -> error::Result<impl Iterator<Item = GroupMut<'f>>> {
@@ -172,12 +148,11 @@ impl<'f> GroupMut<'f> {
         self.add_dimension(name, 0)
     }
 
-    /// Add an empty group to the dataset
-    pub fn add_group(&mut self, name: &str) -> error::Result<Self> {
+    pub(crate) fn add_group_at(ncid: nc_type, name: &str) -> error::Result<Self> {
         let cstr = std::ffi::CString::new(name).unwrap();
         let mut grpid = 0;
         unsafe {
-            error::checked(nc_def_grp(self.ncid, cstr.as_ptr(), &mut grpid))?;
+            error::checked(nc_def_grp(ncid, cstr.as_ptr(), &mut grpid))?;
         }
 
         Ok(Self(
@@ -187,6 +162,11 @@ impl<'f> GroupMut<'f> {
             },
             PhantomData,
         ))
+    }
+
+    /// Add an empty group to the dataset
+    pub fn add_group(&mut self, name: &str) -> error::Result<Self> {
+        Self::add_group_at(self.id(), name)
     }
     /// Adds a variable from a set of unique identifiers, recursing upwards
     /// from the current group if necessary.
@@ -272,4 +252,34 @@ impl<'f> Group<'f> {
     pub(crate) fn parent(&self) -> Option<Self> {
         unimplemented!()
     }
+}
+
+pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<Item = Group<'f>>> {
+    let mut ngrps = 0;
+    unsafe {
+        error::checked(nc_inq_grps(ncid, &mut ngrps, std::ptr::null_mut()))?;
+    }
+    let mut grps = vec![0; ngrps as _];
+    unsafe {
+        error::checked(nc_inq_grps(ncid, std::ptr::null_mut(), grps.as_mut_ptr()))?;
+    }
+    Ok(grps.into_iter().map(|id| Group {
+        ncid: id,
+        _file: PhantomData,
+    }))
+}
+
+pub(crate) fn group_from_name<'f>(ncid: nc_type, name: &str) -> error::Result<Option<Group<'f>>> {
+    let cname = std::ffi::CString::new(name).unwrap();
+    let mut grpid = 0;
+    let e = unsafe { nc_inq_grp_ncid(ncid, cname.as_ptr(), &mut grpid) };
+    if e == NC_ENOTFOUND {
+        return Ok(None);
+    } else {
+        error::checked(e)?;
+    }
+    Ok(Some(Group {
+        ncid: grpid,
+        _file: PhantomData,
+    }))
 }

@@ -161,3 +161,43 @@ pub(crate) fn dimensions_from_variable<'g>(
         })
     }))
 }
+
+pub(crate) fn dimension_from_name<'f>(
+    ncid: nc_type,
+    name: &str,
+) -> error::Result<Option<Dimension<'f>>> {
+    let cname = std::ffi::CString::new(name).unwrap();
+    let mut dimid = 0;
+    let e = unsafe { nc_inq_dimid(ncid, cname.as_ptr(), &mut dimid) };
+    if e == NC_ENOTFOUND {
+        return Ok(None);
+    } else {
+        error::checked(e)?;
+    }
+    let mut dimlen = 0;
+    unsafe {
+        error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen)).unwrap();
+    }
+    Ok(Some(Dimension {
+        len: core::num::NonZeroUsize::new(dimlen),
+        id: super::dimension::Identifier { ncid, dimid },
+        _group: PhantomData,
+    }))
+}
+
+pub(crate) fn add_dimension_at<'f>(
+    ncid: nc_type,
+    name: &str,
+    len: usize,
+) -> error::Result<Dimension<'f>> {
+    let cname = std::ffi::CString::new(name).unwrap();
+    let mut dimid = 0;
+    unsafe {
+        error::checked(nc_def_dim(ncid, cname.as_ptr(), len, &mut dimid))?;
+    }
+    Ok(Dimension {
+        len: core::num::NonZeroUsize::new(dimid as _),
+        id: Identifier { ncid: ncid, dimid },
+        _group: PhantomData,
+    })
+}

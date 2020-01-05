@@ -239,7 +239,7 @@ fn nc4_groups() {
 
     let file = netcdf::open(&f).unwrap();
 
-    let grp1 = &file.group("grp1").expect("Could not find group");
+    let grp1 = &file.group("grp1").expect("Could not find group").unwrap();
     assert_eq!(grp1.name().unwrap(), "grp1");
 
     let mut data = vec![0i32; 6 * 12];
@@ -283,6 +283,7 @@ fn create_group_dimensions() {
 
     assert_eq!(
         f.group("gp1")
+            .unwrap()
             .expect("Could not find group")
             .variable("y")
             .unwrap()
@@ -292,8 +293,10 @@ fn create_group_dimensions() {
     );
     assert_eq!(
         f.group("gp1")
+            .unwrap()
             .expect("Could not find group")
             .group("gp2")
+            .unwrap()
             .expect("Could not find group")
             .variable("y")
             .unwrap()
@@ -303,8 +306,10 @@ fn create_group_dimensions() {
     );
     assert_eq!(
         f.group("gp1")
+            .unwrap()
             .expect("Could not find group")
             .group("gp2")
+            .unwrap()
             .expect("Could not find group")
             .variable("z")
             .expect("Could not find variable")
@@ -374,7 +379,7 @@ fn def_dims_vars_attrs() {
             .unwrap();
 
         // test var attrs
-        let mut var = file.variable_mut(var_name).unwrap();
+        let mut var = file.variable_mut(var_name).unwrap().unwrap();
         var.add_attribute("varattr1", 5).unwrap();
         var.add_attribute("varattr2", "Variable string attr".to_string())
             .unwrap();
@@ -711,7 +716,7 @@ fn put_single_value() {
     {
         // re-open it in append mode
         let mut file_a = netcdf::append(&f).unwrap();
-        let var = &mut file_a.variable_mut(var_name).unwrap();
+        let var = &mut file_a.variable_mut(var_name).unwrap().unwrap();
         var.put_value(100.0f32, Some(&indices)).unwrap();
         // close it (done when `file_a` goes out of scope)
     }
@@ -747,7 +752,7 @@ fn put_values() {
     {
         // re-open it in append mode
         let mut file_a = netcdf::append(&f).unwrap();
-        let var = &mut file_a.variable_mut(var_name).unwrap();
+        let var = &mut file_a.variable_mut(var_name).unwrap().unwrap();
         let res = var.put_values(values, Some(indices), Some(len));
         assert_eq!(res.unwrap(), ());
         // close it (done when `file_a` goes out of scope)
@@ -963,7 +968,7 @@ fn set_compression_all_variables_in_a_group() {
         var.compression(9).expect("Could not set compression level");
     }
 
-    let mut var = file.variable_mut("var0").unwrap();
+    let mut var = file.variable_mut("var0").unwrap().unwrap();
     var.compression(netcdf_sys::NC_MAX_DEFLATE_LEVEL + 1)
         .unwrap_err();
 }
@@ -1248,7 +1253,7 @@ fn unlimited_in_parents() {
     }
     let mut file = netcdf::append(&path).unwrap();
 
-    let g = &mut file.group_mut("g").unwrap();
+    let g = &mut file.group_mut("g").unwrap().unwrap();
     g.add_variable::<i16>("w", &["z1"]).unwrap();
     g.add_variable::<u16>("v", &["x"]).unwrap();
 }
@@ -1266,20 +1271,25 @@ fn dimension_identifiers() {
         let g = &mut file.add_group("g").unwrap();
         let dim = &g.add_dimension("x", 5).unwrap();
         let vgid = dim.identifier();
-        let mut gg = file.group_mut("g").unwrap().add_group("g").unwrap();
+        let mut gg = file
+            .group_mut("g")
+            .unwrap()
+            .unwrap()
+            .add_group("g")
+            .unwrap();
         let dim = &gg.add_dimension("x", 7).unwrap();
         let vggid = dim.identifier();
 
         // Create variables
         file.add_variable_from_identifiers::<i8>("v_self_id", &[vrootid])
             .unwrap();
-        let mut g = file.group_mut("g").unwrap();
+        let mut g = file.group_mut("g").unwrap().unwrap();
         g.add_variable_from_identifiers::<i8>("v_root_id", &[vrootid])
             .unwrap();
         g.add_variable_from_identifiers::<i8>("v_self_id", &[vgid])
             .unwrap();
 
-        let gg = &mut g.group_mut("g").unwrap();
+        let gg = &mut g.group_mut("g").unwrap().unwrap();
         gg.add_variable_from_identifiers::<i8>("v_root_id", &[vrootid])
             .unwrap();
         gg.add_variable_from_identifiers::<i8>("v_up_id", &[vgid])
@@ -1294,6 +1304,7 @@ fn dimension_identifiers() {
     assert_eq!(
         file.group("g")
             .unwrap()
+            .unwrap()
             .variable("v_root_id")
             .unwrap()
             .len(),
@@ -1301,6 +1312,7 @@ fn dimension_identifiers() {
     );
     assert_eq!(
         file.group("g")
+            .unwrap()
             .unwrap()
             .variable("v_self_id")
             .unwrap()
@@ -1310,7 +1322,9 @@ fn dimension_identifiers() {
     assert_eq!(
         file.group("g")
             .unwrap()
+            .unwrap()
             .group("g")
+            .unwrap()
             .unwrap()
             .variable("v_self_id")
             .unwrap()
@@ -1320,7 +1334,9 @@ fn dimension_identifiers() {
     assert_eq!(
         file.group("g")
             .unwrap()
+            .unwrap()
             .group("g")
+            .unwrap()
             .unwrap()
             .variable("v_up_id")
             .unwrap()
@@ -1330,7 +1346,9 @@ fn dimension_identifiers() {
     assert_eq!(
         file.group("g")
             .unwrap()
+            .unwrap()
             .group("g")
+            .unwrap()
             .unwrap()
             .variable("v_root_id")
             .unwrap()

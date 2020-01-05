@@ -51,7 +51,7 @@
 //! // open it in read/write mode
 //! let mut file = netcdf::append("crabs2.nc")?;
 //! // get a mutable binding of the variable "crab_coolness_level"
-//! let mut var = file.variable_mut("crab_coolness_level").unwrap();
+//! let mut var = file.variable_mut("crab_coolness_level")?.unwrap();
 //!
 //! let data : Vec<i32> = vec![100; 10];
 //! // write 5 first elements of the vector `data` into `var` starting at index 2;
