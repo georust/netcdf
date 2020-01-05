@@ -469,7 +469,6 @@ impl<'a> Attribute<'a> {
             attname
         };
 
-        let _l = LOCK.lock().unwrap();
         error::checked(unsafe {
             match val {
                 AttrValue::Uchar(x) => {

@@ -4,7 +4,6 @@
 
 #![allow(clippy::similar_names)]
 use super::nc_type;
-use super::LOCK;
 use netcdf_sys::nc_strerror;
 use std::num::TryFromIntError;
 
@@ -125,7 +124,6 @@ impl fmt::Display for Error {
             Self::AlreadyExists => write!(f, "variable/group/dimension already exists"),
             Self::NotFound(x) => write!(f, "Could not find {}", x),
             Self::Netcdf(x) => {
-                let _l = LOCK.lock().unwrap();
                 let msg;
                 unsafe {
                     let cmsg = nc_strerror(*x);

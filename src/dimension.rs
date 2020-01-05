@@ -33,6 +33,7 @@ impl<'g> Dimension<'g> {
         } else {
             let mut len = 0;
             let err = unsafe {
+                // Must lock in case other variables adds to the dimension length
                 let _l = LOCK.lock().unwrap();
                 error::checked(nc_inq_dimlen(self.id.ncid, self.id.dimid, &mut len))
             };

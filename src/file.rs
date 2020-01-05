@@ -193,10 +193,12 @@ impl MutableFile {
     where
         T: Numeric,
     {
+        let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.ncid(), T::NCTYPE, name, dims)
     }
 
     pub fn add_dimension<'g>(&'g mut self, name: &str, len: usize) -> error::Result<Dimension<'g>> {
+        let _l = LOCK.lock().unwrap();
         super::dimension::add_dimension_at(self.ncid(), name, len)
     }
     pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<Dimension> {
@@ -217,12 +219,15 @@ impl MutableFile {
     where
         T: Numeric,
     {
+        let _l = LOCK.lock().unwrap();
         super::variable::add_variable_from_identifiers(self.ncid(), name, dims, T::NCTYPE)
     }
     pub fn add_group<'f>(&'f mut self, name: &str) -> error::Result<GroupMut<'f>> {
+        let _l = LOCK.lock().unwrap();
         GroupMut::add_group_at(self.ncid(), name)
     }
     pub fn add_string_variable(&mut self, name: &str, dims: &[&str]) -> error::Result<VariableMut> {
+        let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.ncid(), NC_STRING, name, dims)
     }
     pub fn variable_mut<'g>(
@@ -242,6 +247,7 @@ impl MutableFile {
     where
         T: Into<AttrValue>,
     {
+        let _l = LOCK.lock().unwrap();
         Attribute::put(self.ncid(), NC_GLOBAL, name, val.into())
     }
 }

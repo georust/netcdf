@@ -157,7 +157,6 @@ impl<'f, 'g> VariableMut<'f, 'g> {
     /// compression (good for CPU bound tasks), and 9 providing the
     /// highest compression level (good for memory bound tasks)
     pub fn compression(&mut self, deflate_level: nc_type) -> error::Result<()> {
-        let _l = LOCK.lock().unwrap();
         unsafe {
             error::checked(nc_def_var_deflate(
                 self.ncid,
@@ -178,7 +177,6 @@ impl<'f, 'g> VariableMut<'f, 'g> {
     /// the file. This has no effect on the memory order when reading/putting
     /// a buffer.
     pub fn chunking(&mut self, chunksize: &[usize]) -> error::Result<()> {
-        let _l = LOCK.lock().unwrap();
         if chunksize.len() != self.dimensions.len() {
             return Err(error::Error::SliceLen);
         }
@@ -480,7 +478,6 @@ macro_rules! impl_numeric {
                 indices: &[usize],
                 value: Self,
             ) -> error::Result<()> {
-                let _g = LOCK.lock().unwrap();
                 error::checked($nc_put_var1_type(
                     variable.ncid,
                     variable.varid,
@@ -496,7 +493,6 @@ macro_rules! impl_numeric {
                 slice_len: &[usize],
                 values: &[Self],
             ) -> error::Result<()> {
-                let _l = LOCK.lock().unwrap();
                 error::checked($nc_put_vara_type(
                     variable.ncid,
                     variable.varid,
@@ -531,7 +527,6 @@ macro_rules! impl_numeric {
                 strides: &[isize],
                 values: *const Self,
             ) -> error::Result<()> {
-                let _l = LOCK.lock().unwrap();
                 error::checked($nc_put_vars_type(
                     variable.ncid,
                     variable.varid,
@@ -694,6 +689,7 @@ impl<'f, 'g> VariableMut<'f, 'g> {
     where
         T: Into<AttrValue>,
     {
+        let _l = LOCK.lock().unwrap();
         Attribute::put(self.ncid, self.varid, name, val.into())
     }
 }
@@ -725,10 +721,10 @@ impl<'f, 'g> Variable<'f, 'g> {
             indices_ = self.default_indices(false)?;
             &indices_
         };
-        let _l = LOCK.lock().unwrap();
 
         let mut s: *mut std::os::raw::c_char = std::ptr::null_mut();
         unsafe {
+            let _l = LOCK.lock().unwrap();
             error::checked(nc_get_var1_string(
                 self.ncid,
                 self.varid,
@@ -785,8 +781,8 @@ impl<'f, 'g> Variable<'f, 'g> {
         }
         let mut location = std::mem::MaybeUninit::uninit();
         let mut nofill: nc_type = 0;
-        let _l = LOCK.lock().unwrap();
         unsafe {
+            let _l = LOCK.lock().unwrap();
             error::checked(nc_inq_var_fill(
                 self.ncid,
                 self.varid,
@@ -936,8 +932,6 @@ impl<'f, 'g> VariableMut<'f, 'g> {
         let value = std::ffi::CString::new(value).expect("String contained interior 0");
         let mut ptr = value.as_ptr();
 
-        let _l = LOCK.lock().unwrap();
-
         unsafe {
             error::checked(nc_put_var1_string(
                 self.ncid,
@@ -1059,7 +1053,6 @@ impl<'f, 'g> VariableMut<'f, 'g> {
         if T::NCTYPE != self.vartype {
             return Err(error::Error::TypeMismatch);
         }
-        let _l = LOCK.lock().unwrap();
         unsafe {
             error::checked(nc_def_var_fill(
                 self.ncid,
@@ -1079,7 +1072,6 @@ impl<'f, 'g> VariableMut<'f, 'g> {
     /// This is unsafe, as reading from this variable without
     /// writing to it will produce potential garbage values
     pub unsafe fn set_nofill(&mut self) -> error::Result<()> {
-        let _l = LOCK.lock().unwrap();
         error::checked(nc_def_var_fill(
             self.ncid,
             self.varid,
@@ -1093,7 +1085,6 @@ impl<'f, 'g> VariableMut<'f, 'g> {
     /// `endian` can take a `Endianness` value with Native being `NC_ENDIAN_NATIVE` (0),
     /// Little `NC_ENDIAN_LITTLE` (1), Big `NC_ENDIAN_BIG` (2)
     pub fn endian(&mut self, e: Endianness) -> error::Result<()> {
-        let _l = LOCK.lock().unwrap();
         let endianness = match e {
             Endianness::Native => NC_ENDIAN_NATIVE,
             Endianness::Little => NC_ENDIAN_LITTLE,

@@ -6,6 +6,7 @@ use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
 use super::variable::{Numeric, Variable, VariableMut};
+use super::LOCK;
 use netcdf_sys::*;
 use std::marker::PhantomData;
 
@@ -124,11 +125,13 @@ impl<'f> GroupMut<'f> {
     where
         T: Into<AttrValue>,
     {
+        let _l = LOCK.lock().unwrap();
         Attribute::put(self.ncid, NC_GLOBAL, name, val.into())
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension<'g>(&'g mut self, name: &str, len: usize) -> error::Result<Dimension<'g>> {
+        let _l = LOCK.lock().unwrap();
         super::dimension::add_dimension_at(self.id(), name, len)
     }
 
@@ -155,6 +158,7 @@ impl<'f> GroupMut<'f> {
 
     /// Add an empty group to the dataset
     pub fn add_group(&mut self, name: &str) -> error::Result<Self> {
+        let _l = LOCK.lock().unwrap();
         Self::add_group_at(self.id(), name)
     }
     /// Adds a variable from a set of unique identifiers, recursing upwards
@@ -167,6 +171,7 @@ impl<'f> GroupMut<'f> {
     where
         T: Numeric,
     {
+        let _l = LOCK.lock().unwrap();
         super::variable::add_variable_from_identifiers(self.id(), name, dims, T::NCTYPE)
     }
 
@@ -182,11 +187,13 @@ impl<'f> GroupMut<'f> {
     where
         T: Numeric,
     {
+        let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.id(), T::NCTYPE, name, dims)
     }
 
     /// Adds a variable with a basic type of string
     pub fn add_string_variable(&mut self, name: &str, dims: &[&str]) -> error::Result<VariableMut> {
+        let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.id(), NC_STRING, name, dims)
     }
 }
