@@ -81,20 +81,7 @@ impl<'f, 'g> Variable<'f, 'g> {
         unsafe {
             error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr()))?;
         }
-        let dimensions = dimids
-            .into_iter()
-            .map(|id| {
-                let mut len = 0;
-                unsafe { error::checked(nc_inq_dimlen(ncid, id, &mut len))? }
-                Ok(Dimension {
-                    len: core::num::NonZeroUsize::new(len),
-                    id: super::dimension::Identifier {
-                        ncid: ncid,
-                        dimid: id,
-                    },
-                    _group: PhantomData,
-                })
-            })
+        let dimensions = super::dimension::dimensions_from_variable(ncid, varid)?
             .collect::<error::Result<Vec<_>>>()?;
 
         Ok(Some(Variable {

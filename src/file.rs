@@ -149,6 +149,7 @@ impl ReadOnlyFile {
         super::dimension::dimensions_from_location(self.ncid())
     }
     pub fn attribute<'f>(&'f self, name: &str) -> error::Result<Option<Attribute<'f>>> {
+        let _l = super::LOCK.lock().unwrap();
         Attribute::find_from_name(self.ncid(), None, name)
     }
     pub fn attributes<'f>(
