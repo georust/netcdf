@@ -2,7 +2,7 @@
 
 #![allow(clippy::similar_names)]
 use super::attribute::{AttrValue, Attribute};
-use super::dimension::{Dimension, Identifier};
+use super::dimension::{self, Dimension};
 use super::error;
 use super::group::{Group, GroupMut};
 use super::variable::{Numeric, Variable, VariableMut};
@@ -208,7 +208,7 @@ impl MutableFile {
     pub fn add_variable_from_identifiers<T>(
         &mut self,
         name: &str,
-        dims: &[super::dimension::Identifier],
+        dims: &[dimension::Identifier],
     ) -> error::Result<VariableMut>
     where
         T: Numeric,

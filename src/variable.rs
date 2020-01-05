@@ -9,7 +9,6 @@ use super::LOCK;
 #[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
 use netcdf_sys::*;
-use std::convert::TryInto;
 use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::marker::Sized;
@@ -703,41 +702,6 @@ impl std::ops::Deref for NcString {
 }
 
 impl<'f, 'g> VariableMut<'f, 'g> {
-    pub(crate) fn new(
-        grp_id: nc_type,
-        name: &str,
-        dims: Vec<Dimension<'f>>,
-        vartype: nc_type,
-    ) -> error::Result<Self> {
-        use std::ffi::CString;
-        let cname = CString::new(name).unwrap();
-
-        let dimids: Vec<nc_type> = dims.iter().map(|x| x.id.dimid).collect();
-        let mut id = 0;
-        unsafe {
-            let _l = LOCK.lock().unwrap();
-            error::checked(nc_def_var(
-                grp_id,
-                cname.as_ptr(),
-                vartype,
-                dimids.len().try_into()?,
-                dimids.as_ptr(),
-                &mut id,
-            ))?;
-        }
-
-        Ok(Self(
-            Variable {
-                dimensions: dims,
-                vartype,
-                ncid: grp_id,
-                varid: id,
-                _group: PhantomData,
-            },
-            PhantomData,
-        ))
-    }
-
     /// Adds an attribute to the variable
     pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<Attribute>
     where

@@ -129,23 +129,7 @@ impl<'f> GroupMut<'f> {
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension<'g>(&'g mut self, name: &str, len: usize) -> error::Result<Dimension<'g>> {
-        use std::ffi::CString;
-
-        let mut dimid = 0;
-        let cname = CString::new(name).unwrap();
-
-        unsafe {
-            error::checked(nc_def_dim(self.ncid, cname.as_ptr(), len, &mut dimid))?;
-        }
-
-        Ok(Dimension {
-            len: core::num::NonZeroUsize::new(len),
-            id: super::dimension::Identifier {
-                ncid: self.ncid,
-                dimid,
-            },
-            _group: PhantomData,
-        })
+        super::dimension::add_dimension_at(self.id(), name, len)
     }
 
     /// Adds a dimension with unbounded size
@@ -183,47 +167,7 @@ impl<'f> GroupMut<'f> {
     where
         T: Numeric,
     {
-        let odims = dims;
-        let dims = dims.iter().map(|x| x.dimid).collect::<Vec<_>>();
-        let cname = std::ffi::CString::new(name).unwrap();
-        let xtype = T::NCTYPE;
-
-        let mut varid = 0;
-        unsafe {
-            error::checked(nc_def_var(
-                self.id(),
-                cname.as_ptr(),
-                xtype,
-                dims.len() as _,
-                dims.as_ptr(),
-                &mut varid,
-            ))?;
-        }
-        let dimensions = odims
-            .into_iter()
-            .map(|id| {
-                let mut dimlen = 0;
-                unsafe {
-                    error::checked(nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen))?;
-                }
-                Ok(Dimension {
-                    len: core::num::NonZeroUsize::new(dimlen),
-                    id: id.clone(),
-                    _group: PhantomData,
-                })
-            })
-            .collect::<error::Result<Vec<_>>>()?;
-
-        Ok(VariableMut(
-            Variable {
-                ncid: self.id(),
-                dimensions,
-                varid,
-                vartype: xtype,
-                _group: PhantomData,
-            },
-            PhantomData,
-        ))
+        super::variable::add_variable_from_identifiers(self.id(), name, dims, T::NCTYPE)
     }
 
     /// Create a Variable into the dataset, with no data written into it
