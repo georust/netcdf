@@ -25,8 +25,7 @@ pub struct Identifier {
 
 #[allow(clippy::len_without_is_empty)]
 impl<'g> Dimension<'g> {
-    /// Get current length of the dimensions, which is
-    /// the product of all dimensions in the variable
+    /// Get current length of this dimension
     pub fn len(&self) -> usize {
         if let Some(x) = self.len {
             x.get()
@@ -67,7 +66,8 @@ impl<'g> Dimension<'g> {
         Ok(String::from_utf8(name)?)
     }
 
-    /// Grabs a unique identifier for this dimension
+    /// Grabs the unique identifier for this dimension, which
+    /// can be used in `add_variable_from_identifiers`
     pub fn identifier(&self) -> Identifier {
         self.id
     }

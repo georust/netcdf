@@ -1004,9 +1004,9 @@ fn read_from_memory() {
     origfile.read_to_end(&mut bytes).unwrap();
 
     let file = netcdf::open_mem(None, &bytes).unwrap();
-    let x = &(*file).dimension("x").unwrap();
+    let x = &(*file).dimension("x").unwrap().unwrap();
     assert_eq!(x.len(), 6);
-    let y = &(*file).dimension("y").unwrap();
+    let y = &(*file).dimension("y").unwrap().unwrap();
     assert_eq!(y.len(), 12);
     let mut v = vec![0i32; 6 * 12];
     (*file)

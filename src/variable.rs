@@ -27,6 +27,7 @@ pub struct Variable<'f, 'g> {
 }
 
 #[derive(Debug)]
+/// Mutable access to a variable
 pub struct VariableMut<'f, 'g>(
     pub(crate) Variable<'f, 'g>,
     pub(crate) PhantomData<&'g mut nc_type>,

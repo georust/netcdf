@@ -14,10 +14,12 @@ pub struct Attribute<'a> {
     pub(crate) name: [u8; NC_MAX_NAME as usize + 1],
     /// Group or file this attribute is in
     pub(crate) ncid: nc_type,
-    /// Variable/global this id is connected to
+    /// Variable/global this id is connected to. This is
+    /// set to NC_GLOBAL when attached to a group
     pub(crate) varid: nc_type,
     /// Holds the variable/group to prevent the
-    /// attribute being deleted or modified
+    /// attribute being deleted or modified from
+    /// under us
     pub(crate) _marker: PhantomData<&'a nc_type>,
 }
 
@@ -47,6 +49,7 @@ impl<'a> Attribute<'a> {
             .unwrap_or(self.name.len());
         std::str::from_utf8(&self.name[..zeropos])
     }
+    /// Number of elements in this attribute
     fn num_elems(&self) -> error::Result<usize> {
         let _l = LOCK.lock().unwrap();
         let mut nelems = 0;
@@ -60,6 +63,7 @@ impl<'a> Attribute<'a> {
         }
         Ok(nelems as _)
     }
+    /// Type of this attribute
     fn typ(&self) -> error::Result<nc_type> {
         let mut atttype = 0;
         unsafe {
@@ -73,6 +77,10 @@ impl<'a> Attribute<'a> {
         Ok(atttype)
     }
     /// Get the value of the attribute
+    ///
+    /// # Errors
+    ///
+    /// Unsupported type or netcdf error
     #[allow(clippy::too_many_lines)]
     pub fn value(&self) -> error::Result<AttrValue> {
         let attlen = self.num_elems()?;
@@ -365,6 +373,7 @@ impl<'a> Attribute<'a> {
     }
 }
 
+/// Iterator over all attributes for a location
 pub(crate) struct AttributeIterator<'a> {
     ncid: nc_type,
     varid: Option<nc_type>,

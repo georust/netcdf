@@ -63,6 +63,7 @@ impl<'f> Group<'f> {
     ) -> error::Result<impl Iterator<Item = error::Result<Variable<'f, 'g>>>> {
         super::variable::variables_at_ncid(self.id())
     }
+
     /// Get a single attribute
     pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
         let _l = super::LOCK.lock().unwrap();
@@ -74,6 +75,7 @@ impl<'f> Group<'f> {
         let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.ncid, None)
     }
+
     /// Get a single dimension
     pub fn dimension(&self, name: &str) -> error::Result<Option<Dimension>> {
         super::dimension::dimension_from_name(self.id(), name)
@@ -84,6 +86,7 @@ impl<'f> Group<'f> {
     ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'g>>>> {
         super::dimension::dimensions_from_location(self.id())
     }
+
     /// Get a group
     pub fn group(&self, name: &str) -> error::Result<Option<Self>> {
         group_from_name(self.id(), name)
@@ -110,7 +113,8 @@ impl<'f> GroupMut<'f> {
         self.variables()
             .map(|var| var.map(|var| var.map(|var| VariableMut(var, PhantomData))))
     }
-    /// Mutable access to group
+
+    /// Mutable access to subgroup
     pub fn group_mut(&'f mut self, name: &str) -> error::Result<Option<Self>> {
         self.group(name)
             .map(|g| g.map(|g| GroupMut(g, PhantomData)))
@@ -161,19 +165,6 @@ impl<'f> GroupMut<'f> {
         let _l = LOCK.lock().unwrap();
         Self::add_group_at(self.id(), name)
     }
-    /// Adds a variable from a set of unique identifiers, recursing upwards
-    /// from the current group if necessary.
-    pub fn add_variable_from_identifiers<T>(
-        &mut self,
-        name: &str,
-        dims: &[super::dimension::Identifier],
-    ) -> error::Result<VariableMut>
-    where
-        T: Numeric,
-    {
-        let _l = LOCK.lock().unwrap();
-        super::variable::add_variable_from_identifiers(self.id(), name, dims, T::NCTYPE)
-    }
 
     /// Create a Variable into the dataset, with no data written into it
     ///
@@ -190,11 +181,23 @@ impl<'f> GroupMut<'f> {
         let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.id(), T::NCTYPE, name, dims)
     }
-
     /// Adds a variable with a basic type of string
     pub fn add_string_variable(&mut self, name: &str, dims: &[&str]) -> error::Result<VariableMut> {
         let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.id(), NC_STRING, name, dims)
+    }
+    /// Adds a variable from a set of unique identifiers, recursing upwards
+    /// from the current group if necessary.
+    pub fn add_variable_from_identifiers<T>(
+        &mut self,
+        name: &str,
+        dims: &[super::dimension::Identifier],
+    ) -> error::Result<VariableMut>
+    where
+        T: Numeric,
+    {
+        let _l = LOCK.lock().unwrap();
+        super::variable::add_variable_from_identifiers(self.id(), name, dims, T::NCTYPE)
     }
 }
 

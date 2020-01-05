@@ -97,11 +97,11 @@ impl File {
 pub struct ReadOnlyFile(File);
 
 impl ReadOnlyFile {
-    /// path used ot open/create the file
+    /// path used to open/create the file
     ///
     /// #Errors
     ///
-    /// Netcdf layer could fail, and the resulting path
+    /// Netcdf layer could fail, or the resulting path
     /// could contain an invalid UTF8 sequence
     pub fn path(&self) -> error::Result<String> {
         let name = {
@@ -131,40 +131,52 @@ impl ReadOnlyFile {
         }
     }
 
+    fn ncid(&self) -> nc_type {
+        self.0.ncid
+    }
+
+    /// Get a variable from the group
     pub fn variable<'g>(&'g self, name: &str) -> error::Result<Option<Variable<'g, 'g>>> {
         Variable::find_from_name(self.ncid(), name)
     }
-    pub fn group(&self, name: &str) -> error::Result<Option<Group>> {
-        super::group::group_from_name(self.ncid(), name)
+    /// Iterate over all variables in a group
+    pub fn variables<'f>(
+        &'f self,
+    ) -> error::Result<impl Iterator<Item = error::Result<Variable<'f, 'f>>>> {
+        super::variable::variables_at_ncid(self.ncid())
     }
-    pub fn groups<'g>(&'g self) -> error::Result<impl Iterator<Item = Group<'g>>> {
-        super::group::groups_at_ncid(self.ncid())
-    }
-    pub fn dimension<'f>(&self, name: &str) -> error::Result<Option<Dimension<'f>>> {
-        super::dimension::dimension_from_name(self.ncid(), name)
-    }
-    pub fn dimensions<'g>(
-        &'g self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'g>>>> {
-        super::dimension::dimensions_from_location(self.ncid())
-    }
+
+    /// Get a single attribute
     pub fn attribute<'f>(&'f self, name: &str) -> error::Result<Option<Attribute<'f>>> {
         let _l = super::LOCK.lock().unwrap();
         Attribute::find_from_name(self.ncid(), None, name)
     }
+    /// Get all attributes in the root group
     pub fn attributes<'f>(
         &'f self,
     ) -> error::Result<impl Iterator<Item = error::Result<Attribute<'f>>>> {
         let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.0.ncid, None)
     }
-    pub fn variables<'f>(
-        &'f self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Variable<'f, 'f>>>> {
-        super::variable::variables_at_ncid(self.ncid())
+
+    /// Get a single dimension
+    pub fn dimension<'f>(&self, name: &str) -> error::Result<Option<Dimension<'f>>> {
+        super::dimension::dimension_from_name(self.ncid(), name)
     }
-    fn ncid(&self) -> nc_type {
-        self.0.ncid
+    /// Iterator over all dimensions in the root group
+    pub fn dimensions<'g>(
+        &'g self,
+    ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'g>>>> {
+        super::dimension::dimensions_from_location(self.ncid())
+    }
+
+    /// Get a group
+    pub fn group(&self, name: &str) -> error::Result<Option<Group>> {
+        super::group::group_from_name(self.ncid(), name)
+    }
+    /// Iterator over all subgroups in the root group
+    pub fn groups<'g>(&'g self) -> error::Result<impl Iterator<Item = Group<'g>>> {
+        super::group::groups_at_ncid(self.ncid())
     }
 }
 
@@ -185,6 +197,61 @@ impl MutableFile {
         GroupMut(self.root(), PhantomData)
     }
 
+    /// Get a mutable variable from the group
+    pub fn variable_mut<'g>(
+        &'g mut self,
+        name: &str,
+    ) -> error::Result<Option<VariableMut<'g, 'g>>> {
+        self.variable(name)
+            .map(|var| var.map(|var| VariableMut(var, PhantomData)))
+    }
+    /// Iterate over all variables in the root group, with mutable access
+    pub fn variables_mut<'f>(
+        &'f mut self,
+    ) -> error::Result<impl Iterator<Item = error::Result<VariableMut<'f, 'f>>>> {
+        self.variables()
+            .map(|v| v.map(|var| var.map(|var| VariableMut(var, PhantomData))))
+    }
+
+    /// Mutable access to subgroup
+    pub fn group_mut<'f>(&'f mut self, name: &str) -> error::Result<Option<GroupMut<'f>>> {
+        self.group(name)
+            .map(|g| g.map(|g| GroupMut(g, PhantomData)))
+    }
+    /// Iterator over all groups (mutable access)
+    pub fn groups_mut<'f>(&'f mut self) -> error::Result<impl Iterator<Item = GroupMut<'f>>> {
+        self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
+    }
+
+    /// Add an attribute to the root group
+    pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
+    where
+        T: Into<AttrValue>,
+    {
+        let _l = LOCK.lock().unwrap();
+        Attribute::put(self.ncid(), NC_GLOBAL, name, val.into())
+    }
+
+    /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
+    pub fn add_dimension<'g>(&'g mut self, name: &str, len: usize) -> error::Result<Dimension<'g>> {
+        let _l = LOCK.lock().unwrap();
+        super::dimension::add_dimension_at(self.ncid(), name, len)
+    }
+    /// Adds a dimension with unbounded size
+    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<Dimension> {
+        self.add_dimension(name, 0)
+    }
+
+    /// Add an empty group to the dataset
+    pub fn add_group<'f>(&'f mut self, name: &str) -> error::Result<GroupMut<'f>> {
+        let _l = LOCK.lock().unwrap();
+        GroupMut::add_group_at(self.ncid(), name)
+    }
+
+    /// Create a Variable into the dataset, with no data written into it
+    ///
+    /// Dimensions are identified using the name of the dimension, and will recurse upwards
+    /// if not found in the current group.
     pub fn add_variable<'f, T>(
         &'f mut self,
         name: &str,
@@ -196,21 +263,13 @@ impl MutableFile {
         let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.ncid(), T::NCTYPE, name, dims)
     }
-
-    pub fn add_dimension<'g>(&'g mut self, name: &str, len: usize) -> error::Result<Dimension<'g>> {
+    /// Adds a variable with a basic type of string
+    pub fn add_string_variable(&mut self, name: &str, dims: &[&str]) -> error::Result<VariableMut> {
         let _l = LOCK.lock().unwrap();
-        super::dimension::add_dimension_at(self.ncid(), name, len)
+        VariableMut::add_from_str(self.ncid(), NC_STRING, name, dims)
     }
-    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<Dimension> {
-        self.add_dimension(name, 0)
-    }
-    pub fn group_mut<'f>(&'f mut self, name: &str) -> error::Result<Option<GroupMut<'f>>> {
-        self.group(name)
-            .map(|g| g.map(|g| GroupMut(g, PhantomData)))
-    }
-    pub fn groups_mut<'f>(&'f mut self) -> error::Result<impl Iterator<Item = GroupMut<'f>>> {
-        self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
-    }
+    /// Adds a variable from a set of unique identifiers, recursing upwards
+    /// from the current group if necessary.
     pub fn add_variable_from_identifiers<T>(
         &mut self,
         name: &str,
@@ -221,34 +280,6 @@ impl MutableFile {
     {
         let _l = LOCK.lock().unwrap();
         super::variable::add_variable_from_identifiers(self.ncid(), name, dims, T::NCTYPE)
-    }
-    pub fn add_group<'f>(&'f mut self, name: &str) -> error::Result<GroupMut<'f>> {
-        let _l = LOCK.lock().unwrap();
-        GroupMut::add_group_at(self.ncid(), name)
-    }
-    pub fn add_string_variable(&mut self, name: &str, dims: &[&str]) -> error::Result<VariableMut> {
-        let _l = LOCK.lock().unwrap();
-        VariableMut::add_from_str(self.ncid(), NC_STRING, name, dims)
-    }
-    pub fn variable_mut<'g>(
-        &'g mut self,
-        name: &str,
-    ) -> error::Result<Option<VariableMut<'g, 'g>>> {
-        self.variable(name)
-            .map(|var| var.map(|var| VariableMut(var, PhantomData)))
-    }
-    pub fn variables_mut<'f>(
-        &'f mut self,
-    ) -> error::Result<impl Iterator<Item = error::Result<VariableMut<'f, 'f>>>> {
-        self.variables()
-            .map(|v| v.map(|var| var.map(|var| VariableMut(var, PhantomData))))
-    }
-    pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
-    where
-        T: Into<AttrValue>,
-    {
-        let _l = LOCK.lock().unwrap();
-        Attribute::put(self.ncid(), NC_GLOBAL, name, val.into())
     }
 }
 
