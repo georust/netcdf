@@ -205,6 +205,9 @@ impl MutableFile {
         self.group(name)
             .map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
+    pub fn groups_mut<'f>(&'f mut self) -> error::Result<impl Iterator<Item = GroupMut<'f>>> {
+        self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
+    }
     pub fn add_variable_from_identifiers<T>(
         &mut self,
         name: &str,

@@ -15,7 +15,7 @@ use std::marker::Sized;
 
 #[allow(clippy::doc_markdown)]
 /// This struct defines a netCDF variable.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Variable<'f, 'g> {
     /// The variable name
     pub(crate) dimensions: Vec<Dimension<'f>>,
