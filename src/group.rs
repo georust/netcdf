@@ -8,6 +8,7 @@ use super::error;
 use super::variable::{Numeric, Variable, VariableMut};
 use super::LOCK;
 use netcdf_sys::*;
+use std::convert::TryInto;
 use std::marker::PhantomData;
 
 /// Main component of the netcdf format. Holds all variables,
@@ -21,6 +22,7 @@ pub struct Group<'f> {
 
 #[derive(Debug)]
 /// Mutable access to a group
+#[allow(clippy::module_name_repetitions)]
 pub struct GroupMut<'f>(
     pub(crate) Group<'f>,
     pub(crate) PhantomData<&'f mut nc_type>,
@@ -174,10 +176,10 @@ impl<'f> GroupMut<'f> {
     }
 
     pub(crate) fn add_group_at(ncid: nc_type, name: &str) -> error::Result<Self> {
-        let cname = super::utils::short_name_to_bytes(name)?;
+        let byte_name = super::utils::short_name_to_bytes(name)?;
         let mut grpid = 0;
         unsafe {
-            error::checked(nc_def_grp(ncid, cname.as_ptr() as *const _, &mut grpid))?;
+            error::checked(nc_def_grp(ncid, byte_name.as_ptr() as *const _, &mut grpid))?;
         }
 
         Ok(Self(
@@ -239,11 +241,11 @@ impl<'f> GroupMut<'f> {
 }
 
 pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<Item = Group<'f>>> {
-    let mut ngrps = 0;
+    let mut num_grps = 0;
     unsafe {
-        error::checked(nc_inq_grps(ncid, &mut ngrps, std::ptr::null_mut()))?;
+        error::checked(nc_inq_grps(ncid, &mut num_grps, std::ptr::null_mut()))?;
     }
-    let mut grps = vec![0; ngrps as _];
+    let mut grps = vec![0; num_grps.try_into()?];
     unsafe {
         error::checked(nc_inq_grps(ncid, std::ptr::null_mut(), grps.as_mut_ptr()))?;
     }
@@ -254,9 +256,9 @@ pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<I
 }
 
 pub(crate) fn group_from_name<'f>(ncid: nc_type, name: &str) -> error::Result<Option<Group<'f>>> {
-    let cname = super::utils::short_name_to_bytes(name)?;
+    let byte_name = super::utils::short_name_to_bytes(name)?;
     let mut grpid = 0;
-    let e = unsafe { nc_inq_grp_ncid(ncid, cname.as_ptr() as *const _, &mut grpid) };
+    let e = unsafe { nc_inq_grp_ncid(ncid, byte_name.as_ptr() as *const _, &mut grpid) };
     if e == NC_ENOTFOUND {
         return Ok(None);
     } else {

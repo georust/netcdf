@@ -61,7 +61,7 @@
 //! # Ok(()) }
 //! ```
 
-// #![warn(missing_docs)]
+#![warn(missing_docs)]
 #![allow(clippy::must_use_candidate)]
 
 use lazy_static::lazy_static;
@@ -127,7 +127,10 @@ pub(crate) mod utils {
         if name.len() > NC_MAX_NAME as _ {
             Err(NC_EMAXNAME.into())
         } else {
-            let len = name.bytes().position(|x| x == 0).unwrap_or(name.len());
+            let len = name
+                .bytes()
+                .position(|x| x == 0)
+                .unwrap_or_else(|| name.len());
             let mut bytes = [0_u8; NC_MAX_NAME as usize + 1];
             bytes[..len].copy_from_slice(name.as_bytes());
             Ok(bytes)

@@ -28,7 +28,7 @@ impl Drop for File {
 }
 
 impl File {
-    /// Open a netCDF file in read only mode.
+    /// Open a `netCDF` file in read only mode.
     ///
     /// Consider using [`netcdf::open`] instead to open with
     /// a generic `Path` object, and ensure read-only on
@@ -94,6 +94,8 @@ impl File {
 }
 
 #[derive(Debug)]
+/// Read only accessible file
+#[allow(clippy::module_name_repetitions)]
 pub struct ReadOnlyFile(File);
 
 impl ReadOnlyFile {
@@ -124,7 +126,7 @@ impl ReadOnlyFile {
     }
 
     /// Main entrypoint for interacting with the netcdf file.
-    pub fn root<'f>(&'f self) -> Group<'f> {
+    pub fn root(&self) -> Group {
         Group {
             ncid: self.ncid(),
             _file: PhantomData,
@@ -182,6 +184,7 @@ impl ReadOnlyFile {
 
 /// Mutable access to file
 #[derive(Debug)]
+#[allow(clippy::module_name_repetitions)]
 pub struct MutableFile(ReadOnlyFile);
 
 impl std::ops::Deref for MutableFile {
@@ -193,7 +196,7 @@ impl std::ops::Deref for MutableFile {
 
 impl MutableFile {
     /// Mutable access to the root group
-    pub fn root_mut<'f>(&'f mut self) -> GroupMut<'f> {
+    pub fn root_mut(&mut self) -> GroupMut {
         GroupMut(self.root(), PhantomData)
     }
 

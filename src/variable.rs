@@ -9,17 +9,18 @@ use super::LOCK;
 #[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
 use netcdf_sys::*;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::marker::Sized;
 
 #[allow(clippy::doc_markdown)]
-/// This struct defines a netCDF variable.
+/// This struct defines a `netCDF` variable.
 #[derive(Debug, Clone)]
 pub struct Variable<'g> {
     /// The variable name
     pub(crate) dimensions: Vec<Dimension<'g>>,
-    /// the netcdf variable type identifier (from netcdf-sys)
+    /// the `netCDF` variable type identifier (from netcdf-sys)
     pub(crate) vartype: nc_type,
     pub(crate) ncid: nc_type,
     pub(crate) varid: nc_type,
@@ -28,6 +29,7 @@ pub struct Variable<'g> {
 
 #[derive(Debug)]
 /// Mutable access to a variable.
+#[allow(clippy::module_name_repetitions)]
 pub struct VariableMut<'g>(
     pub(crate) Variable<'g>,
     pub(crate) PhantomData<&'g mut nc_type>,
@@ -75,7 +77,7 @@ impl<'g> Variable<'g> {
                 std::ptr::null_mut(),
             ))?;
         }
-        let mut dimids = vec![0; ndims as _];
+        let mut dimids = vec![0; ndims.try_into()?];
         unsafe {
             error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr()))?;
         }
@@ -84,7 +86,7 @@ impl<'g> Variable<'g> {
 
         Ok(Some(Variable {
             dimensions,
-            ncid: ncid,
+            ncid,
             varid,
             vartype: xtype,
             _group: PhantomData,
@@ -101,7 +103,10 @@ impl<'g> Variable<'g> {
                 name.as_mut_ptr() as *mut _,
             ))?;
         }
-        let zeropos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
+        let zeropos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
         name.resize(zeropos, 0);
 
         Ok(String::from_utf8(name)?)
@@ -393,6 +398,12 @@ where
 
     /// get a SLICE of values into the variable, with the source
     /// strided by `strides`
+    ///
+    /// # Safety
+    ///
+    /// `values` must contain space for all the data,
+    /// `indices`, `slice_len`, and `strides` must be of
+    /// at least dimension length size.
     unsafe fn get_values_strided(
         variable: &Variable,
         indices: &[usize],
@@ -403,6 +414,12 @@ where
 
     /// put a SLICE of values into the variable, with the destination
     /// strided by `strides`
+    ///
+    /// # Safety
+    ///
+    /// `values` must contain space for all the data,
+    /// `indices`, `slice_len`, and `strides` must be of
+    /// at least dimension length size.
     unsafe fn put_values_strided(
         variable: &mut VariableMut,
         indices: &[usize],
@@ -848,6 +865,7 @@ impl<'g> Variable<'g> {
             if slice_len.len() != self.dimensions.len() {
                 return Err("slice mismatch".into());
             }
+            #[allow(clippy::cast_possible_wrap)]
             for (((d, &start), &count), &stride) in self
                 .dimensions
                 .iter()
@@ -856,7 +874,7 @@ impl<'g> Variable<'g> {
                 .zip(strides)
             {
                 if stride == 0 && count != 1 {
-                    return Err(error::Error::StrideError);
+                    return Err(error::Error::Stride);
                 }
                 if count == 0 {
                     return Err(error::Error::ZeroSlice);
@@ -875,12 +893,10 @@ impl<'g> Variable<'g> {
                 .iter()
                 .zip(indices)
                 .zip(strides)
-                .map(|((d, &start), &stride)| {
-                    if stride == 0 {
-                        1
-                    } else if stride < 0 {
-                        start / stride.abs() as usize
-                    } else {
+                .map(|((d, &start), &stride)| match stride {
+                    0 => 1,
+                    stride if stride < 0 => start / stride.abs() as usize,
+                    stride => {
                         let dlen = d.len();
                         let round_up = stride.abs() as usize - 1;
                         (dlen - start + round_up) / stride.abs() as usize
@@ -1003,11 +1019,12 @@ impl<'g> VariableMut<'g> {
                 if count == 0 {
                     return Err(error::Error::ZeroSlice);
                 }
+                #[allow(clippy::cast_possible_wrap)]
                 let end = start as isize + (count as isize - 1) * stride;
                 if end < 0 {
                     return Err(error::Error::IndexMismatch);
                 }
-                if !d.is_unlimited() && end > d.len() as isize {
+                if !d.is_unlimited() && end > d.len().try_into()? {
                     return Err(error::Error::IndexMismatch);
                 }
             }
@@ -1022,9 +1039,9 @@ impl<'g> VariableMut<'g> {
                     match stride {
                         0 => 1,
                         stride if stride > 0 => {
+                            let stride: usize = stride.try_into().unwrap();
                             let dlen = d.len();
-                            let nelems = (dlen - start + stride as usize - 1) / stride as usize;
-                            nelems
+                            (dlen - start + stride - 1) / stride
                         }
                         _stride => {
                             // Negative stride
@@ -1114,7 +1131,7 @@ impl<'g> VariableMut<'g> {
                 ncid,
                 cname.as_ptr() as *const _,
                 xtype,
-                dimensions.len() as _,
+                dimensions.len().try_into()?,
                 dimensions.as_ptr(),
                 &mut varid,
             ))?;
@@ -1127,10 +1144,10 @@ impl<'g> VariableMut<'g> {
 
         Ok(VariableMut(
             Variable {
-                ncid: ncid,
-                varid: varid,
+                ncid,
+                varid,
                 vartype: xtype,
-                dimensions: dimensions,
+                dimensions,
                 _group: PhantomData,
             },
             PhantomData,
@@ -1145,7 +1162,7 @@ pub(crate) fn variables_at_ncid<'g>(
     unsafe {
         error::checked(nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut()))?;
     }
-    let mut varids = vec![0; nvars as _];
+    let mut varids = vec![0; nvars.try_into()?];
     unsafe {
         error::checked(nc_inq_varids(
             ncid,
@@ -1179,13 +1196,13 @@ pub(crate) fn add_variable_from_identifiers<'g>(
     let cname = super::utils::short_name_to_bytes(name)?;
 
     let dimensions = dims
-        .into_iter()
-        .map(|id| {
+        .iter()
+        .map(move |&id| {
             // Internal netcdf detail, the top 16 bits gives the corresponding
             // file handle. This to ensure dimensions are not added from another
             // file which is unrelated to self
             if id.ncid >> 16 != ncid >> 16 {
-                Err(error::Error::WrongDataset)?;
+                return Err(error::Error::WrongDataset);
             }
             let mut dimlen = 0;
             unsafe {
@@ -1193,7 +1210,7 @@ pub(crate) fn add_variable_from_identifiers<'g>(
             }
             Ok(Dimension {
                 len: core::num::NonZeroUsize::new(dimlen),
-                id: id.clone(),
+                id,
                 _group: PhantomData,
             })
         })
@@ -1206,7 +1223,7 @@ pub(crate) fn add_variable_from_identifiers<'g>(
             ncid,
             cname.as_ptr() as *const _,
             xtype,
-            dims.len() as _,
+            dims.len().try_into()?,
             dims.as_ptr(),
             &mut varid,
         ))?;

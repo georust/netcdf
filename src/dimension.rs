@@ -4,6 +4,7 @@
 use super::error;
 use super::LOCK;
 use netcdf_sys::*;
+use std::convert::TryInto;
 use std::marker::PhantomData;
 
 /// Represents a netcdf dimension
@@ -73,7 +74,7 @@ impl<'g> Dimension<'g> {
     }
 }
 
-pub(crate) fn from_name_toid<'f>(loc: nc_type, name: &str) -> error::Result<nc_type> {
+pub(crate) fn from_name_toid(loc: nc_type, name: &str) -> error::Result<nc_type> {
     let mut dimid = 0;
     let cname = super::utils::short_name_to_bytes(name)?;
     unsafe {
@@ -95,10 +96,7 @@ pub(crate) fn from_name<'f>(loc: nc_type, name: &str) -> error::Result<Dimension
 
     Ok(Dimension {
         len: core::num::NonZeroUsize::new(dimlen),
-        id: Identifier {
-            ncid: loc,
-            dimid: dimid,
-        },
+        id: Identifier { ncid: loc, dimid },
         _group: PhantomData,
     })
 }
@@ -115,7 +113,7 @@ pub(crate) fn dimensions_from_location<'g>(
             false as _,
         ))?;
     }
-    let mut dimids = vec![0; ndims as _];
+    let mut dimids = vec![0; ndims.try_into()?];
     unsafe {
         error::checked(nc_inq_dimids(
             ncid,
@@ -131,7 +129,7 @@ pub(crate) fn dimensions_from_location<'g>(
         }
         Ok(Dimension {
             len: core::num::NonZeroUsize::new(dimlen),
-            id: Identifier { ncid: ncid, dimid },
+            id: Identifier { ncid, dimid },
             _group: PhantomData,
         })
     }))
@@ -145,7 +143,7 @@ pub(crate) fn dimensions_from_variable<'g>(
     unsafe {
         error::checked(nc_inq_varndims(ncid, varid, &mut ndims))?;
     }
-    let mut dimids = vec![0; ndims as _];
+    let mut dimids = vec![0; ndims.try_into()?];
     unsafe {
         error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr()))?;
     }
@@ -157,7 +155,7 @@ pub(crate) fn dimensions_from_variable<'g>(
         }
         Ok(Dimension {
             len: core::num::NonZeroUsize::new(dimlen),
-            id: Identifier { ncid: ncid, dimid },
+            id: Identifier { ncid, dimid },
             _group: PhantomData,
         })
     }))
@@ -202,8 +200,8 @@ pub(crate) fn add_dimension_at<'f>(
         ))?;
     }
     Ok(Dimension {
-        len: core::num::NonZeroUsize::new(dimid as _),
-        id: Identifier { ncid: ncid, dimid },
+        len: core::num::NonZeroUsize::new(dimid.try_into()?),
+        id: Identifier { ncid, dimid },
         _group: PhantomData,
     })
 }

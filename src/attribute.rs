@@ -4,6 +4,7 @@
 use super::error;
 use super::LOCK;
 use netcdf_sys::*;
+use std::convert::TryInto;
 use std::marker::PhantomData;
 
 /// Extra properties of a variable or a group can be represented
@@ -46,7 +47,7 @@ impl<'a> Attribute<'a> {
             .name
             .iter()
             .position(|&x| x == 0)
-            .unwrap_or(self.name.len());
+            .unwrap_or_else(|| self.name.len());
         std::str::from_utf8(&self.name[..zeropos])
     }
     /// Number of elements in this attribute
@@ -395,7 +396,7 @@ impl<'a> AttributeIterator<'a> {
         Ok(Self {
             ncid,
             varid,
-            natts: natts as _,
+            natts: natts.try_into()?,
             current_natt: 0,
             _marker: PhantomData,
         })
@@ -414,7 +415,7 @@ impl<'a> Iterator for AttributeIterator<'a> {
             if let Err(e) = error::checked(nc_inq_attname(
                 self.ncid,
                 self.varid.unwrap_or(NC_GLOBAL),
-                self.current_natt as _,
+                self.current_natt.try_into().unwrap(),
                 name.as_mut_ptr() as *mut _,
             )) {
                 return Some(Err(e));
@@ -463,6 +464,7 @@ pub enum AttrValue {
 
 impl<'a> Attribute<'a> {
     #[allow(clippy::needless_pass_by_value)] // All values will be small
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn put(
         ncid: nc_type,
         varid: nc_type,
@@ -630,7 +632,7 @@ impl<'a> Attribute<'a> {
 
         Ok(Some(Attribute {
             name: attname,
-            ncid: ncid,
+            ncid,
             varid: varid.unwrap_or(NC_GLOBAL),
             _marker: PhantomData,
         }))
