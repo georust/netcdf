@@ -59,7 +59,7 @@ impl<'g> Variable<'g> {
         let cname = super::utils::short_name_to_bytes(name)?;
         let mut varid = 0;
         let e = unsafe { nc_inq_varid(ncid, cname.as_ptr() as *const _, &mut varid) };
-        if e == NC_ENOTFOUND {
+        if e == NC_ENOTVAR {
             return Ok(None);
         } else {
             error::checked(e)?;
@@ -180,6 +180,10 @@ impl<'g> VariableMut<'g> {
     /// the file. This has no effect on the memory order when reading/putting
     /// a buffer.
     pub fn chunking(&mut self, chunksize: &[usize]) -> error::Result<()> {
+        if self.dimensions.is_empty() {
+            // Can't really set chunking, would lead to segfault
+            return Ok(());
+        }
         if chunksize.len() != self.dimensions.len() {
             return Err(error::Error::SliceLen);
         }
@@ -1121,7 +1125,13 @@ impl<'g> VariableMut<'g> {
     ) -> error::Result<Self> {
         let dimensions = dims
             .iter()
-            .map(|dimname| super::dimension::from_name_toid(ncid, dimname))
+            .map(
+                |dimname| match super::dimension::from_name_toid(ncid, dimname) {
+                    Ok(Some(id)) => Ok(id),
+                    Ok(None) => Err(error::Error::NotFound(format!("dimensions {}", dimname))),
+                    Err(e) => Err(e),
+                },
+            )
             .collect::<error::Result<Vec<_>>>()?;
 
         let cname = super::utils::short_name_to_bytes(name)?;
@@ -1139,7 +1149,11 @@ impl<'g> VariableMut<'g> {
 
         let dimensions = dims
             .iter()
-            .map(|dimname| super::dimension::from_name(ncid, dimname))
+            .map(|dimname| match super::dimension::from_name(ncid, dimname) {
+                Ok(None) => Err(error::Error::NotFound(format!("dimensions {}", dimname))),
+                Ok(Some(dim)) => Ok(dim),
+                Err(e) => Err(e),
+            })
             .collect::<error::Result<Vec<_>>>()?;
 
         Ok(VariableMut(

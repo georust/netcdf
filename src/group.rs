@@ -259,7 +259,7 @@ pub(crate) fn group_from_name<'f>(ncid: nc_type, name: &str) -> error::Result<Op
     let byte_name = super::utils::short_name_to_bytes(name)?;
     let mut grpid = 0;
     let e = unsafe { nc_inq_grp_ncid(ncid, byte_name.as_ptr() as *const _, &mut grpid) };
-    if e == NC_ENOTFOUND {
+    if e == NC_ENOGRP {
         return Ok(None);
     } else {
         error::checked(e)?;

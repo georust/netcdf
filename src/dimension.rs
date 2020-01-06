@@ -74,31 +74,37 @@ impl<'g> Dimension<'g> {
     }
 }
 
-pub(crate) fn from_name_toid(loc: nc_type, name: &str) -> error::Result<nc_type> {
+pub(crate) fn from_name_toid(loc: nc_type, name: &str) -> error::Result<Option<nc_type>> {
     let mut dimid = 0;
     let cname = super::utils::short_name_to_bytes(name)?;
-    unsafe {
-        error::checked(nc_inq_dimid(loc, cname.as_ptr() as *const _, &mut dimid))?;
+    let e = unsafe { nc_inq_dimid(loc, cname.as_ptr() as *const _, &mut dimid) };
+    if e == NC_EBADDIM {
+        return Ok(None);
+    } else {
+        error::checked(e)?;
     }
-    Ok(dimid)
+    Ok(Some(dimid))
 }
 
-pub(crate) fn from_name<'f>(loc: nc_type, name: &str) -> error::Result<Dimension<'f>> {
+pub(crate) fn from_name<'f>(loc: nc_type, name: &str) -> error::Result<Option<Dimension<'f>>> {
     let mut dimid = 0;
     let cname = super::utils::short_name_to_bytes(name)?;
-    unsafe {
-        error::checked(nc_inq_dimid(loc, cname.as_ptr() as *const _, &mut dimid))?;
+    let e = unsafe { nc_inq_dimid(loc, cname.as_ptr() as *const _, &mut dimid) };
+    if e == NC_EBADDIM {
+        return Ok(None);
+    } else {
+        error::checked(e)?;
     }
     let mut dimlen = 0;
     unsafe {
         error::checked(nc_inq_dimlen(loc, dimid, &mut dimlen))?;
     }
 
-    Ok(Dimension {
+    Ok(Some(Dimension {
         len: core::num::NonZeroUsize::new(dimlen),
         id: Identifier { ncid: loc, dimid },
         _group: PhantomData,
-    })
+    }))
 }
 
 pub(crate) fn dimensions_from_location<'g>(
@@ -168,7 +174,7 @@ pub(crate) fn dimension_from_name<'f>(
     let cname = super::utils::short_name_to_bytes(name)?;
     let mut dimid = 0;
     let e = unsafe { nc_inq_dimid(ncid, cname.as_ptr() as *const _, &mut dimid) };
-    if e == NC_ENOTFOUND {
+    if e == NC_EBADDIM {
         return Ok(None);
     } else {
         error::checked(e)?;
