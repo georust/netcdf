@@ -1599,3 +1599,18 @@ fn dimension_identifiers_from_different_ncids() {
     g0.add_variable_from_identifiers::<u8>("var3", &[id, idg])
         .unwrap();
 }
+
+#[test]
+fn count_dimensions() {
+    let d = tempfile::tempdir().unwrap();
+    let mut file = netcdf::create(d.path().join("count_dimensions.rs")).unwrap();
+
+    file.add_dimension("a", 4).unwrap();
+    file.add_dimension("b", 0).unwrap();
+    file.add_dimension("c", 63).unwrap();
+    file.add_unlimited_dimension("d").unwrap();
+    file.add_unlimited_dimension("e").unwrap();
+    file.add_dimension("f", 63).unwrap();
+
+    assert_eq!(file.dimensions().unwrap().count(), 6);
+}
