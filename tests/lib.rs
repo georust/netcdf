@@ -1292,14 +1292,12 @@ fn dimension_identifiers() {
         let g = &mut file.add_group("g").unwrap();
         let dim = &g.add_dimension("x", 5).unwrap();
         let vgid = dim.identifier();
-        let mut gg = file
-            .group_mut("g")
-            .unwrap()
-            .unwrap()
-            .add_group("g")
-            .unwrap();
-        let dim = &gg.add_dimension("x", 7).unwrap();
-        let vggid = dim.identifier();
+        let vggid = {
+            let mut g = file.group_mut("g").unwrap().unwrap();
+            let mut gg = g.add_group("g").unwrap();
+            let dim = &gg.add_dimension("x", 7).unwrap();
+            dim.identifier()
+        };
 
         // Create variables
         file.add_variable_from_identifiers::<i8>("v_self_id", &[vrootid])

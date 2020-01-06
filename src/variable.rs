@@ -16,9 +16,9 @@ use std::marker::Sized;
 #[allow(clippy::doc_markdown)]
 /// This struct defines a netCDF variable.
 #[derive(Debug, Clone)]
-pub struct Variable<'f, 'g> {
+pub struct Variable<'g> {
     /// The variable name
-    pub(crate) dimensions: Vec<Dimension<'f>>,
+    pub(crate) dimensions: Vec<Dimension<'g>>,
     /// the netcdf variable type identifier (from netcdf-sys)
     pub(crate) vartype: nc_type,
     pub(crate) ncid: nc_type,
@@ -27,14 +27,14 @@ pub struct Variable<'f, 'g> {
 }
 
 #[derive(Debug)]
-/// Mutable access to a variable
-pub struct VariableMut<'f, 'g>(
-    pub(crate) Variable<'f, 'g>,
+/// Mutable access to a variable.
+pub struct VariableMut<'g>(
+    pub(crate) Variable<'g>,
     pub(crate) PhantomData<&'g mut nc_type>,
 );
 
-impl<'f, 'g> std::ops::Deref for VariableMut<'f, 'g> {
-    type Target = Variable<'f, 'g>;
+impl<'g> std::ops::Deref for VariableMut<'g> {
+    type Target = Variable<'g>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -52,11 +52,8 @@ pub enum Endianness {
 }
 
 #[allow(clippy::len_without_is_empty)]
-impl<'f, 'g> Variable<'f, 'g> {
-    pub(crate) fn find_from_name(
-        ncid: nc_type,
-        name: &str,
-    ) -> error::Result<Option<Variable<'f, 'g>>> {
+impl<'g> Variable<'g> {
+    pub(crate) fn find_from_name(ncid: nc_type, name: &str) -> error::Result<Option<Variable<'g>>> {
         let cname = super::utils::short_name_to_bytes(name)?;
         let mut varid = 0;
         let e = unsafe { nc_inq_varid(ncid, cname.as_ptr() as *const _, &mut varid) };
@@ -151,7 +148,7 @@ impl<'f, 'g> Variable<'f, 'g> {
         }
     }
 }
-impl<'f, 'g> VariableMut<'f, 'g> {
+impl<'g> VariableMut<'g> {
     /// Sets compression on the variable. Must be set before filling in data.
     ///
     /// `deflate_level` can take a value 0..=9, with 0 being no
@@ -200,7 +197,7 @@ impl<'f, 'g> VariableMut<'f, 'g> {
     }
 }
 
-impl<'f, 'g> Variable<'f, 'g> {
+impl<'g> Variable<'g> {
     /// Checks for array mismatch
     fn check_indices(&self, indices: &[usize], putting: bool) -> error::Result<()> {
         if indices.len() != self.dimensions.len() {
@@ -684,7 +681,7 @@ impl std::ops::Deref for NcString {
     }
 }
 
-impl<'f, 'g> VariableMut<'f, 'g> {
+impl<'g> VariableMut<'g> {
     /// Adds an attribute to the variable
     pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<Attribute>
     where
@@ -695,7 +692,7 @@ impl<'f, 'g> VariableMut<'f, 'g> {
     }
 }
 
-impl<'f, 'g> Variable<'f, 'g> {
+impl<'g> Variable<'g> {
     ///  Fetches one specific value at specific indices
     ///  indices must has the same length as self.dimensions.
     pub fn value<T: Numeric>(&self, indices: Option<&[usize]>) -> error::Result<T> {
@@ -900,7 +897,7 @@ impl<'f, 'g> Variable<'f, 'g> {
     }
 }
 
-impl<'f, 'g> VariableMut<'f, 'g> {
+impl<'g> VariableMut<'g> {
     /// Put a single value at `indices`
     pub fn put_value<T: Numeric>(
         &mut self,
@@ -1098,7 +1095,7 @@ impl<'f, 'g> VariableMut<'f, 'g> {
     }
 }
 
-impl<'f, 'g> VariableMut<'f, 'g> {
+impl<'g> VariableMut<'g> {
     pub(crate) fn add_from_str(
         ncid: nc_type,
         xtype: nc_type,
@@ -1141,12 +1138,9 @@ impl<'f, 'g> VariableMut<'f, 'g> {
     }
 }
 
-pub(crate) fn variables_at_ncid<'f, 'g>(
+pub(crate) fn variables_at_ncid<'g>(
     ncid: nc_type,
-) -> error::Result<impl Iterator<Item = error::Result<Variable<'f, 'g>>>>
-where
-    'f: 'g,
-{
+) -> error::Result<impl Iterator<Item = error::Result<Variable<'g>>>> {
     let mut nvars = 0;
     unsafe {
         error::checked(nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut()))?;
@@ -1176,12 +1170,12 @@ where
     }))
 }
 
-pub(crate) fn add_variable_from_identifiers<'f, 'g>(
+pub(crate) fn add_variable_from_identifiers<'g>(
     ncid: nc_type,
     name: &str,
     dims: &[super::dimension::Identifier],
     xtype: nc_type,
-) -> error::Result<VariableMut<'f, 'g>> {
+) -> error::Result<VariableMut<'g>> {
     let cname = super::utils::short_name_to_bytes(name)?;
 
     let dimensions = dims

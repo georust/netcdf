@@ -136,13 +136,13 @@ impl ReadOnlyFile {
     }
 
     /// Get a variable from the group
-    pub fn variable<'g>(&'g self, name: &str) -> error::Result<Option<Variable<'g, 'g>>> {
+    pub fn variable<'f>(&'f self, name: &str) -> error::Result<Option<Variable<'f>>> {
         Variable::find_from_name(self.ncid(), name)
     }
     /// Iterate over all variables in a group
     pub fn variables<'f>(
         &'f self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Variable<'f, 'f>>>> {
+    ) -> error::Result<impl Iterator<Item = error::Result<Variable<'f>>>> {
         super::variable::variables_at_ncid(self.ncid())
     }
 
@@ -164,18 +164,18 @@ impl ReadOnlyFile {
         super::dimension::dimension_from_name(self.ncid(), name)
     }
     /// Iterator over all dimensions in the root group
-    pub fn dimensions<'g>(
-        &'g self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'g>>>> {
+    pub fn dimensions<'f>(
+        &'f self,
+    ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'f>>>> {
         super::dimension::dimensions_from_location(self.ncid())
     }
 
     /// Get a group
-    pub fn group(&self, name: &str) -> error::Result<Option<Group>> {
+    pub fn group<'f>(&'f self, name: &str) -> error::Result<Option<Group<'f>>> {
         super::group::group_from_name(self.ncid(), name)
     }
     /// Iterator over all subgroups in the root group
-    pub fn groups<'g>(&'g self) -> error::Result<impl Iterator<Item = Group<'g>>> {
+    pub fn groups<'f>(&'f self) -> error::Result<impl Iterator<Item = Group<'f>>> {
         super::group::groups_at_ncid(self.ncid())
     }
 }
@@ -198,17 +198,25 @@ impl MutableFile {
     }
 
     /// Get a mutable variable from the group
-    pub fn variable_mut<'g>(
-        &'g mut self,
-        name: &str,
-    ) -> error::Result<Option<VariableMut<'g, 'g>>> {
+    pub fn variable_mut<'f>(&'f mut self, name: &str) -> error::Result<Option<VariableMut<'f>>> {
         self.variable(name)
             .map(|var| var.map(|var| VariableMut(var, PhantomData)))
     }
     /// Iterate over all variables in the root group, with mutable access
+    ///
+    /// # Examples
+    /// Use this to get multiple writable variables
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut file = netcdf::append("file.nc")?;
+    /// let mut vars = file.variables_mut()?.collect::<Result<Vec<_>, _>>()?;
+    /// vars[0].put_value(1_u8, Some(&[2, 5]))?;
+    /// vars[1].put_value(1_u8, Some(&[5, 2]))?;
+    /// # Ok(()) }
+    /// ```
     pub fn variables_mut<'f>(
         &'f mut self,
-    ) -> error::Result<impl Iterator<Item = error::Result<VariableMut<'f, 'f>>>> {
+    ) -> error::Result<impl Iterator<Item = error::Result<VariableMut<'f>>>> {
         self.variables()
             .map(|v| v.map(|var| var.map(|var| VariableMut(var, PhantomData))))
     }
@@ -233,7 +241,7 @@ impl MutableFile {
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
-    pub fn add_dimension<'g>(&'g mut self, name: &str, len: usize) -> error::Result<Dimension<'g>> {
+    pub fn add_dimension<'f>(&'f mut self, name: &str, len: usize) -> error::Result<Dimension<'f>> {
         let _l = LOCK.lock().unwrap();
         super::dimension::add_dimension_at(self.ncid(), name, len)
     }
@@ -256,7 +264,7 @@ impl MutableFile {
         &'f mut self,
         name: &str,
         dims: &[&str],
-    ) -> error::Result<VariableMut<'f, 'f>>
+    ) -> error::Result<VariableMut<'f>>
     where
         T: Numeric,
     {
@@ -264,17 +272,21 @@ impl MutableFile {
         VariableMut::add_from_str(self.ncid(), T::NCTYPE, name, dims)
     }
     /// Adds a variable with a basic type of string
-    pub fn add_string_variable(&mut self, name: &str, dims: &[&str]) -> error::Result<VariableMut> {
+    pub fn add_string_variable<'f>(
+        &'f mut self,
+        name: &str,
+        dims: &[&str],
+    ) -> error::Result<VariableMut<'f>> {
         let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.ncid(), NC_STRING, name, dims)
     }
     /// Adds a variable from a set of unique identifiers, recursing upwards
     /// from the current group if necessary.
-    pub fn add_variable_from_identifiers<T>(
-        &mut self,
+    pub fn add_variable_from_identifiers<'f, T>(
+        &'f mut self,
         name: &str,
         dims: &[dimension::Identifier],
-    ) -> error::Result<VariableMut>
+    ) -> error::Result<VariableMut<'f>>
     where
         T: Numeric,
     {
