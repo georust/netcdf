@@ -10,7 +10,7 @@
 //! let file = netcdf::open("simle_xy.nc")?;
 //!
 //! // Access any variable, attribute, or dimension through lookups on hashmaps
-//! let var = &file.variable("data").expect("Could not find variable 'data'");
+//! let var = &file.variable("data")?.expect("Could not find variable 'data'");
 //!
 //! // Read variable as numeric types
 //! let data_i32 = var.value::<i32>(None)?;
@@ -36,7 +36,7 @@
 //! let var_name = "crab_coolness_level";
 //! let data : Vec<i32> = vec![42; 10];
 //! // Variable type written to file
-//! let var = file.add_variable::<i32>(
+//! let mut var = file.add_variable::<i32>(
 //!             var_name,
 //!             &[dim_name],
 //! )?;
@@ -51,7 +51,7 @@
 //! // open it in read/write mode
 //! let mut file = netcdf::append("crabs2.nc")?;
 //! // get a mutable binding of the variable "crab_coolness_level"
-//! let mut var = file.variable_mut("crab_coolness_level").unwrap();
+//! let mut var = file.variable_mut("crab_coolness_level")?.unwrap();
 //!
 //! let data : Vec<i32> = vec![100; 10];
 //! // write 5 first elements of the vector `data` into `var` starting at index 2;
@@ -84,7 +84,7 @@ pub use variable::*;
 /// Open a netcdf file in create mode
 ///
 /// Will overwrite exising file
-pub fn create<P>(name: P) -> error::Result<File>
+pub fn create<P>(name: P) -> error::Result<MutableFile>
 where
     P: AsRef<std::path::Path>,
 {
@@ -92,7 +92,7 @@ where
 }
 
 /// Open a netcdf file in append mode
-pub fn append<P>(name: P) -> error::Result<File>
+pub fn append<P>(name: P) -> error::Result<MutableFile>
 where
     P: AsRef<std::path::Path>,
 {
@@ -104,16 +104,36 @@ pub fn open<P>(name: P) -> error::Result<ReadOnlyFile>
 where
     P: AsRef<std::path::Path>,
 {
-    ReadOnlyFile::open(name.as_ref())
+    File::open(name.as_ref())
 }
 
 #[cfg(feature = "memory")]
 /// Open a netcdf file from a buffer
 pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<MemFile<'a>> {
-    file::MemFile::new(name, mem)
+    File::open_from_memory(name, mem)
 }
 
 lazy_static! {
     /// Use this when accessing netcdf functions
     pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());
+}
+
+pub(crate) mod utils {
+    use super::*;
+    use netcdf_sys::{NC_EMAXNAME, NC_MAX_NAME};
+    /// Use this function for short netcdf names to avoid the allocation
+    /// for a `CString`
+    pub(crate) fn short_name_to_bytes(name: &str) -> error::Result<[u8; NC_MAX_NAME as usize + 1]> {
+        if name.len() > NC_MAX_NAME as _ {
+            Err(NC_EMAXNAME.into())
+        } else {
+            let len = name
+                .bytes()
+                .position(|x| x == 0)
+                .unwrap_or_else(|| name.len());
+            let mut bytes = [0_u8; NC_MAX_NAME as usize + 1];
+            bytes[..len].copy_from_slice(name.as_bytes());
+            Ok(bytes)
+        }
+    }
 }

@@ -1,84 +1,52 @@
 //! Open, create, and append netcdf files
 
 #![allow(clippy::similar_names)]
+use super::attribute::{AttrValue, Attribute};
+use super::dimension::{self, Dimension};
 use super::error;
-use super::group::Group;
+use super::group::{Group, GroupMut};
+use super::variable::{Numeric, Variable, VariableMut};
 use super::LOCK;
 use netcdf_sys::*;
-use std::cell::UnsafeCell;
-use std::convert::TryInto;
 use std::ffi::CString;
+use std::marker::PhantomData;
 use std::path;
-use std::rc::Rc;
 
-/// Container for netcdf type
 #[derive(Debug)]
-pub struct File {
-    pub(crate) ncid: nc_type,
-    pub(crate) name: String,
-    pub(crate) root: Rc<UnsafeCell<Group>>,
+pub(crate) struct File {
+    ncid: nc_type,
 }
 
-impl File {
-    /// Current name of the file. This name sometimes gives the name
-    /// of the file used to open it, or some arbitrary name when
-    /// opened through a memory buffer
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Main entrypoint for interacting with the netcdf file. Also accessible
-    /// through the `Deref` trait on `File`
-    pub fn root(&self) -> &Group {
-        unsafe { &*self.root.get() }
-    }
-
-    /// Mutable access to the root group
-    pub fn root_mut(&mut self) -> &mut Group {
-        unsafe { &mut *self.root.get() }
-    }
-}
-
-impl std::ops::Deref for File {
-    type Target = Group;
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*self.root.get() }
-    }
-}
-
-impl std::ops::DerefMut for File {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *self.root.get() }
-    }
-}
-
-impl File {
-    #[allow(clippy::doc_markdown)]
-    /// Open a netCDF file in read only mode.
-    ///
-    /// Consider using [`crate::open`] instead to open with
-    /// a generic `Path` object, and ensure read-only on
-    /// the `File`
-    pub fn open(path: &path::Path) -> error::Result<Self> {
-        let f = CString::new(path.to_str().unwrap()).unwrap();
-        let mut ncid: nc_type = -1;
+impl Drop for File {
+    fn drop(&mut self) {
         unsafe {
             let _g = LOCK.lock().unwrap();
+            // Can't really do much with an error here
+            let _err = error::checked(nc_close(self.ncid));
+        }
+    }
+}
+
+impl File {
+    /// Open a `netCDF` file in read only mode.
+    ///
+    /// Consider using [`netcdf::open`] instead to open with
+    /// a generic `Path` object, and ensure read-only on
+    /// the `File`
+    pub(crate) fn open(path: &path::Path) -> error::Result<ReadOnlyFile> {
+        let f = CString::new(path.to_str().unwrap()).unwrap();
+        let mut ncid: nc_type = 0;
+        unsafe {
+            let _l = LOCK.lock().unwrap();
             error::checked(nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid))?;
         }
-
-        let root = parse_file(ncid)?;
-
-        Ok(Self {
-            ncid,
-            name: path.file_name().unwrap().to_string_lossy().to_string(),
-            root,
-        })
+        Ok(ReadOnlyFile(Self { ncid }))
     }
+
     #[allow(clippy::doc_markdown)]
     /// Open a netCDF file in append mode (read/write).
     /// The file must already exist.
-    pub fn append(path: &path::Path) -> error::Result<Self> {
+    pub(crate) fn append(path: &path::Path) -> error::Result<MutableFile> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         unsafe {
@@ -86,19 +54,13 @@ impl File {
             error::checked(nc_open(f.as_ptr(), NC_WRITE, &mut ncid))?;
         }
 
-        let root = parse_file(ncid)?;
-
-        Ok(Self {
-            ncid,
-            name: path.file_name().unwrap().to_string_lossy().to_string(),
-            root,
-        })
+        Ok(MutableFile(ReadOnlyFile(Self { ncid })))
     }
     #[allow(clippy::doc_markdown)]
     /// Open a netCDF file in creation mode.
     ///
     /// Will overwrite existing file if any
-    pub fn create(path: &path::Path) -> error::Result<Self> {
+    pub(crate) fn create(path: &path::Path) -> error::Result<MutableFile> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         unsafe {
@@ -106,91 +68,14 @@ impl File {
             error::checked(nc_create(f.as_ptr(), NC_NETCDF4 | NC_CLOBBER, &mut ncid))?;
         }
 
-        let root = Rc::new(UnsafeCell::new(Group {
-            name: "root".to_string(),
-            ncid,
-            grpid: None,
-            variables: Vec::default(),
-            dimensions: Vec::default(),
-            groups: Vec::default(),
-            parent: None,
-            this: None,
-        }));
-        {
-            let rootref = Some(Rc::downgrade(&root));
-            let root = unsafe { &mut *root.get() };
-            root.this = rootref;
-        }
-        Ok(Self {
-            ncid,
-            name: path.file_name().unwrap().to_string_lossy().to_string(),
-            root,
-        })
+        Ok(MutableFile(ReadOnlyFile(Self { ncid })))
     }
-}
 
-/// File that does not allow writing to it, enforced by
-/// borrow rules (can not get `mut File`)
-///
-/// `Deref`s to `File`, but does not provide mutable access,
-/// so the following code will not compile:
-/// ```compile_fail
-/// # fn main() -> netcdf::Result<()>{
-/// let file = netcdf::open("file.nc")?;
-/// file.add_dimension("somedim", 10)?;
-/// # }
-/// ```
-#[derive(Debug)]
-pub struct ReadOnlyFile {
-    file: File,
-}
-
-impl std::ops::Deref for ReadOnlyFile {
-    type Target = File;
-    fn deref(&self) -> &Self::Target {
-        &self.file
-    }
-}
-
-impl ReadOnlyFile {
-    pub(crate) fn open(path: &path::Path) -> error::Result<Self> {
-        Ok(Self {
-            file: File::open(path)?,
-        })
-    }
-}
-
-#[cfg(feature = "memory")]
-/// The memory mapped file is kept in this structure to keep the
-/// lifetime of the buffer longer than the file.
-///
-/// Access the [`File`] through the `Deref` trait,
-/// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let buffer = &[0, 42, 1, 2];
-/// let file = &netcdf::MemFile::new(None, buffer)?;
-///
-/// let variables = file.variables();
-/// # Ok(()) }
-/// ```
-#[allow(clippy::module_name_repetitions)]
-pub struct MemFile<'a> {
-    file: File,
-    _buffer: std::marker::PhantomData<&'a [u8]>,
-}
-
-#[cfg(feature = "memory")]
-impl<'a> std::ops::Deref for MemFile<'a> {
-    type Target = File;
-    fn deref(&self) -> &Self::Target {
-        &self.file
-    }
-}
-
-#[cfg(feature = "memory")]
-impl<'a> MemFile<'a> {
-    /// Open a file from the given buffer
-    pub fn new(name: Option<&str>, mem: &'a [u8]) -> error::Result<Self> {
+    #[cfg(feature = "memory")]
+    pub(crate) fn open_from_memory<'buffer>(
+        name: Option<&str>,
+        mem: &'buffer [u8],
+    ) -> error::Result<MemFile<'buffer>> {
         let cstr = std::ffi::CString::new(name.unwrap_or("/")).unwrap();
         let mut ncid = 0;
         unsafe {
@@ -204,305 +89,235 @@ impl<'a> MemFile<'a> {
             ))?;
         }
 
-        let root = parse_file(ncid)?;
-
-        Ok(Self {
-            file: File {
-                name: name.unwrap_or("").to_string(),
-                ncid,
-                root,
-            },
-            _buffer: std::marker::PhantomData,
-        })
+        Ok(MemFile(ReadOnlyFile(Self { ncid }), PhantomData))
     }
 }
 
-impl Drop for File {
-    fn drop(&mut self) {
-        unsafe {
-            let _g = LOCK.lock().unwrap();
-            // Can't really do much with an error here
-            let _err = error::checked(nc_close(self.ncid));
-        }
-    }
-}
+#[derive(Debug)]
+/// Read only accessible file
+#[allow(clippy::module_name_repetitions)]
+pub struct ReadOnlyFile(File);
 
-use super::dimension::Dimension;
-
-fn get_group_dimensions(ncid: nc_type) -> error::Result<Vec<Dimension>> {
-    let mut ndims: nc_type = 0;
-    unsafe {
-        error::checked(nc_inq_dimids(ncid, &mut ndims, std::ptr::null_mut(), 0))?;
-    }
-
-    if ndims == 0 {
-        return Ok(Vec::new());
-    }
-    let mut dimids = vec![0 as nc_type; ndims.try_into()?];
-    unsafe {
-        error::checked(nc_inq_dimids(
-            ncid,
-            std::ptr::null_mut(),
-            dimids.as_mut_ptr(),
-            0,
-        ))?;
-    }
-
-    let unlimited_dims = get_unlimited_dimensions(ncid)?;
-    let mut dimensions = Vec::with_capacity(ndims.try_into()?);
-    let mut buf = [0_u8; NC_MAX_NAME as usize + 1];
-    for dimid in dimids {
-        for i in buf.iter_mut() {
-            *i = 0
-        }
-        let mut len = 0;
-        unsafe {
-            error::checked(nc_inq_dim(
-                ncid,
-                dimid as _,
-                buf.as_mut_ptr() as *mut _,
-                &mut len,
-            ))?;
-        }
-
-        let zero_pos = buf
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| buf.len());
-        let name = String::from(String::from_utf8_lossy(&buf[..zero_pos]));
-
-        let len = if unlimited_dims.contains(&dimid) {
-            None
-        } else {
-            Some(unsafe { core::num::NonZeroUsize::new_unchecked(len) })
-        };
-        dimensions.push(Dimension {
-            ncid,
-            name,
-            len,
-            id: dimid,
-        });
-    }
-
-    Ok(dimensions)
-}
-
-fn get_dimensions_of_var(
-    ncid: nc_type,
-    varid: nc_type,
-    g: &Group,
-) -> error::Result<Vec<Dimension>> {
-    let mut ndims = 0;
-    unsafe {
-        error::checked(nc_inq_var(
-            ncid,
-            varid,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            &mut ndims,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-        ))?;
-    }
-    if ndims == 0 {
-        return Ok(Vec::new());
-    }
-    let mut dimids = vec![0; ndims.try_into()?];
-    unsafe {
-        error::checked(nc_inq_var(
-            ncid,
-            varid,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            dimids.as_mut_ptr(),
-            std::ptr::null_mut(),
-        ))?;
-    }
-
-    let mut dimensions = Vec::with_capacity(ndims.try_into()?);
-    for dimid in dimids {
-        let d = if let Some(d) = g.dimensions().find(|x| x.id == dimid) {
-            d
-        } else if let Some(d) = g
-            .parents()
-            .flat_map(Group::dimensions)
-            .find(|x| x.id == dimid)
-        {
-            d
-        } else {
-            return Err(error::Error::NotFound(format!("dimid {}", dimid)));
+impl ReadOnlyFile {
+    /// path used to open/create the file
+    ///
+    /// #Errors
+    ///
+    /// Netcdf layer could fail, or the resulting path
+    /// could contain an invalid UTF8 sequence
+    pub fn path(&self) -> error::Result<String> {
+        let name = {
+            let mut pathlen = 0;
+            unsafe {
+                error::checked(nc_inq_path(self.0.ncid, &mut pathlen, std::ptr::null_mut()))?;
+            }
+            let mut name = vec![0_u8; pathlen as _];
+            unsafe {
+                error::checked(nc_inq_path(
+                    self.0.ncid,
+                    std::ptr::null_mut(),
+                    name.as_mut_ptr() as *mut _,
+                ))?;
+            }
+            name
         };
 
-        dimensions.push(d.clone());
+        Ok(String::from_utf8(name)?)
     }
 
-    Ok(dimensions)
+    /// Main entrypoint for interacting with the netcdf file.
+    pub fn root(&self) -> Group {
+        Group {
+            ncid: self.ncid(),
+            _file: PhantomData,
+        }
+    }
+
+    fn ncid(&self) -> nc_type {
+        self.0.ncid
+    }
+
+    /// Get a variable from the group
+    pub fn variable<'f>(&'f self, name: &str) -> error::Result<Option<Variable<'f>>> {
+        Variable::find_from_name(self.ncid(), name)
+    }
+    /// Iterate over all variables in a group
+    pub fn variables<'f>(
+        &'f self,
+    ) -> error::Result<impl Iterator<Item = error::Result<Variable<'f>>>> {
+        super::variable::variables_at_ncid(self.ncid())
+    }
+
+    /// Get a single attribute
+    pub fn attribute<'f>(&'f self, name: &str) -> error::Result<Option<Attribute<'f>>> {
+        let _l = super::LOCK.lock().unwrap();
+        Attribute::find_from_name(self.ncid(), None, name)
+    }
+    /// Get all attributes in the root group
+    pub fn attributes<'f>(
+        &'f self,
+    ) -> error::Result<impl Iterator<Item = error::Result<Attribute<'f>>>> {
+        let _l = super::LOCK.lock().unwrap();
+        crate::attribute::AttributeIterator::new(self.0.ncid, None)
+    }
+
+    /// Get a single dimension
+    pub fn dimension<'f>(&self, name: &str) -> error::Result<Option<Dimension<'f>>> {
+        super::dimension::dimension_from_name(self.ncid(), name)
+    }
+    /// Iterator over all dimensions in the root group
+    pub fn dimensions<'f>(
+        &'f self,
+    ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'f>>>> {
+        super::dimension::dimensions_from_location(self.ncid())
+    }
+
+    /// Get a group
+    pub fn group<'f>(&'f self, name: &str) -> error::Result<Option<Group<'f>>> {
+        super::group::group_from_name(self.ncid(), name)
+    }
+    /// Iterator over all subgroups in the root group
+    pub fn groups<'f>(&'f self) -> error::Result<impl Iterator<Item = Group<'f>>> {
+        super::group::groups_at_ncid(self.ncid())
+    }
 }
 
-use super::Variable;
-fn get_variables(ncid: nc_type, g: &Group) -> error::Result<Vec<Variable>> {
-    let mut nvars = 0;
-    unsafe {
-        error::checked(nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut()))?;
+/// Mutable access to file
+#[derive(Debug)]
+#[allow(clippy::module_name_repetitions)]
+pub struct MutableFile(ReadOnlyFile);
+
+impl std::ops::Deref for MutableFile {
+    type Target = ReadOnlyFile;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
-    if nvars == 0 {
-        return Ok(Vec::new());
-    }
-    let mut varids = vec![0; nvars.try_into()?];
-    unsafe {
-        error::checked(nc_inq_varids(
-            ncid,
-            std::ptr::null_mut(),
-            varids.as_mut_ptr(),
-        ))?;
-    }
-
-    let mut variables = Vec::with_capacity(nvars.try_into()?);
-    let mut name = [0_u8; NC_MAX_NAME as usize + 1];
-    for varid in varids {
-        for i in name.iter_mut() {
-            *i = 0;
-        }
-        let mut vartype = 0;
-        unsafe {
-            error::checked(nc_inq_var(
-                ncid,
-                varid,
-                name.as_mut_ptr() as *mut _,
-                &mut vartype,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            ))?;
-        }
-        let dimensions = get_dimensions_of_var(ncid, varid, g)?;
-
-        let zero_pos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
-        let name = String::from(String::from_utf8_lossy(&name[..zero_pos]));
-
-        let v = Variable {
-            ncid,
-            varid,
-            dimensions,
-            name,
-            vartype,
-        };
-
-        variables.push(v);
-    }
-
-    Ok(variables)
 }
 
-fn get_groups(
-    ncid: nc_type,
-    parent: &Rc<UnsafeCell<Group>>,
-) -> error::Result<Vec<Rc<UnsafeCell<Group>>>> {
-    let mut ngroups = 0;
-
-    unsafe {
-        error::checked(nc_inq_grps(ncid, &mut ngroups, std::ptr::null_mut()))?;
-    }
-    if ngroups == 0 {
-        return Ok(Vec::new());
-    }
-    let mut grpids = vec![0; ngroups.try_into()?];
-    unsafe {
-        error::checked(nc_inq_grps(ncid, std::ptr::null_mut(), grpids.as_mut_ptr()))?;
+impl MutableFile {
+    /// Mutable access to the root group
+    pub fn root_mut(&mut self) -> GroupMut {
+        GroupMut(self.root(), PhantomData)
     }
 
-    let mut groups = Vec::with_capacity(ngroups.try_into()?);
-    let mut cname = [0; NC_MAX_NAME as usize + 1];
-    for grpid in grpids {
-        for i in cname.iter_mut() {
-            *i = 0;
-        }
-        unsafe {
-            error::checked(nc_inq_grpname(grpid, cname.as_mut_ptr()))?;
-        }
-
-        let name = unsafe { std::ffi::CStr::from_ptr(cname.as_ptr()) }
-            .to_string_lossy()
-            .to_string();
-
-        let g = Rc::new(UnsafeCell::new(Group {
-            name: name.clone(),
-            ncid,
-            grpid: Some(grpid),
-            dimensions: Vec::new(),
-            variables: Vec::new(),
-            groups: Vec::new(),
-            parent: Some(Rc::downgrade(parent)),
-            this: None,
-        }));
-
-        let refcell = Rc::downgrade(&g);
-        let gref = unsafe { &mut *g.get() };
-        gref.this = Some(refcell);
-
-        let dimensions = get_group_dimensions(grpid)?;
-        gref.dimensions = dimensions;
-        let variables = get_variables(grpid, &gref)?;
-        gref.variables = variables;
-
-        let subgroups = get_groups(grpid, &g)?;
-        gref.groups = subgroups;
-
-        groups.push(g);
+    /// Get a mutable variable from the group
+    pub fn variable_mut<'f>(&'f mut self, name: &str) -> error::Result<Option<VariableMut<'f>>> {
+        self.variable(name)
+            .map(|var| var.map(|var| VariableMut(var, PhantomData)))
+    }
+    /// Iterate over all variables in the root group, with mutable access
+    ///
+    /// # Examples
+    /// Use this to get multiple writable variables
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut file = netcdf::append("file.nc")?;
+    /// let mut vars = file.variables_mut()?.collect::<Result<Vec<_>, _>>()?;
+    /// vars[0].put_value(1_u8, Some(&[2, 5]))?;
+    /// vars[1].put_value(1_u8, Some(&[5, 2]))?;
+    /// # Ok(()) }
+    /// ```
+    pub fn variables_mut<'f>(
+        &'f mut self,
+    ) -> error::Result<impl Iterator<Item = error::Result<VariableMut<'f>>>> {
+        self.variables()
+            .map(|v| v.map(|var| var.map(|var| VariableMut(var, PhantomData))))
     }
 
-    Ok(groups)
-}
-
-fn get_unlimited_dimensions(ncid: nc_type) -> error::Result<Vec<nc_type>> {
-    let mut nunlim = 0;
-    unsafe {
-        error::checked(nc_inq_unlimdims(ncid, &mut nunlim, std::ptr::null_mut()))?;
+    /// Mutable access to subgroup
+    pub fn group_mut<'f>(&'f mut self, name: &str) -> error::Result<Option<GroupMut<'f>>> {
+        self.group(name)
+            .map(|g| g.map(|g| GroupMut(g, PhantomData)))
+    }
+    /// Iterator over all groups (mutable access)
+    pub fn groups_mut<'f>(&'f mut self) -> error::Result<impl Iterator<Item = GroupMut<'f>>> {
+        self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
 
-    let mut uldim = vec![0; nunlim.try_into()?];
-    unsafe {
-        error::checked(nc_inq_unlimdims(
-            ncid,
-            std::ptr::null_mut(),
-            uldim.as_mut_ptr(),
-        ))?;
-    }
-    Ok(uldim)
-}
-
-fn parse_file(ncid: nc_type) -> error::Result<Rc<UnsafeCell<Group>>> {
-    let _l = LOCK.lock().unwrap();
-
-    let g = Rc::new(UnsafeCell::new(Group {
-        ncid,
-        grpid: None,
-        name: "root".into(),
-        dimensions: Vec::new(),
-        variables: Vec::new(),
-        groups: Vec::new(),
-        parent: None,
-        this: None,
-    }));
-    let thisref = Some(Rc::downgrade(&g));
+    /// Add an attribute to the root group
+    pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
+    where
+        T: Into<AttrValue>,
     {
-        let g = unsafe { &mut *g.get() };
-        g.this = thisref;
+        let _l = LOCK.lock().unwrap();
+        Attribute::put(self.ncid(), NC_GLOBAL, name, val.into())
     }
-    let gref = unsafe { &mut *g.get() };
 
-    let dimensions = get_group_dimensions(ncid)?;
-    gref.dimensions = dimensions;
+    /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
+    pub fn add_dimension<'f>(&'f mut self, name: &str, len: usize) -> error::Result<Dimension<'f>> {
+        let _l = LOCK.lock().unwrap();
+        super::dimension::add_dimension_at(self.ncid(), name, len)
+    }
+    /// Adds a dimension with unbounded size
+    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<Dimension> {
+        self.add_dimension(name, 0)
+    }
 
-    let variables = get_variables(ncid, gref)?;
-    gref.variables = variables;
+    /// Add an empty group to the dataset
+    pub fn add_group<'f>(&'f mut self, name: &str) -> error::Result<GroupMut<'f>> {
+        let _l = LOCK.lock().unwrap();
+        GroupMut::add_group_at(self.ncid(), name)
+    }
 
-    let groups = get_groups(ncid, &g)?;
-    gref.groups = groups;
+    /// Create a Variable into the dataset, with no data written into it
+    ///
+    /// Dimensions are identified using the name of the dimension, and will recurse upwards
+    /// if not found in the current group.
+    pub fn add_variable<'f, T>(
+        &'f mut self,
+        name: &str,
+        dims: &[&str],
+    ) -> error::Result<VariableMut<'f>>
+    where
+        T: Numeric,
+    {
+        let _l = LOCK.lock().unwrap();
+        VariableMut::add_from_str(self.ncid(), T::NCTYPE, name, dims)
+    }
+    /// Adds a variable with a basic type of string
+    pub fn add_string_variable<'f>(
+        &'f mut self,
+        name: &str,
+        dims: &[&str],
+    ) -> error::Result<VariableMut<'f>> {
+        let _l = LOCK.lock().unwrap();
+        VariableMut::add_from_str(self.ncid(), NC_STRING, name, dims)
+    }
+    /// Adds a variable from a set of unique identifiers, recursing upwards
+    /// from the current group if necessary.
+    pub fn add_variable_from_identifiers<'f, T>(
+        &'f mut self,
+        name: &str,
+        dims: &[dimension::Identifier],
+    ) -> error::Result<VariableMut<'f>>
+    where
+        T: Numeric,
+    {
+        let _l = LOCK.lock().unwrap();
+        super::variable::add_variable_from_identifiers(self.ncid(), name, dims, T::NCTYPE)
+    }
+}
 
-    Ok(g)
+#[cfg(feature = "memory")]
+/// The memory mapped file is kept in this structure to keep the
+/// lifetime of the buffer longer than the file.
+///
+/// Access a [`ReadOnlyFile`] through the `Deref` trait,
+/// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let buffer = &[0, 42, 1, 2];
+/// let file = &netcdf::open_mem(None, buffer)?;
+///
+/// let variables = file.variables()?;
+/// # Ok(()) }
+/// ```
+#[allow(clippy::module_name_repetitions)]
+pub struct MemFile<'buffer>(ReadOnlyFile, std::marker::PhantomData<&'buffer [u8]>);
+
+#[cfg(feature = "memory")]
+impl<'a> std::ops::Deref for MemFile<'a> {
+    type Target = ReadOnlyFile;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
