@@ -27,10 +27,9 @@ fn run(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Group: {}", g.name()?);
+    println!("Group: {}", g.name());
     println!("Dimensions:");
-    for d in g.dimensions()? {
-        let d = d?;
+    for d in g.dimensions() {
         if d.is_unlimited() {
             println!("\t{} : Unlimited ({})", d.name(), d.len());
         } else {
@@ -38,8 +37,7 @@ fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error
         }
     }
     println!("Variables:");
-    for v in g.variables()? {
-        let v = v?;
+    for v in g.variables() {
         print!("\t{}", v.name());
         print!("(");
         for d in v.dimensions() {
@@ -51,11 +49,10 @@ fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error
         }
     }
     println!("Attributes:");
-    for a in g.attributes()? {
-        let a = a?;
+    for a in g.attributes() {
         println!("\t\t{} = {:?}", a.name(), a.value()?);
     }
-    for g in g.groups()? {
+    for g in g.groups() {
         println!();
         print_group(&g)?;
     }
