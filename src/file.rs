@@ -13,11 +13,11 @@ use std::marker::PhantomData;
 use std::path;
 
 #[derive(Debug)]
-pub(crate) struct File {
+pub(crate) struct RawFile {
     ncid: nc_type,
 }
 
-impl Drop for File {
+impl Drop for RawFile {
     fn drop(&mut self) {
         unsafe {
             let _g = LOCK.lock().unwrap();
@@ -27,20 +27,20 @@ impl Drop for File {
     }
 }
 
-impl File {
+impl RawFile {
     /// Open a `netCDF` file in read only mode.
     ///
     /// Consider using [`netcdf::open`] instead to open with
     /// a generic `Path` object, and ensure read-only on
     /// the `File`
-    pub(crate) fn open(path: &path::Path) -> error::Result<ReadOnlyFile> {
+    pub(crate) fn open(path: &path::Path) -> error::Result<File> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = 0;
         unsafe {
             let _l = LOCK.lock().unwrap();
             error::checked(nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid))?;
         }
-        Ok(ReadOnlyFile(Self { ncid }))
+        Ok(File(Self { ncid }))
     }
 
     #[allow(clippy::doc_markdown)]
@@ -54,7 +54,7 @@ impl File {
             error::checked(nc_open(f.as_ptr(), NC_WRITE, &mut ncid))?;
         }
 
-        Ok(MutableFile(ReadOnlyFile(Self { ncid })))
+        Ok(MutableFile(File(Self { ncid })))
     }
     #[allow(clippy::doc_markdown)]
     /// Open a netCDF file in creation mode.
@@ -68,7 +68,7 @@ impl File {
             error::checked(nc_create(f.as_ptr(), NC_NETCDF4 | NC_CLOBBER, &mut ncid))?;
         }
 
-        Ok(MutableFile(ReadOnlyFile(Self { ncid })))
+        Ok(MutableFile(File(Self { ncid })))
     }
 
     #[cfg(feature = "memory")]
@@ -89,16 +89,16 @@ impl File {
             ))?;
         }
 
-        Ok(MemFile(ReadOnlyFile(Self { ncid }), PhantomData))
+        Ok(MemFile(File(Self { ncid }), PhantomData))
     }
 }
 
 #[derive(Debug)]
 /// Read only accessible file
 #[allow(clippy::module_name_repetitions)]
-pub struct ReadOnlyFile(File);
+pub struct File(RawFile);
 
-impl ReadOnlyFile {
+impl File {
     /// path used to open/create the file
     ///
     /// #Errors
@@ -185,10 +185,10 @@ impl ReadOnlyFile {
 /// Mutable access to file
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
-pub struct MutableFile(ReadOnlyFile);
+pub struct MutableFile(File);
 
 impl std::ops::Deref for MutableFile {
-    type Target = ReadOnlyFile;
+    type Target = File;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -302,7 +302,7 @@ impl MutableFile {
 /// The memory mapped file is kept in this structure to keep the
 /// lifetime of the buffer longer than the file.
 ///
-/// Access a [`ReadOnlyFile`] through the `Deref` trait,
+/// Access a [`File`] through the `Deref` trait,
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let buffer = &[0, 42, 1, 2];
@@ -312,11 +312,11 @@ impl MutableFile {
 /// # Ok(()) }
 /// ```
 #[allow(clippy::module_name_repetitions)]
-pub struct MemFile<'buffer>(ReadOnlyFile, std::marker::PhantomData<&'buffer [u8]>);
+pub struct MemFile<'buffer>(File, std::marker::PhantomData<&'buffer [u8]>);
 
 #[cfg(feature = "memory")]
 impl<'a> std::ops::Deref for MemFile<'a> {
-    type Target = ReadOnlyFile;
+    type Target = File;
     fn deref(&self) -> &Self::Target {
         &self.0
     }

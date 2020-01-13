@@ -88,7 +88,7 @@ pub fn create<P>(name: P) -> error::Result<MutableFile>
 where
     P: AsRef<std::path::Path>,
 {
-    File::create(name.as_ref())
+    RawFile::create(name.as_ref())
 }
 
 /// Open a netcdf file in append mode
@@ -96,21 +96,21 @@ pub fn append<P>(name: P) -> error::Result<MutableFile>
 where
     P: AsRef<std::path::Path>,
 {
-    File::append(name.as_ref())
+    RawFile::append(name.as_ref())
 }
 
 /// Open a netcdf file in read mode
-pub fn open<P>(name: P) -> error::Result<ReadOnlyFile>
+pub fn open<P>(name: P) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
 {
-    File::open(name.as_ref())
+    RawFile::open(name.as_ref())
 }
 
 #[cfg(feature = "memory")]
 /// Open a netcdf file from a buffer
 pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<MemFile<'a>> {
-    File::open_from_memory(name, mem)
+    RawFile::open_from_memory(name, mem)
 }
 
 lazy_static! {
