@@ -468,7 +468,6 @@ fn def_dims_vars_attrs() {
                 .unwrap()
                 .expect("Could not find variable")
                 .attribute("varattr1")
-                .expect("netcdf error occured")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
@@ -480,7 +479,6 @@ fn def_dims_vars_attrs() {
                 .unwrap()
                 .expect("Could not find variable")
                 .attribute("varattr2")
-                .expect("netcdf error occured")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
@@ -708,12 +706,12 @@ fn append() {
     assert!(file
         .variables()
         .unwrap()
-        .find(|x| x.as_ref().unwrap().name().unwrap() == "some_variable")
+        .find(|x| x.as_ref().unwrap().name() == "some_variable")
         .is_some());
     assert!(file
         .variables()
         .unwrap()
-        .find(|x| x.as_ref().unwrap().name().unwrap() == "some_other_variable")
+        .find(|x| x.as_ref().unwrap().name() == "some_other_variable")
         .is_some());
 }
 
@@ -817,7 +815,6 @@ fn set_fill_value() {
         .expect("Could not find variable");
     let attr = var
         .attribute("_FillValue")
-        .expect("other error")
         .expect("could not find attribute")
         .value()
         .unwrap();
@@ -857,25 +854,17 @@ fn more_fill_values() {
 
     // assert_eq!(var.value::<i32>(Some(&[0])).unwrap(), GARBAGE);
     assert_eq!(var.value::<i32>(Some(&[1])).unwrap(), 6_i32);
-    assert!(var.attribute("_FillValue").unwrap().is_none());
+    assert!(var.attribute("_FillValue").is_none());
 
     let var = &mut file.add_variable::<i32>("v2", &["x"]).unwrap();
     var.set_fill_value(2_i32).unwrap();
     assert_eq!(
-        var.attribute("_FillValue")
-            .unwrap()
-            .unwrap()
-            .value()
-            .unwrap(),
+        var.attribute("_FillValue").unwrap().value().unwrap(),
         AttrValue::Int(2)
     );
     var.set_fill_value(3_i32).unwrap();
     assert_eq!(
-        var.attribute("_FillValue")
-            .unwrap()
-            .unwrap()
-            .value()
-            .unwrap(),
+        var.attribute("_FillValue").unwrap().value().unwrap(),
         AttrValue::Int(3)
     );
     unsafe { var.set_nofill().unwrap() };

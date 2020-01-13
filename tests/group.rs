@@ -58,14 +58,14 @@ fn find_variable() {
     let z = group.variable_mut("z").unwrap().unwrap();
     assert_eq!(z.dimensions()[0].len(), 3);
     assert_eq!(z.vartype(), netcdf_sys::NC_UBYTE);
-    assert_eq!(z.name().unwrap(), "z");
+    assert_eq!(z.name(), "z");
 
     assert!(group.variable("vvvvv").unwrap().is_none());
 
     for var in group.variables_mut().unwrap() {
         let mut var = var.unwrap();
         var.compression(3).unwrap();
-        if var.name().unwrap() == "z" {
+        if var.name() == "z" {
             var.chunking(&[1]).unwrap();
         } else {
             var.chunking(&[]).unwrap();

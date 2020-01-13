@@ -31,8 +31,7 @@ fn attributes_read() {
         .expect("Could not add attribute");
     assert_eq!(var.vartype(), netcdf_sys::NC_FLOAT);
 
-    for attr in var.attributes().unwrap() {
-        let attr = attr.unwrap();
+    for attr in var.attributes() {
         attr.value().unwrap();
     }
 }
@@ -81,7 +80,6 @@ fn open_pres_temp_4d() {
     // test var attributes
     assert_eq!(
         pres.attribute("units")
-            .expect("netcdf error")
             .expect("Could not find attribute")
             .value()
             .unwrap(),
