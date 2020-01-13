@@ -69,7 +69,7 @@ impl<'f> Group<'f> {
     {
         super::variable::variables_at_ncid(self.id())
             .unwrap()
-            .map(|v| v.unwrap())
+            .map(Result::unwrap)
     }
 
     /// Get a single attribute
@@ -78,12 +78,12 @@ impl<'f> Group<'f> {
         Attribute::find_from_name(self.ncid, None, name).unwrap()
     }
     /// Get all attributes in the group
-    pub fn attributes<'a>(&'a self) -> impl Iterator<Item = Attribute<'a>> {
+    pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
         // Need to lock when reading the first attribute (per group)
         let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.ncid, None)
             .unwrap()
-            .map(|a| a.unwrap())
+            .map(Result::unwrap)
     }
 
     /// Get a single dimension
@@ -100,7 +100,7 @@ impl<'f> Group<'f> {
     {
         super::dimension::dimensions_from_location(self.id())
             .unwrap()
-            .map(|d| d.unwrap())
+            .map(Result::unwrap)
     }
 
     /// Get a group

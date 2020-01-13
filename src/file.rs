@@ -148,10 +148,10 @@ impl File {
         Variable::find_from_name(self.ncid(), name).unwrap()
     }
     /// Iterate over all variables in a group
-    pub fn variables<'f>(&'f self) -> impl Iterator<Item = Variable<'f>> {
+    pub fn variables(&self) -> impl Iterator<Item = Variable> {
         super::variable::variables_at_ncid(self.ncid())
             .unwrap()
-            .map(|v| v.unwrap())
+            .map(Result::unwrap)
     }
 
     /// Get a single attribute
@@ -160,11 +160,11 @@ impl File {
         Attribute::find_from_name(self.ncid(), None, name).unwrap()
     }
     /// Get all attributes in the root group
-    pub fn attributes<'f>(&'f self) -> impl Iterator<Item = Attribute<'f>> {
+    pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
         let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.0.ncid, None)
             .unwrap()
-            .map(|a| a.unwrap())
+            .map(Result::unwrap)
     }
 
     /// Get a single dimension
@@ -172,10 +172,10 @@ impl File {
         super::dimension::dimension_from_name(self.ncid(), name).unwrap()
     }
     /// Iterator over all dimensions in the root group
-    pub fn dimensions<'f>(&'f self) -> impl Iterator<Item = Dimension<'f>> {
+    pub fn dimensions(&self) -> impl Iterator<Item = Dimension> {
         super::dimension::dimensions_from_location(self.ncid())
             .unwrap()
-            .map(|d| d.unwrap())
+            .map(Result::unwrap)
     }
 
     /// Get a group
@@ -232,7 +232,7 @@ impl MutableFile {
     /// vars[1].put_value(1_u8, Some(&[5, 2]))?;
     /// # Ok(()) }
     /// ```
-    pub fn variables_mut<'f>(&'f mut self) -> impl Iterator<Item = VariableMut<'f>> {
+    pub fn variables_mut(&mut self) -> impl Iterator<Item = VariableMut> {
         self.variables().map(|var| VariableMut(var, PhantomData))
     }
 
