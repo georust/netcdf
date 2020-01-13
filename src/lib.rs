@@ -10,7 +10,7 @@
 //! let file = netcdf::open("simle_xy.nc")?;
 //!
 //! // Access any variable, attribute, or dimension through lookups on hashmaps
-//! let var = &file.variable("data")?.expect("Could not find variable 'data'");
+//! let var = &file.variable("data").expect("Could not find variable 'data'");
 //!
 //! // Read variable as numeric types
 //! let data_i32 = var.value::<i32>(None)?;
@@ -51,7 +51,7 @@
 //! // open it in read/write mode
 //! let mut file = netcdf::append("crabs2.nc")?;
 //! // get a mutable binding of the variable "crab_coolness_level"
-//! let mut var = file.variable_mut("crab_coolness_level")?.unwrap();
+//! let mut var = file.variable_mut("crab_coolness_level").unwrap();
 //!
 //! let data : Vec<i32> = vec![100; 10];
 //! // write 5 first elements of the vector `data` into `var` starting at index 2;

@@ -126,10 +126,16 @@ impl File {
     }
 
     /// Main entrypoint for interacting with the netcdf file.
-    pub fn root(&self) -> Group {
-        Group {
-            ncid: self.ncid(),
-            _file: PhantomData,
+    pub fn root(&self) -> Option<Group> {
+        let mut format = 0;
+        unsafe { error::checked(nc_inq_format(self.ncid(), &mut format)) }.unwrap();
+
+        match format {
+            NC_FORMAT_NETCDF4 | NC_FORMAT_NETCDF4_CLASSIC => Some(Group {
+                ncid: self.ncid(),
+                _file: PhantomData,
+            }),
+            _ => None,
         }
     }
 
@@ -138,45 +144,53 @@ impl File {
     }
 
     /// Get a variable from the group
-    pub fn variable<'f>(&'f self, name: &str) -> error::Result<Option<Variable<'f>>> {
-        Variable::find_from_name(self.ncid(), name)
+    pub fn variable<'f>(&'f self, name: &str) -> Option<Variable<'f>> {
+        Variable::find_from_name(self.ncid(), name).unwrap()
     }
     /// Iterate over all variables in a group
-    pub fn variables<'f>(
-        &'f self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Variable<'f>>>> {
+    pub fn variables<'f>(&'f self) -> impl Iterator<Item = Variable<'f>> {
         super::variable::variables_at_ncid(self.ncid())
+            .unwrap()
+            .map(|v| v.unwrap())
     }
 
     /// Get a single attribute
-    pub fn attribute<'f>(&'f self, name: &str) -> error::Result<Option<Attribute<'f>>> {
+    pub fn attribute<'f>(&'f self, name: &str) -> Option<Attribute<'f>> {
         let _l = super::LOCK.lock().unwrap();
-        Attribute::find_from_name(self.ncid(), None, name)
+        Attribute::find_from_name(self.ncid(), None, name).unwrap()
     }
     /// Get all attributes in the root group
-    pub fn attributes<'f>(
-        &'f self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Attribute<'f>>>> {
+    pub fn attributes<'f>(&'f self) -> impl Iterator<Item = Attribute<'f>> {
         let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.0.ncid, None)
+            .unwrap()
+            .map(|a| a.unwrap())
     }
 
     /// Get a single dimension
-    pub fn dimension<'f>(&self, name: &str) -> error::Result<Option<Dimension<'f>>> {
-        super::dimension::dimension_from_name(self.ncid(), name)
+    pub fn dimension<'f>(&self, name: &str) -> Option<Dimension<'f>> {
+        super::dimension::dimension_from_name(self.ncid(), name).unwrap()
     }
     /// Iterator over all dimensions in the root group
-    pub fn dimensions<'f>(
-        &'f self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'f>>>> {
+    pub fn dimensions<'f>(&'f self) -> impl Iterator<Item = Dimension<'f>> {
         super::dimension::dimensions_from_location(self.ncid())
+            .unwrap()
+            .map(|d| d.unwrap())
     }
 
     /// Get a group
+    ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file
     pub fn group<'f>(&'f self, name: &str) -> error::Result<Option<Group<'f>>> {
         super::group::group_from_name(self.ncid(), name)
     }
     /// Iterator over all subgroups in the root group
+    ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file
     pub fn groups<'f>(&'f self) -> error::Result<impl Iterator<Item = Group<'f>>> {
         super::group::groups_at_ncid(self.ncid())
     }
@@ -196,14 +210,15 @@ impl std::ops::Deref for MutableFile {
 
 impl MutableFile {
     /// Mutable access to the root group
-    pub fn root_mut(&mut self) -> GroupMut {
-        GroupMut(self.root(), PhantomData)
+    ///
+    /// Return None if this can't be a root group
+    pub fn root_mut(&mut self) -> Option<GroupMut> {
+        self.root().map(|root| GroupMut(root, PhantomData))
     }
 
     /// Get a mutable variable from the group
-    pub fn variable_mut<'f>(&'f mut self, name: &str) -> error::Result<Option<VariableMut<'f>>> {
-        self.variable(name)
-            .map(|var| var.map(|var| VariableMut(var, PhantomData)))
+    pub fn variable_mut<'f>(&'f mut self, name: &str) -> Option<VariableMut<'f>> {
+        self.variable(name).map(|var| VariableMut(var, PhantomData))
     }
     /// Iterate over all variables in the root group, with mutable access
     ///
@@ -212,24 +227,29 @@ impl MutableFile {
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut file = netcdf::append("file.nc")?;
-    /// let mut vars = file.variables_mut()?.collect::<Result<Vec<_>, _>>()?;
+    /// let mut vars = file.variables_mut().collect::<Vec<_>>();
     /// vars[0].put_value(1_u8, Some(&[2, 5]))?;
     /// vars[1].put_value(1_u8, Some(&[5, 2]))?;
     /// # Ok(()) }
     /// ```
-    pub fn variables_mut<'f>(
-        &'f mut self,
-    ) -> error::Result<impl Iterator<Item = error::Result<VariableMut<'f>>>> {
-        self.variables()
-            .map(|v| v.map(|var| var.map(|var| VariableMut(var, PhantomData))))
+    pub fn variables_mut<'f>(&'f mut self) -> impl Iterator<Item = VariableMut<'f>> {
+        self.variables().map(|var| VariableMut(var, PhantomData))
     }
 
     /// Mutable access to subgroup
+    ///
+    /// # Errors
+    ///
+    /// File does not support groups
     pub fn group_mut<'f>(&'f mut self, name: &str) -> error::Result<Option<GroupMut<'f>>> {
         self.group(name)
             .map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
     /// Iterator over all groups (mutable access)
+    ///
+    /// # Errors
+    ///
+    /// File does not support groups
     pub fn groups_mut<'f>(&'f mut self) -> error::Result<impl Iterator<Item = GroupMut<'f>>> {
         self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
@@ -308,7 +328,7 @@ impl MutableFile {
 /// let buffer = &[0, 42, 1, 2];
 /// let file = &netcdf::open_mem(None, buffer)?;
 ///
-/// let variables = file.variables()?;
+/// let variables = file.variables();
 /// # Ok(()) }
 /// ```
 #[allow(clippy::module_name_repetitions)]
