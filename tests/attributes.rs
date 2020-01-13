@@ -13,7 +13,7 @@ fn attributes_read() {
         .expect("netcdf error")
         .expect("Could not find attribute");
 
-    assert_eq!(attr.name().unwrap(), "PROGLANG");
+    assert_eq!(attr.name(), "PROGLANG");
 
     for attr in file.attributes().unwrap() {
         let attr = attr.unwrap();
@@ -266,7 +266,7 @@ fn multi_attributes() {
     let mut atts = 0;
     for att in file.attributes().unwrap() {
         let att = att.unwrap();
-        match att.name().unwrap() {
+        match att.name() {
             "u8s" => {
                 assert_eq!(att.value().unwrap(), vec![1_u8, 2, 3, 4].into());
             }
