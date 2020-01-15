@@ -26,12 +26,7 @@ pub struct Attribute<'a> {
 
 impl<'a> std::fmt::Debug for Attribute<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "name: ")?;
-        if let Ok(name) = self.name() {
-            write!(f, "{}", name)?;
-        } else {
-            write!(f, "<<not utf8 name>>")?;
-        }
+        write!(f, "name: {}", self.name())?;
         write!(f, "ncid: {}", self.ncid)?;
         write!(f, "varid: {}", self.varid)
     }
@@ -42,13 +37,14 @@ impl<'a> Attribute<'a> {
     ///
     /// # Errors
     /// attribute could have a name containing an invalid utf8-sequence
-    pub fn name(&self) -> Result<&str, std::str::Utf8Error> {
+    pub fn name(&self) -> &str {
         let zeropos = self
             .name
             .iter()
             .position(|&x| x == 0)
             .unwrap_or_else(|| self.name.len());
         std::str::from_utf8(&self.name[..zeropos])
+            .expect("Attribute name contains invalid sequence")
     }
     /// Number of elements in this attribute
     fn num_elems(&self) -> error::Result<usize> {

@@ -49,14 +49,15 @@ impl<'g> Dimension<'g> {
     }
 
     /// Gets the name of the dimension
-    pub fn name(&self) -> error::Result<String> {
+    pub fn name(&self) -> String {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
             error::checked(nc_inq_dimname(
                 self.id.ncid,
                 self.id.dimid,
                 name.as_mut_ptr() as *mut _,
-            ))?;
+            ))
+            .unwrap();
         }
 
         let zeropos = name
@@ -64,7 +65,7 @@ impl<'g> Dimension<'g> {
             .position(|&x| x == 0)
             .unwrap_or_else(|| name.len());
         name.resize(zeropos, 0);
-        Ok(String::from_utf8(name)?)
+        String::from_utf8(name).expect("Dimension did not have a valid name")
     }
 
     /// Grabs the unique identifier for this dimension, which

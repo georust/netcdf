@@ -10,13 +10,11 @@ fn attributes_read() {
 
     let attr = &file
         .attribute("PROGLANG")
-        .expect("netcdf error")
         .expect("Could not find attribute");
 
-    assert_eq!(attr.name().unwrap(), "PROGLANG");
+    assert_eq!(attr.name(), "PROGLANG");
 
-    for attr in file.attributes().unwrap() {
-        let attr = attr.unwrap();
+    for attr in file.attributes() {
         let _val = attr.value().expect("Could not get value");
     }
 
@@ -31,8 +29,7 @@ fn attributes_read() {
         .expect("Could not add attribute");
     assert_eq!(var.vartype(), netcdf_sys::NC_FLOAT);
 
-    for attr in var.attributes().unwrap() {
-        let attr = attr.unwrap();
+    for attr in var.attributes() {
         attr.value().unwrap();
     }
 }
@@ -45,25 +42,13 @@ fn attribute_put() {
     let mut f = netcdf::create(p).unwrap();
 
     f.add_attribute("a", "1").unwrap();
-    assert_eq!(
-        f.attribute("a").unwrap().unwrap().value().unwrap(),
-        "1".into()
-    );
+    assert_eq!(f.attribute("a").unwrap().value().unwrap(), "1".into());
     f.add_attribute("b", "2").unwrap();
-    assert_eq!(
-        f.attribute("b").unwrap().unwrap().value().unwrap(),
-        "2".into()
-    );
+    assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
     f.add_attribute("a", 2u32).unwrap();
-    assert_eq!(
-        f.attribute("a").unwrap().unwrap().value().unwrap(),
-        2u32.into()
-    );
+    assert_eq!(f.attribute("a").unwrap().value().unwrap(), 2u32.into());
     f.add_attribute("b", "2").unwrap();
-    assert_eq!(
-        f.attribute("b").unwrap().unwrap().value().unwrap(),
-        "2".into()
-    );
+    assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
 }
 #[test]
 #[cfg(feature = "ndarray")]
@@ -72,16 +57,15 @@ fn open_pres_temp_4d() {
 
     let file = netcdf::open(&f).unwrap();
 
-    let pres = &file.variable("pressure").unwrap().unwrap();
-    assert_eq!(pres.dimensions()[0].name().unwrap(), "time");
-    assert_eq!(pres.dimensions()[1].name().unwrap(), "level");
-    assert_eq!(pres.dimensions()[2].name().unwrap(), "latitude");
-    assert_eq!(pres.dimensions()[3].name().unwrap(), "longitude");
+    let pres = &file.variable("pressure").unwrap();
+    assert_eq!(pres.dimensions()[0].name(), "time");
+    assert_eq!(pres.dimensions()[1].name(), "level");
+    assert_eq!(pres.dimensions()[2].name(), "latitude");
+    assert_eq!(pres.dimensions()[3].name(), "longitude");
 
     // test var attributes
     assert_eq!(
         pres.attribute("units")
-            .expect("netcdf error")
             .expect("Could not find attribute")
             .value()
             .unwrap(),
@@ -96,7 +80,6 @@ fn global_attrs() {
 
     let ch1_attr = &file
         .attribute("CH1_DARK_COUNT")
-        .expect("netcdf error")
         .expect("Could not find attribute");
     let chi = ch1_attr.value().unwrap();
     let eps = 1e-6;
@@ -106,10 +89,7 @@ fn global_attrs() {
         panic!("Did not get the expected attr type");
     }
 
-    let sensor_attr = &file
-        .attribute("sensor")
-        .expect("netcdf error")
-        .expect("Could not find attribute");
+    let sensor_attr = &file.attribute("sensor").expect("Could not find attribute");
     let sensor_data = sensor_attr.value().unwrap();
     if let AttrValue::Str(x) = sensor_data {
         assert_eq!("AVHRR/3", x);
@@ -146,99 +126,51 @@ fn all_attr_types() {
 
         assert_eq!(
             AttrValue::Uchar(3),
-            file.attribute("attr_ubyte")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_ubyte").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Schar(3),
-            file.attribute("attr_byte")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_byte").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Ushort(3),
-            file.attribute("attr_ushort")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_ushort").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Short(3),
-            file.attribute("attr_short")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_short").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Int(3),
-            file.attribute("attr_int")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_int").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Uint(3),
-            file.attribute("attr_uint")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_uint").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Ulonglong(3),
-            file.attribute("attr_uint64")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_uint64").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Longlong(3),
-            file.attribute("attr_int64")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_int64").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Float(3.2),
-            file.attribute("attr_float")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_float").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Double(3.2),
-            file.attribute("attr_double")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_double").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Str("Hello world!".into()),
-            file.attribute("attr_text")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_text").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Str(u8string.into()),
-            file.attribute("attr_text_utf8")
-                .unwrap()
-                .unwrap()
-                .value()
-                .unwrap()
+            file.attribute("attr_text_utf8").unwrap().value().unwrap()
         );
     }
 }
@@ -264,9 +196,8 @@ fn multi_attributes() {
     }
     let file = netcdf::open(path).unwrap();
     let mut atts = 0;
-    for att in file.attributes().unwrap() {
-        let att = att.unwrap();
-        match att.name().unwrap() {
+    for att in file.attributes() {
+        match att.name() {
             "u8s" => {
                 assert_eq!(att.value().unwrap(), vec![1_u8, 2, 3, 4].into());
             }

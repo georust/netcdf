@@ -94,14 +94,15 @@ impl<'g> Variable<'g> {
     }
 
     /// Get name of variable
-    pub fn name(&self) -> error::Result<String> {
+    pub fn name(&self) -> String {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
             error::checked(nc_inq_varname(
                 self.ncid,
                 self.varid,
                 name.as_mut_ptr() as *mut _,
-            ))?;
+            ))
+            .unwrap();
         }
         let zeropos = name
             .iter()
@@ -109,21 +110,22 @@ impl<'g> Variable<'g> {
             .unwrap_or_else(|| name.len());
         name.resize(zeropos, 0);
 
-        Ok(String::from_utf8(name)?)
+        String::from_utf8(name).expect("Variable name contained invalid sequence")
     }
     /// Get an attribute of this variable
-    pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
+    pub fn attribute<'a>(&'a self, name: &str) -> Option<Attribute<'a>> {
         // Need to lock when reading the first attribute (per variable)
         let _l = super::LOCK.lock().unwrap();
         Attribute::find_from_name(self.ncid, Some(self.varid), name)
+            .expect("Could not retrieve attribute")
     }
     /// Iterator over all the attributes of this variable
-    pub fn attributes<'a>(
-        &'a self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Attribute<'a>>>> {
+    pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
         // Need to lock when reading the first attribute (per variable)
         let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.ncid, Some(self.varid))
+            .expect("Could not get attributes")
+            .map(Result::unwrap)
     }
     /// Dimensions for a variable
     pub fn dimensions(&self) -> &[Dimension] {
@@ -140,6 +142,10 @@ impl<'g> Variable<'g> {
         self.dimensions.iter().map(Dimension::len).product()
     }
     /// Get endianness of the variable.
+    ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file
     pub fn endian_value(&self) -> error::Result<Endianness> {
         let mut e: nc_type = 0;
         unsafe {
@@ -159,6 +165,10 @@ impl<'g> VariableMut<'g> {
     /// `deflate_level` can take a value 0..=9, with 0 being no
     /// compression (good for CPU bound tasks), and 9 providing the
     /// highest compression level (good for memory bound tasks)
+    ///
+    /// # Errors
+    ///
+    /// Not a `netcdf-4` file or `deflate_level` not valid
     pub fn compression(&mut self, deflate_level: nc_type) -> error::Result<()> {
         unsafe {
             error::checked(nc_def_var_deflate(
@@ -179,6 +189,10 @@ impl<'g> VariableMut<'g> {
     /// the full dimensions lengths, to change how the variable is stored in
     /// the file. This has no effect on the memory order when reading/putting
     /// a buffer.
+    ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file or invalid chunksize
     pub fn chunking(&mut self, chunksize: &[usize]) -> error::Result<()> {
         if self.dimensions.is_empty() {
             // Can't really set chunking, would lead to segfault
@@ -1064,6 +1078,10 @@ impl<'g> VariableMut<'g> {
     }
 
     /// Set a Fill Value
+    ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file, late define, `fill_value` has the wrong type
     #[allow(clippy::needless_pass_by_value)] // All values will be small
     pub fn set_fill_value<T>(&mut self, fill_value: T) -> error::Result<()>
     where
@@ -1086,10 +1104,15 @@ impl<'g> VariableMut<'g> {
     /// Set the fill value to no value. Use this when wanting to avoid
     /// duplicate writes into empty variables.
     ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file
+    ///
     /// # Safety
     ///
-    /// This is unsafe, as reading from this variable without
-    /// writing to it will produce potential garbage values
+    /// Reading from this variable after having defined nofill
+    /// will read potentially uninitialized data. Normally
+    /// one will expect to find some filler value
     pub unsafe fn set_nofill(&mut self) -> error::Result<()> {
         error::checked(nc_def_var_fill(
             self.ncid,
@@ -1103,6 +1126,10 @@ impl<'g> VariableMut<'g> {
     ///
     /// `endian` can take a `Endianness` value with Native being `NC_ENDIAN_NATIVE` (0),
     /// Little `NC_ENDIAN_LITTLE` (1), Big `NC_ENDIAN_BIG` (2)
+    ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file, late define
     pub fn endian(&mut self, e: Endianness) -> error::Result<()> {
         let endianness = match e {
             Endianness::Native => NC_ENDIAN_NATIVE,

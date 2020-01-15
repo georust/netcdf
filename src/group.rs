@@ -37,10 +37,10 @@ impl<'f> std::ops::Deref for GroupMut<'f> {
 
 impl<'f> Group<'f> {
     /// Name of the current group
-    pub fn name(&self) -> error::Result<String> {
+    pub fn name(&self) -> String {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
-            error::checked(nc_inq_grpname(self.ncid, name.as_mut_ptr() as *mut _))?;
+            error::checked(nc_inq_grpname(self.ncid, name.as_mut_ptr() as *mut _)).unwrap();
         }
         let zeropos = name
             .iter()
@@ -48,7 +48,7 @@ impl<'f> Group<'f> {
             .unwrap_or_else(|| name.len());
         name.resize(zeropos, 0);
 
-        Ok(String::from_utf8(name)?)
+        String::from_utf8(name).expect("Group did not have a valid name")
     }
     /// Internal ncid of the group
     fn id(&self) -> nc_type {
@@ -56,103 +56,99 @@ impl<'f> Group<'f> {
     }
 
     /// Get a variable from the group
-    pub fn variable<'g>(&'g self, name: &str) -> error::Result<Option<Variable<'g>>>
+    pub fn variable<'g>(&'g self, name: &str) -> Option<Variable<'g>>
     where
         'f: 'g,
     {
-        Variable::find_from_name(self.id(), name)
+        Variable::find_from_name(self.id(), name).unwrap()
     }
     /// Iterate over all variables in a group
-    pub fn variables<'g>(
-        &'g self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Variable<'g>>>>
+    pub fn variables<'g>(&'g self) -> impl Iterator<Item = Variable<'g>>
     where
         'f: 'g,
     {
         super::variable::variables_at_ncid(self.id())
+            .unwrap()
+            .map(Result::unwrap)
     }
 
     /// Get a single attribute
-    pub fn attribute<'a>(&'a self, name: &str) -> error::Result<Option<Attribute<'a>>> {
+    pub fn attribute<'a>(&'a self, name: &str) -> Option<Attribute<'a>> {
         let _l = super::LOCK.lock().unwrap();
-        Attribute::find_from_name(self.ncid, None, name)
+        Attribute::find_from_name(self.ncid, None, name).unwrap()
     }
     /// Get all attributes in the group
-    pub fn attributes<'a>(
-        &'a self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Attribute<'a>>>> {
+    pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
         // Need to lock when reading the first attribute (per group)
         let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.ncid, None)
+            .unwrap()
+            .map(Result::unwrap)
     }
 
     /// Get a single dimension
-    pub fn dimension<'g>(&'g self, name: &str) -> error::Result<Option<Dimension<'g>>>
+    pub fn dimension<'g>(&'g self, name: &str) -> Option<Dimension<'g>>
     where
         'f: 'g,
     {
-        super::dimension::dimension_from_name(self.id(), name)
+        super::dimension::dimension_from_name(self.id(), name).unwrap()
     }
     /// Iterator over all dimensions
-    pub fn dimensions<'g>(
-        &'g self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'g>>>>
+    pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>>
     where
         'f: 'g,
     {
         super::dimension::dimensions_from_location(self.id())
+            .unwrap()
+            .map(Result::unwrap)
     }
 
     /// Get a group
-    pub fn group<'g>(&'g self, name: &str) -> error::Result<Option<Group<'g>>>
+    pub fn group<'g>(&'g self, name: &str) -> Option<Group<'g>>
     where
         'f: 'g,
     {
-        group_from_name(self.id(), name)
+        // We are in a group, must support netCDF-4
+        group_from_name(self.id(), name).unwrap()
     }
     /// Iterator over all subgroups in this group
-    pub fn groups<'g>(&'g self) -> error::Result<impl Iterator<Item = Group<'g>>>
+    pub fn groups<'g>(&'g self) -> impl Iterator<Item = Group<'g>>
     where
         'f: 'g,
     {
-        groups_at_ncid(self.id())
+        groups_at_ncid(self.id()).unwrap()
     }
 }
 
 impl<'f> GroupMut<'f> {
     /// Get a mutable variable from the group
-    pub fn variable_mut<'g>(&'g mut self, name: &str) -> error::Result<Option<VariableMut<'g>>>
+    pub fn variable_mut<'g>(&'g mut self, name: &str) -> Option<VariableMut<'g>>
     where
         'f: 'g,
     {
-        self.variable(name)
-            .map(|v| v.map(|v| VariableMut(v, PhantomData)))
+        self.variable(name).map(|v| VariableMut(v, PhantomData))
     }
     /// Iterate over all variables in a group, with mutable access
-    pub fn variables_mut<'g>(
-        &'g mut self,
-    ) -> error::Result<impl Iterator<Item = error::Result<VariableMut<'g>>>>
+    pub fn variables_mut<'g>(&'g mut self) -> impl Iterator<Item = VariableMut<'g>>
     where
         'f: 'g,
     {
-        self.variables()
-            .map(|var| var.map(|var| var.map(|var| VariableMut(var, PhantomData))))
+        self.variables().map(|var| VariableMut(var, PhantomData))
     }
 
     /// Mutable access to subgroup
-    pub fn group_mut<'g>(&'g mut self, name: &str) -> error::Result<Option<GroupMut<'g>>>
+    pub fn group_mut<'g>(&'g mut self, name: &str) -> Option<GroupMut<'g>>
     where
         'f: 'g,
     {
-        self.group(name)
-            .map(|g| g.map(|g| GroupMut(g, PhantomData)))
+        self.group(name).map(|g| GroupMut(g, PhantomData))
     }
     /// Iterator over all groups (mutable access)
-    pub fn groups_mut<'g>(&'g mut self) -> error::Result<impl Iterator<Item = GroupMut<'g>>>
+    pub fn groups_mut<'g>(&'g mut self) -> impl Iterator<Item = GroupMut<'g>>
     where
         'f: 'g,
     {
-        self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
+        self.groups().map(|g| GroupMut(g, PhantomData))
     }
 
     /// Add an attribute to the group

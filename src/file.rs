@@ -13,11 +13,11 @@ use std::marker::PhantomData;
 use std::path;
 
 #[derive(Debug)]
-pub(crate) struct File {
+pub(crate) struct RawFile {
     ncid: nc_type,
 }
 
-impl Drop for File {
+impl Drop for RawFile {
     fn drop(&mut self) {
         unsafe {
             let _g = LOCK.lock().unwrap();
@@ -27,20 +27,20 @@ impl Drop for File {
     }
 }
 
-impl File {
+impl RawFile {
     /// Open a `netCDF` file in read only mode.
     ///
     /// Consider using [`netcdf::open`] instead to open with
     /// a generic `Path` object, and ensure read-only on
     /// the `File`
-    pub(crate) fn open(path: &path::Path) -> error::Result<ReadOnlyFile> {
+    pub(crate) fn open(path: &path::Path) -> error::Result<File> {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = 0;
         unsafe {
             let _l = LOCK.lock().unwrap();
             error::checked(nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid))?;
         }
-        Ok(ReadOnlyFile(Self { ncid }))
+        Ok(File(Self { ncid }))
     }
 
     #[allow(clippy::doc_markdown)]
@@ -54,7 +54,7 @@ impl File {
             error::checked(nc_open(f.as_ptr(), NC_WRITE, &mut ncid))?;
         }
 
-        Ok(MutableFile(ReadOnlyFile(Self { ncid })))
+        Ok(MutableFile(File(Self { ncid })))
     }
     #[allow(clippy::doc_markdown)]
     /// Open a netCDF file in creation mode.
@@ -68,7 +68,7 @@ impl File {
             error::checked(nc_create(f.as_ptr(), NC_NETCDF4 | NC_CLOBBER, &mut ncid))?;
         }
 
-        Ok(MutableFile(ReadOnlyFile(Self { ncid })))
+        Ok(MutableFile(File(Self { ncid })))
     }
 
     #[cfg(feature = "memory")]
@@ -89,16 +89,16 @@ impl File {
             ))?;
         }
 
-        Ok(MemFile(ReadOnlyFile(Self { ncid }), PhantomData))
+        Ok(MemFile(File(Self { ncid }), PhantomData))
     }
 }
 
 #[derive(Debug)]
 /// Read only accessible file
 #[allow(clippy::module_name_repetitions)]
-pub struct ReadOnlyFile(File);
+pub struct File(RawFile);
 
-impl ReadOnlyFile {
+impl File {
     /// path used to open/create the file
     ///
     /// #Errors
@@ -126,10 +126,16 @@ impl ReadOnlyFile {
     }
 
     /// Main entrypoint for interacting with the netcdf file.
-    pub fn root(&self) -> Group {
-        Group {
-            ncid: self.ncid(),
-            _file: PhantomData,
+    pub fn root(&self) -> Option<Group> {
+        let mut format = 0;
+        unsafe { error::checked(nc_inq_format(self.ncid(), &mut format)) }.unwrap();
+
+        match format {
+            NC_FORMAT_NETCDF4 | NC_FORMAT_NETCDF4_CLASSIC => Some(Group {
+                ncid: self.ncid(),
+                _file: PhantomData,
+            }),
+            _ => None,
         }
     }
 
@@ -138,45 +144,53 @@ impl ReadOnlyFile {
     }
 
     /// Get a variable from the group
-    pub fn variable<'f>(&'f self, name: &str) -> error::Result<Option<Variable<'f>>> {
-        Variable::find_from_name(self.ncid(), name)
+    pub fn variable<'f>(&'f self, name: &str) -> Option<Variable<'f>> {
+        Variable::find_from_name(self.ncid(), name).unwrap()
     }
     /// Iterate over all variables in a group
-    pub fn variables<'f>(
-        &'f self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Variable<'f>>>> {
+    pub fn variables(&self) -> impl Iterator<Item = Variable> {
         super::variable::variables_at_ncid(self.ncid())
+            .unwrap()
+            .map(Result::unwrap)
     }
 
     /// Get a single attribute
-    pub fn attribute<'f>(&'f self, name: &str) -> error::Result<Option<Attribute<'f>>> {
+    pub fn attribute<'f>(&'f self, name: &str) -> Option<Attribute<'f>> {
         let _l = super::LOCK.lock().unwrap();
-        Attribute::find_from_name(self.ncid(), None, name)
+        Attribute::find_from_name(self.ncid(), None, name).unwrap()
     }
     /// Get all attributes in the root group
-    pub fn attributes<'f>(
-        &'f self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Attribute<'f>>>> {
+    pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
         let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.0.ncid, None)
+            .unwrap()
+            .map(Result::unwrap)
     }
 
     /// Get a single dimension
-    pub fn dimension<'f>(&self, name: &str) -> error::Result<Option<Dimension<'f>>> {
-        super::dimension::dimension_from_name(self.ncid(), name)
+    pub fn dimension<'f>(&self, name: &str) -> Option<Dimension<'f>> {
+        super::dimension::dimension_from_name(self.ncid(), name).unwrap()
     }
     /// Iterator over all dimensions in the root group
-    pub fn dimensions<'f>(
-        &'f self,
-    ) -> error::Result<impl Iterator<Item = error::Result<Dimension<'f>>>> {
+    pub fn dimensions(&self) -> impl Iterator<Item = Dimension> {
         super::dimension::dimensions_from_location(self.ncid())
+            .unwrap()
+            .map(Result::unwrap)
     }
 
     /// Get a group
+    ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file
     pub fn group<'f>(&'f self, name: &str) -> error::Result<Option<Group<'f>>> {
         super::group::group_from_name(self.ncid(), name)
     }
     /// Iterator over all subgroups in the root group
+    ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file
     pub fn groups<'f>(&'f self) -> error::Result<impl Iterator<Item = Group<'f>>> {
         super::group::groups_at_ncid(self.ncid())
     }
@@ -185,10 +199,10 @@ impl ReadOnlyFile {
 /// Mutable access to file
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
-pub struct MutableFile(ReadOnlyFile);
+pub struct MutableFile(File);
 
 impl std::ops::Deref for MutableFile {
-    type Target = ReadOnlyFile;
+    type Target = File;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -196,14 +210,15 @@ impl std::ops::Deref for MutableFile {
 
 impl MutableFile {
     /// Mutable access to the root group
-    pub fn root_mut(&mut self) -> GroupMut {
-        GroupMut(self.root(), PhantomData)
+    ///
+    /// Return None if this can't be a root group
+    pub fn root_mut(&mut self) -> Option<GroupMut> {
+        self.root().map(|root| GroupMut(root, PhantomData))
     }
 
     /// Get a mutable variable from the group
-    pub fn variable_mut<'f>(&'f mut self, name: &str) -> error::Result<Option<VariableMut<'f>>> {
-        self.variable(name)
-            .map(|var| var.map(|var| VariableMut(var, PhantomData)))
+    pub fn variable_mut<'f>(&'f mut self, name: &str) -> Option<VariableMut<'f>> {
+        self.variable(name).map(|var| VariableMut(var, PhantomData))
     }
     /// Iterate over all variables in the root group, with mutable access
     ///
@@ -212,24 +227,29 @@ impl MutableFile {
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut file = netcdf::append("file.nc")?;
-    /// let mut vars = file.variables_mut()?.collect::<Result<Vec<_>, _>>()?;
+    /// let mut vars = file.variables_mut().collect::<Vec<_>>();
     /// vars[0].put_value(1_u8, Some(&[2, 5]))?;
     /// vars[1].put_value(1_u8, Some(&[5, 2]))?;
     /// # Ok(()) }
     /// ```
-    pub fn variables_mut<'f>(
-        &'f mut self,
-    ) -> error::Result<impl Iterator<Item = error::Result<VariableMut<'f>>>> {
-        self.variables()
-            .map(|v| v.map(|var| var.map(|var| VariableMut(var, PhantomData))))
+    pub fn variables_mut(&mut self) -> impl Iterator<Item = VariableMut> {
+        self.variables().map(|var| VariableMut(var, PhantomData))
     }
 
     /// Mutable access to subgroup
+    ///
+    /// # Errors
+    ///
+    /// File does not support groups
     pub fn group_mut<'f>(&'f mut self, name: &str) -> error::Result<Option<GroupMut<'f>>> {
         self.group(name)
             .map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
     /// Iterator over all groups (mutable access)
+    ///
+    /// # Errors
+    ///
+    /// File does not support groups
     pub fn groups_mut<'f>(&'f mut self) -> error::Result<impl Iterator<Item = GroupMut<'f>>> {
         self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
@@ -302,21 +322,21 @@ impl MutableFile {
 /// The memory mapped file is kept in this structure to keep the
 /// lifetime of the buffer longer than the file.
 ///
-/// Access a [`ReadOnlyFile`] through the `Deref` trait,
+/// Access a [`File`] through the `Deref` trait,
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let buffer = &[0, 42, 1, 2];
 /// let file = &netcdf::open_mem(None, buffer)?;
 ///
-/// let variables = file.variables()?;
+/// let variables = file.variables();
 /// # Ok(()) }
 /// ```
 #[allow(clippy::module_name_repetitions)]
-pub struct MemFile<'buffer>(ReadOnlyFile, std::marker::PhantomData<&'buffer [u8]>);
+pub struct MemFile<'buffer>(File, std::marker::PhantomData<&'buffer [u8]>);
 
 #[cfg(feature = "memory")]
 impl<'a> std::ops::Deref for MemFile<'a> {
-    type Target = ReadOnlyFile;
+    type Target = File;
     fn deref(&self) -> &Self::Target {
         &self.0
     }

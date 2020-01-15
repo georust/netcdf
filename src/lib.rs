@@ -10,7 +10,7 @@
 //! let file = netcdf::open("simle_xy.nc")?;
 //!
 //! // Access any variable, attribute, or dimension through lookups on hashmaps
-//! let var = &file.variable("data")?.expect("Could not find variable 'data'");
+//! let var = &file.variable("data").expect("Could not find variable 'data'");
 //!
 //! // Read variable as numeric types
 //! let data_i32 = var.value::<i32>(None)?;
@@ -51,7 +51,7 @@
 //! // open it in read/write mode
 //! let mut file = netcdf::append("crabs2.nc")?;
 //! // get a mutable binding of the variable "crab_coolness_level"
-//! let mut var = file.variable_mut("crab_coolness_level")?.unwrap();
+//! let mut var = file.variable_mut("crab_coolness_level").unwrap();
 //!
 //! let data : Vec<i32> = vec![100; 10];
 //! // write 5 first elements of the vector `data` into `var` starting at index 2;
@@ -88,7 +88,7 @@ pub fn create<P>(name: P) -> error::Result<MutableFile>
 where
     P: AsRef<std::path::Path>,
 {
-    File::create(name.as_ref())
+    RawFile::create(name.as_ref())
 }
 
 /// Open a netcdf file in append mode
@@ -96,21 +96,21 @@ pub fn append<P>(name: P) -> error::Result<MutableFile>
 where
     P: AsRef<std::path::Path>,
 {
-    File::append(name.as_ref())
+    RawFile::append(name.as_ref())
 }
 
 /// Open a netcdf file in read mode
-pub fn open<P>(name: P) -> error::Result<ReadOnlyFile>
+pub fn open<P>(name: P) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
 {
-    File::open(name.as_ref())
+    RawFile::open(name.as_ref())
 }
 
 #[cfg(feature = "memory")]
 /// Open a netcdf file from a buffer
 pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<MemFile<'a>> {
-    File::open_from_memory(name, mem)
+    RawFile::open_from_memory(name, mem)
 }
 
 lazy_static! {
