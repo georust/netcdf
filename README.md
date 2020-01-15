@@ -9,7 +9,7 @@
 ![Crates.io](https://img.shields.io/crates/l/netcdf)
 [![dependency status](https://deps.rs/repo/github/mhiley/rust-netcdf/status.svg)](https://deps.rs/repo/github/mhiley/rust-netcdf)
 
-Medium-level [NetCDF](http://www.unidata.ucar.edu/software/netcdf/) bindings for Rust
+Medium-level [netCDF](http://www.unidata.ucar.edu/software/netcdf/) bindings for Rust, allowing easy reading and writing of array-like structures to a file.
 
 ## Status
 
