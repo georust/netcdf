@@ -15,8 +15,18 @@ links = "netcdf"
 build = "build.rs"
 exclude = ["testdata/**"]
 
+[dependencies]
+hdf5-sys = { git = "https://github.com/magnusuMET/hdf5-rust.git", branch = "feature/static_build", features = ["hl", "threadsafe", "deprecated"] }
+libz-sys = { version = "1.0.25", optional = true }
+
 [dev-dependencies]
 lazy_static = "1.4.0"
 
+[build-dependencies]
+cmake = "0.1.42"
+
 [features]
+default = ["libz"]
 memio = []
+static = ["libz-sys/static", "hdf5-sys/static"]
+libz = ["libz-sys"]

@@ -1,6 +1,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
+extern crate hdf5_sys;
+
 mod netcdf_bindings;
 mod netcdf_const;
 pub use netcdf_bindings::*;
