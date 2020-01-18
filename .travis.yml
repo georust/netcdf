@@ -9,8 +9,6 @@ rust:
   - beta
   - nightly
 
-sudo: false
-
 matrix:
   allow_failures:
     - rust: nightly
@@ -39,9 +37,11 @@ before_script:
   - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo +stable install cargo-tarpaulin || true
   - cargo install-update -a # update outdated cached binaries
   - rustup component add clippy
+  - rustup component add rustfmt
 
 script:
   - |
+      cargo fmt -- --check &&
       cargo build --all --no-default-features --verbose &&
       cargo build --all --verbose &&
       cargo build --examples --verbose &&
