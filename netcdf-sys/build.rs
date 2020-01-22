@@ -21,7 +21,8 @@ fn build() {
     let hdf5_hl_lib = std::env::var("DEP_HDF5_HL_LIBRARY").unwrap();
 
 
-    let netcdf = cmake::Config::new("source")
+    let mut netcdf_config = cmake::Config::new("source");
+    netcdf_config
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("NC_FIND_SHARED_LIBS", "OFF")
         .define("BUILD_UTILITIES", "OFF")
@@ -39,9 +40,13 @@ fn build() {
         //
         .define("ENABLE_DAP", "OFF") // TODO: feature flag, requires curl
         //
-        .profile("RelWithDebInfo") // TODO: detect opt-level
-        .very_verbose(true)
-        .build();
+        .profile("RelWithDebInfo"); // TODO: detect opt-level
+
+    if feature!("DAP").is_ok() {
+        netcdf_config.define("ENABLE_DAP", "ON");
+    }
+
+    let netcdf = netcdf_config.build();
 
     println!("cargo:rustc-link-lib=static=netcdf");
     println!("cargo:rustc-link-search=native={}/lib", netcdf.display());
