@@ -1,13 +1,13 @@
 # rust-netcdf
 
 [![Docs](https://docs.rs/netcdf/badge.svg)](https://docs.rs/netcdf)
-[![Build Status](https://travis-ci.org/mhiley/rust-netcdf.svg?branch=master)](https://travis-ci.org/mhiley/rust-netcdf)
+[![Build Status](https://travis-ci.org/georust/rust-netcdf.svg?branch=master)](https://travis-ci.org/georust/rust-netcdf)
 [![Crates.io](https://img.shields.io/crates/d/netcdf.svg)](https://crates.io/crates/netcdf)
 [![](http://meritbadge.herokuapp.com/netcdf)](https://crates.io/crates/netcdf)
-[![Coverage Status](https://coveralls.io/repos/github/mhiley/rust-netcdf/badge.svg?branch=master)](https://coveralls.io/github/mhiley/rust-netcdf?branch=master)
-[![codecov](https://codecov.io/gh/mhiley/rust-netcdf/branch/master/graph/badge.svg)](https://codecov.io/gh/mhiley/rust-netcdf)
+[![Coverage Status](https://coveralls.io/repos/github/georust/rust-netcdf/badge.svg?branch=master)](https://coveralls.io/github/georust/rust-netcdf?branch=master)
+[![codecov](https://codecov.io/gh/georust/rust-netcdf/branch/master/graph/badge.svg)](https://codecov.io/gh/georust/rust-netcdf)
 ![Crates.io](https://img.shields.io/crates/l/netcdf)
-[![dependency status](https://deps.rs/repo/github/mhiley/rust-netcdf/status.svg)](https://deps.rs/repo/github/mhiley/rust-netcdf)
+[![dependency status](https://deps.rs/repo/github/georust/rust-netcdf/status.svg)](https://deps.rs/repo/github/georust/rust-netcdf)
 
 Medium-level [netCDF](http://www.unidata.ucar.edu/software/netcdf/) bindings for Rust, allowing easy reading and writing of array-like structures to a file.
 
