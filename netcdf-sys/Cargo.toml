@@ -7,8 +7,8 @@ authors = [
 ]
 license = "MIT"
 description = "FFI bindings to NetCDF"
-repository = "https://github.com/georust/rust-netcdf"
-documentation = "https://github.com/georust/rust-netcdf"
+repository = "https://github.com/georust/netcdf"
+documentation = "https://github.com/georust/netcdf"
 keywords = ["netcdf", "hdf", "hdf5", "cdm", "ffi"]
 edition = "2018"
 links = "netcdf"

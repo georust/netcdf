@@ -1,4 +1,4 @@
-rust-netcdf contains code from Unidata's NetCDF, under the following license:
+netcdf contains code from Unidata's NetCDF, under the following license:
 
 NetCDF License (http://www.unidata.ucar.edu/software/netcdf/copyright.html)
   ---------------
