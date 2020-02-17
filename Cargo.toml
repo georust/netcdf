@@ -32,3 +32,7 @@ structopt = "0.3.3"
 members = [
     "netcdf-sys",
 ]
+
+[patch]
+[patch.crates-io]
+hdf5-sys = { git = "https://github.com/magnusuMET/hdf5-rust", branch = "feature/static_build" }
