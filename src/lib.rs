@@ -118,6 +118,13 @@ lazy_static! {
     pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());
 }
 
+/// All functions should be wrapped in this locker. Disregarding this, expect
+/// segfaults, especially on non-threadsafe hdf5 builds
+pub(crate) fn with_lock<F: FnMut() -> nc_type>(mut f: F) -> nc_type {
+    let _l = LOCK.lock().unwrap();
+    f()
+}
+
 pub(crate) mod utils {
     use super::*;
     use netcdf_sys::{NC_EMAXNAME, NC_MAX_NAME};

@@ -126,6 +126,7 @@ impl fmt::Display for Error {
             Self::Netcdf(x) => {
                 let msg;
                 unsafe {
+                    // Threadsafe
                     let cmsg = nc_strerror(*x);
                     msg = std::ffi::CStr::from_ptr(cmsg);
                 }

@@ -2,7 +2,6 @@
 
 #![allow(clippy::similar_names)]
 use super::error;
-use super::LOCK;
 use netcdf_sys::*;
 use std::convert::TryInto;
 use std::marker::PhantomData;
@@ -48,15 +47,16 @@ impl<'a> Attribute<'a> {
     }
     /// Number of elements in this attribute
     fn num_elems(&self) -> error::Result<usize> {
-        let _l = LOCK.lock().unwrap();
         let mut nelems = 0;
         unsafe {
-            error::checked(nc_inq_attlen(
-                self.ncid,
-                self.varid,
-                self.name.as_ptr() as *const _,
-                &mut nelems,
-            ))?;
+            error::checked(super::with_lock(|| {
+                nc_inq_attlen(
+                    self.ncid,
+                    self.varid,
+                    self.name.as_ptr() as *const _,
+                    &mut nelems,
+                )
+            }))?;
         }
         Ok(nelems as _)
     }
@@ -64,12 +64,14 @@ impl<'a> Attribute<'a> {
     fn typ(&self) -> error::Result<nc_type> {
         let mut atttype = 0;
         unsafe {
-            error::checked(nc_inq_atttype(
-                self.ncid,
-                self.varid,
-                self.name.as_ptr() as *const _,
-                &mut atttype,
-            ))?;
+            error::checked(super::with_lock(|| {
+                nc_inq_atttype(
+                    self.ncid,
+                    self.varid,
+                    self.name.as_ptr() as *const _,
+                    &mut atttype,
+                )
+            }))?;
         }
         Ok(atttype)
     }
@@ -88,24 +90,28 @@ impl<'a> Attribute<'a> {
                 1 => {
                     let mut value = 0;
                     unsafe {
-                        error::checked(nc_get_att_uchar(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            &mut value,
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_uchar(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                &mut value,
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Uchar(value))
                 }
                 len => {
                     let mut values = vec![0_u8; len as usize];
                     unsafe {
-                        error::checked(nc_get_att_uchar(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            values.as_mut_ptr(),
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_uchar(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                values.as_mut_ptr(),
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Uchars(values))
                 }
@@ -114,24 +120,28 @@ impl<'a> Attribute<'a> {
                 1 => {
                     let mut value = 0;
                     unsafe {
-                        error::checked(nc_get_att_schar(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            &mut value,
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_schar(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                &mut value,
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Schar(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
                     unsafe {
-                        error::checked(nc_get_att_schar(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            values.as_mut_ptr(),
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_schar(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                values.as_mut_ptr(),
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Schars(values))
                 }
@@ -140,24 +150,28 @@ impl<'a> Attribute<'a> {
                 1 => {
                     let mut value = 0;
                     unsafe {
-                        error::checked(nc_get_att_short(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            &mut value,
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_short(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                &mut value,
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Short(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
                     unsafe {
-                        error::checked(nc_get_att_short(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            values.as_mut_ptr(),
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_short(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                values.as_mut_ptr(),
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Shorts(values))
                 }
@@ -166,24 +180,28 @@ impl<'a> Attribute<'a> {
                 1 => {
                     let mut value = 0;
                     unsafe {
-                        error::checked(nc_get_att_ushort(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            &mut value,
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_ushort(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                &mut value,
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Ushort(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
                     unsafe {
-                        error::checked(nc_get_att_ushort(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            values.as_mut_ptr(),
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_ushort(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                values.as_mut_ptr(),
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Ushorts(values))
                 }
@@ -192,24 +210,28 @@ impl<'a> Attribute<'a> {
                 1 => {
                     let mut value = 0;
                     unsafe {
-                        error::checked(nc_get_att_int(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            &mut value,
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_int(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                &mut value,
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Int(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
                     unsafe {
-                        error::checked(nc_get_att_int(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            values.as_mut_ptr(),
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_int(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                values.as_mut_ptr(),
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Ints(values))
                 }
@@ -218,24 +240,28 @@ impl<'a> Attribute<'a> {
                 1 => {
                     let mut value = 0;
                     unsafe {
-                        error::checked(nc_get_att_uint(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            &mut value,
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_uint(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                &mut value,
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Uint(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
                     unsafe {
-                        error::checked(nc_get_att_uint(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            values.as_mut_ptr(),
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_uint(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                values.as_mut_ptr(),
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Uints(values))
                 }
@@ -244,24 +270,28 @@ impl<'a> Attribute<'a> {
                 1 => {
                     let mut value = 0;
                     unsafe {
-                        error::checked(nc_get_att_longlong(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            &mut value,
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_longlong(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                &mut value,
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Longlong(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
                     unsafe {
-                        error::checked(nc_get_att_longlong(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            values.as_mut_ptr(),
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_longlong(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                values.as_mut_ptr(),
+                            )
+                        }))?;
                     }
 
                     Ok(AttrValue::Longlongs(values))
@@ -271,24 +301,28 @@ impl<'a> Attribute<'a> {
                 1 => {
                     let mut value = 0;
                     unsafe {
-                        error::checked(nc_get_att_ulonglong(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            &mut value,
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_ulonglong(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                &mut value,
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Ulonglong(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
                     unsafe {
-                        error::checked(nc_get_att_ulonglong(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            values.as_mut_ptr(),
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_ulonglong(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                values.as_mut_ptr(),
+                            )
+                        }))?;
                     }
 
                     Ok(AttrValue::Ulonglongs(values))
@@ -298,24 +332,28 @@ impl<'a> Attribute<'a> {
                 1 => {
                     let mut value = 0.0;
                     unsafe {
-                        error::checked(nc_get_att_float(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            &mut value,
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_float(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                &mut value,
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Float(value))
                 }
                 len => {
                     let mut values = vec![0.0; len as _];
                     unsafe {
-                        error::checked(nc_get_att_float(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            values.as_mut_ptr(),
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_float(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                values.as_mut_ptr(),
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Floats(values))
                 }
@@ -324,24 +362,28 @@ impl<'a> Attribute<'a> {
                 1 => {
                     let mut value = 0.0;
                     unsafe {
-                        error::checked(nc_get_att_double(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            &mut value,
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_double(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                &mut value,
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Double(value))
                 }
                 len => {
                     let mut values = vec![0.0; len as _];
                     unsafe {
-                        error::checked(nc_get_att_double(
-                            self.ncid,
-                            self.varid,
-                            self.name.as_ptr() as *const _,
-                            values.as_mut_ptr(),
-                        ))?;
+                        error::checked(super::with_lock(|| {
+                            nc_get_att_double(
+                                self.ncid,
+                                self.varid,
+                                self.name.as_ptr() as *const _,
+                                values.as_mut_ptr(),
+                            )
+                        }))?;
                     }
                     Ok(AttrValue::Doubles(values))
                 }
@@ -350,12 +392,14 @@ impl<'a> Attribute<'a> {
                 let lentext = attlen;
                 let mut buf: Vec<u8> = vec![0; lentext as _];
                 unsafe {
-                    error::checked(nc_get_att_text(
-                        self.ncid,
-                        self.varid,
-                        self.name.as_ptr() as *const _,
-                        buf.as_mut_ptr() as *mut _,
-                    ))?;
+                    error::checked(super::with_lock(|| {
+                        nc_get_att_text(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            buf.as_mut_ptr() as *mut _,
+                        )
+                    }))?;
                 }
                 let pos = buf
                     .iter()
@@ -383,11 +427,9 @@ impl<'a> AttributeIterator<'a> {
     pub(crate) fn new(ncid: nc_type, varid: Option<nc_type>) -> error::Result<Self> {
         let mut natts = 0;
         unsafe {
-            error::checked(nc_inq_varnatts(
-                ncid,
-                varid.unwrap_or(NC_GLOBAL),
-                &mut natts,
-            ))?;
+            error::checked(super::with_lock(|| {
+                nc_inq_varnatts(ncid, varid.unwrap_or(NC_GLOBAL), &mut natts)
+            }))?;
         }
         Ok(Self {
             ncid,
@@ -408,12 +450,14 @@ impl<'a> Iterator for AttributeIterator<'a> {
 
         let mut name = [0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
-            if let Err(e) = error::checked(nc_inq_attname(
-                self.ncid,
-                self.varid.unwrap_or(NC_GLOBAL),
-                self.current_natt.try_into().unwrap(),
-                name.as_mut_ptr() as *mut _,
-            )) {
+            if let Err(e) = error::checked(super::with_lock(|| {
+                nc_inq_attname(
+                    self.ncid,
+                    self.varid.unwrap_or(NC_GLOBAL),
+                    self.current_natt.try_into().unwrap(),
+                    name.as_mut_ptr() as *mut _,
+                )
+            })) {
                 return Some(Err(e));
             }
         }
@@ -471,123 +515,145 @@ impl<'a> Attribute<'a> {
 
         error::checked(unsafe {
             match val {
-                AttrValue::Uchar(x) => {
+                AttrValue::Uchar(x) => super::with_lock(|| {
                     nc_put_att_uchar(ncid, varid, cname.as_ptr() as *const _, NC_UBYTE, 1, &x)
-                }
-                AttrValue::Uchars(x) => nc_put_att_uchar(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    NC_UBYTE,
-                    x.len(),
-                    x.as_ptr(),
-                ),
-                AttrValue::Schar(x) => {
+                }),
+                AttrValue::Uchars(x) => super::with_lock(|| {
+                    nc_put_att_uchar(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        NC_UBYTE,
+                        x.len(),
+                        x.as_ptr(),
+                    )
+                }),
+                AttrValue::Schar(x) => super::with_lock(|| {
                     nc_put_att_schar(ncid, varid, cname.as_ptr() as *const _, NC_BYTE, 1, &x)
-                }
-                AttrValue::Schars(x) => nc_put_att_schar(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    NC_BYTE,
-                    x.len(),
-                    x.as_ptr(),
-                ),
-                AttrValue::Ushort(x) => {
+                }),
+                AttrValue::Schars(x) => super::with_lock(|| {
+                    nc_put_att_schar(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        NC_BYTE,
+                        x.len(),
+                        x.as_ptr(),
+                    )
+                }),
+                AttrValue::Ushort(x) => super::with_lock(|| {
                     nc_put_att_ushort(ncid, varid, cname.as_ptr() as *const _, NC_USHORT, 1, &x)
-                }
-                AttrValue::Ushorts(x) => nc_put_att_ushort(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    NC_USHORT,
-                    x.len(),
-                    x.as_ptr(),
-                ),
-                AttrValue::Short(x) => {
+                }),
+                AttrValue::Ushorts(x) => super::with_lock(|| {
+                    nc_put_att_ushort(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        NC_USHORT,
+                        x.len(),
+                        x.as_ptr(),
+                    )
+                }),
+                AttrValue::Short(x) => super::with_lock(|| {
                     nc_put_att_short(ncid, varid, cname.as_ptr() as *const _, NC_SHORT, 1, &x)
-                }
-                AttrValue::Shorts(x) => nc_put_att_short(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    NC_SHORT,
-                    x.len(),
-                    x.as_ptr(),
-                ),
-                AttrValue::Uint(x) => {
+                }),
+                AttrValue::Shorts(x) => super::with_lock(|| {
+                    nc_put_att_short(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        NC_SHORT,
+                        x.len(),
+                        x.as_ptr(),
+                    )
+                }),
+                AttrValue::Uint(x) => super::with_lock(|| {
                     nc_put_att_uint(ncid, varid, cname.as_ptr() as *const _, NC_UINT, 1, &x)
-                }
-                AttrValue::Uints(x) => nc_put_att_uint(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    NC_UINT,
-                    x.len(),
-                    x.as_ptr(),
-                ),
-                AttrValue::Int(x) => {
+                }),
+                AttrValue::Uints(x) => super::with_lock(|| {
+                    nc_put_att_uint(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        NC_UINT,
+                        x.len(),
+                        x.as_ptr(),
+                    )
+                }),
+                AttrValue::Int(x) => super::with_lock(|| {
                     nc_put_att_int(ncid, varid, cname.as_ptr() as *const _, NC_INT, 1, &x)
-                }
-                AttrValue::Ints(x) => nc_put_att_int(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    NC_INT,
-                    x.len(),
-                    x.as_ptr(),
-                ),
-                AttrValue::Ulonglong(x) => {
+                }),
+                AttrValue::Ints(x) => super::with_lock(|| {
+                    nc_put_att_int(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        NC_INT,
+                        x.len(),
+                        x.as_ptr(),
+                    )
+                }),
+                AttrValue::Ulonglong(x) => super::with_lock(|| {
                     nc_put_att_ulonglong(ncid, varid, cname.as_ptr() as *const _, NC_UINT64, 1, &x)
-                }
-                AttrValue::Ulonglongs(x) => nc_put_att_ulonglong(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    NC_UINT64,
-                    x.len(),
-                    x.as_ptr(),
-                ),
-                AttrValue::Longlong(x) => {
+                }),
+                AttrValue::Ulonglongs(x) => super::with_lock(|| {
+                    nc_put_att_ulonglong(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        NC_UINT64,
+                        x.len(),
+                        x.as_ptr(),
+                    )
+                }),
+                AttrValue::Longlong(x) => super::with_lock(|| {
                     nc_put_att_longlong(ncid, varid, cname.as_ptr() as *const _, NC_INT64, 1, &x)
-                }
-                AttrValue::Longlongs(x) => nc_put_att_longlong(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    NC_INT64,
-                    x.len(),
-                    x.as_ptr(),
-                ),
-                AttrValue::Float(x) => {
+                }),
+                AttrValue::Longlongs(x) => super::with_lock(|| {
+                    nc_put_att_longlong(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        NC_INT64,
+                        x.len(),
+                        x.as_ptr(),
+                    )
+                }),
+                AttrValue::Float(x) => super::with_lock(|| {
                     nc_put_att_float(ncid, varid, cname.as_ptr() as *const _, NC_FLOAT, 1, &x)
-                }
-                AttrValue::Floats(x) => nc_put_att_float(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    NC_FLOAT,
-                    x.len(),
-                    x.as_ptr(),
-                ),
-                AttrValue::Double(x) => {
+                }),
+                AttrValue::Floats(x) => super::with_lock(|| {
+                    nc_put_att_float(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        NC_FLOAT,
+                        x.len(),
+                        x.as_ptr(),
+                    )
+                }),
+                AttrValue::Double(x) => super::with_lock(|| {
                     nc_put_att_double(ncid, varid, cname.as_ptr() as *const _, NC_DOUBLE, 1, &x)
-                }
-                AttrValue::Doubles(x) => nc_put_att_double(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    NC_DOUBLE,
-                    x.len(),
-                    x.as_ptr(),
-                ),
-                AttrValue::Str(ref x) => nc_put_att_text(
-                    ncid,
-                    varid,
-                    cname.as_ptr() as *const _,
-                    x.len(),
-                    x.as_ptr() as *const _,
-                ),
+                }),
+                AttrValue::Doubles(x) => super::with_lock(|| {
+                    nc_put_att_double(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        NC_DOUBLE,
+                        x.len(),
+                        x.as_ptr(),
+                    )
+                }),
+                AttrValue::Str(ref x) => super::with_lock(|| {
+                    nc_put_att_text(
+                        ncid,
+                        varid,
+                        cname.as_ptr() as *const _,
+                        x.len(),
+                        x.as_ptr() as *const _,
+                    )
+                }),
             }
         })?;
 
@@ -614,12 +680,14 @@ impl<'a> Attribute<'a> {
         };
         let e = unsafe {
             // Checking whether the variable exists by probing for its id
-            nc_inq_attid(
-                ncid,
-                varid.unwrap_or(NC_GLOBAL),
-                attname.as_ptr() as *const _,
-                std::ptr::null_mut(),
-            )
+            super::with_lock(|| {
+                nc_inq_attid(
+                    ncid,
+                    varid.unwrap_or(NC_GLOBAL),
+                    attname.as_ptr() as *const _,
+                    std::ptr::null_mut(),
+                )
+            })
         };
         if e == NC_ENOTATT {
             return Ok(None);
