@@ -16,9 +16,9 @@ build = "build.rs"
 exclude = ["testdata/**"]
 
 [dependencies]
-libz-sys = { version = "1.0.25", optional = true }
+libz-sys = { version = "1.0.25" }
 curl-sys = { version = "0.4.25", optional = true }
-hdf5-sys = { version = "0.6.1", features = ["hl", "deprecated"] }
+hdf5-sys = { version = "0.6.1", features = ["hl", "deprecated", "zlib"] }
 
 [dev-dependencies]
 lazy_static = "1.4.0"
@@ -27,11 +27,10 @@ lazy_static = "1.4.0"
 cmake = "0.1.42"
 
 [features]
-default = ["libz"]
+default = []
 memio = []
 static = ["libz-sys/static", "hdf5-sys/static"]
 # TODO: Link static curl (but only when using "dap") "curl-sys/static-curl", "curl-sys/static-ssl"
-libz = ["libz-sys"]
 dap = ["curl-sys"]
 
 [patch]
