@@ -13,7 +13,25 @@ keywords = ["netcdf", "hdf", "hdf5", "cdm", "ffi"]
 edition = "2018"
 links = "netcdf"
 build = "build.rs"
-exclude = ["testdata/**"]
+exclude = [
+    "testdata/**",
+    "source/conda.recipe/**",
+    "source/ctest_scripts/**",
+    "source/dap4_test/**",
+#   "source/docs/**",
+    "source/debug/**",
+    "source/examples/**",
+    "source/h5test/**",
+    "source/ncdump/**",
+    "source/ncgen/**",
+    "source/ncgen3/**",
+    "source/nc_perf/**",
+    "source/nctest/**",
+    "source/nc_test/**",
+#   "source/nc_test4/**",
+    "source/NUG/**",
+    "source/unit_test/**",
+]
 
 [dependencies]
 libz-sys = { version = "1.0.25" }
