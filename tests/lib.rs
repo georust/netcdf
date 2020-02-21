@@ -1520,3 +1520,31 @@ fn count_dimensions() {
 
     assert_eq!(file.dimensions().count(), 6);
 }
+
+#[test]
+fn open_to_find_unlim_dim() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("open_to_find_unlim_dim.nc");
+    {
+        let mut file = netcdf::create(&path).unwrap();
+        file.add_unlimited_dimension("a").unwrap();
+
+        let mut var = file.add_variable::<i32>("b", &["a"]).unwrap();
+        var.put_values(&[0, 1, 2, 3, 4, 5], None, None).unwrap();
+    }
+
+    let file = netcdf::open(path).unwrap();
+    let dim = file.dimension("a").unwrap();
+    assert_eq!(dim.len(), 6);
+    assert!(dim.is_unlimited());
+
+    let dim = file.dimensions().nth(0).unwrap();
+    assert_eq!(dim.len(), 6);
+    assert!(dim.is_unlimited());
+
+    let var = file.variable("b").unwrap();
+    assert_eq!(var.dimensions().len(), 1);
+    let dim = &var.dimensions()[0];
+    assert_eq!(dim.len(), 6);
+    assert!(dim.is_unlimited());
+}
