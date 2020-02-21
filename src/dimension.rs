@@ -100,6 +100,26 @@ pub(crate) fn from_name<'f>(loc: nc_type, name: &str) -> error::Result<Option<Di
     unsafe {
         error::checked(nc_inq_dimlen(loc, dimid, &mut dimlen))?;
     }
+    if dimlen != 0 {
+        let mut nunlim = 0;
+        unsafe {
+            error::checked(nc_inq_unlimdims(loc, &mut nunlim, std::ptr::null_mut()))?;
+        }
+        if nunlim != 0 {
+            let mut unlimdims = Vec::with_capacity(nunlim.try_into()?);
+            unsafe {
+                error::checked(nc_inq_unlimdims(
+                    loc,
+                    std::ptr::null_mut(),
+                    unlimdims.as_mut_ptr(),
+                ))?;
+            }
+            unsafe { unlimdims.set_len(nunlim.try_into()?) }
+            if unlimdims.contains(&dimid) {
+                dimlen = 0
+            }
+        }
+    }
 
     Ok(Some(Dimension {
         len: core::num::NonZeroUsize::new(dimlen),
@@ -129,10 +149,34 @@ pub(crate) fn dimensions_from_location<'g>(
             false as _,
         ))?;
     }
+    let unlimdims = {
+        let mut nunlimdims = 0;
+        unsafe {
+            error::checked(nc_inq_unlimdims(
+                ncid,
+                &mut nunlimdims,
+                std::ptr::null_mut(),
+            ))?;
+        }
+        let mut unlimdims = Vec::with_capacity(nunlimdims.try_into()?);
+        unsafe {
+            error::checked(nc_inq_unlimdims(
+                ncid,
+                std::ptr::null_mut(),
+                unlimdims.as_mut_ptr(),
+            ))?;
+        }
+        unsafe {
+            unlimdims.set_len(nunlimdims.try_into()?);
+        }
+        unlimdims
+    };
     Ok(dimids.into_iter().map(move |dimid| {
         let mut dimlen = 0;
-        unsafe {
-            error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
+        if !unlimdims.contains(&dimid) {
+            unsafe {
+                error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
+            }
         }
         Ok(Dimension {
             len: core::num::NonZeroUsize::new(dimlen),
@@ -154,11 +198,35 @@ pub(crate) fn dimensions_from_variable<'g>(
     unsafe {
         error::checked(nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr()))?;
     }
+    let unlimdims = {
+        let mut nunlimdims = 0;
+        unsafe {
+            error::checked(nc_inq_unlimdims(
+                ncid,
+                &mut nunlimdims,
+                std::ptr::null_mut(),
+            ))?;
+        }
+        let mut unlimdims = Vec::with_capacity(nunlimdims.try_into()?);
+        unsafe {
+            error::checked(nc_inq_unlimdims(
+                ncid,
+                std::ptr::null_mut(),
+                unlimdims.as_mut_ptr(),
+            ))?;
+        }
+        unsafe {
+            unlimdims.set_len(nunlimdims.try_into()?);
+        }
+        unlimdims
+    };
 
     Ok(dimids.into_iter().map(move |dimid| {
         let mut dimlen = 0;
-        unsafe {
-            error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
+        if !unlimdims.contains(&dimid) {
+            unsafe {
+                error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen))?;
+            }
         }
         Ok(Dimension {
             len: core::num::NonZeroUsize::new(dimlen),
@@ -183,6 +251,27 @@ pub(crate) fn dimension_from_name<'f>(
     let mut dimlen = 0;
     unsafe {
         error::checked(nc_inq_dimlen(ncid, dimid, &mut dimlen)).unwrap();
+    }
+    if dimlen != 0 {
+        // Have to check if this dimension is unlimited
+        let mut nunlim = 0;
+        unsafe {
+            error::checked(nc_inq_unlimdims(ncid, &mut nunlim, std::ptr::null_mut()))?;
+        }
+        if nunlim != 0 {
+            let mut unlimdims = Vec::with_capacity(nunlim.try_into()?);
+            unsafe {
+                error::checked(nc_inq_unlimdims(
+                    ncid,
+                    std::ptr::null_mut(),
+                    unlimdims.as_mut_ptr(),
+                ))?;
+            }
+            unsafe { unlimdims.set_len(nunlim.try_into()?) }
+            if unlimdims.contains(&dimid) {
+                dimlen = 0
+            }
+        }
     }
     Ok(Some(Dimension {
         len: core::num::NonZeroUsize::new(dimlen),
