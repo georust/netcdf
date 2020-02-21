@@ -34,7 +34,7 @@ impl<'a> std::fmt::Debug for Attribute<'a> {
 impl<'a> Attribute<'a> {
     /// Get the name of the attribute
     ///
-    /// # Errors
+    /// # Panics
     /// attribute could have a name containing an invalid utf8-sequence
     pub fn name(&self) -> &str {
         let zeropos = self
