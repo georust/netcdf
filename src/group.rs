@@ -6,7 +6,6 @@ use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
 use super::variable::{Numeric, Variable, VariableMut};
-use super::LOCK;
 use netcdf_sys::*;
 use std::convert::TryInto;
 use std::marker::PhantomData;
@@ -40,7 +39,10 @@ impl<'f> Group<'f> {
     pub fn name(&self) -> String {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
-            error::checked(nc_inq_grpname(self.ncid, name.as_mut_ptr() as *mut _)).unwrap();
+            error::checked(super::with_lock(|| {
+                nc_inq_grpname(self.ncid, name.as_mut_ptr() as *mut _)
+            }))
+            .unwrap();
         }
         let zeropos = name
             .iter()
@@ -74,13 +76,11 @@ impl<'f> Group<'f> {
 
     /// Get a single attribute
     pub fn attribute<'a>(&'a self, name: &str) -> Option<Attribute<'a>> {
-        let _l = super::LOCK.lock().unwrap();
         Attribute::find_from_name(self.ncid, None, name).unwrap()
     }
     /// Get all attributes in the group
     pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
         // Need to lock when reading the first attribute (per group)
-        let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.ncid, None)
             .unwrap()
             .map(Result::unwrap)
@@ -156,13 +156,11 @@ impl<'f> GroupMut<'f> {
     where
         T: Into<AttrValue>,
     {
-        let _l = LOCK.lock().unwrap();
         Attribute::put(self.ncid, NC_GLOBAL, name, val.into())
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension<'g>(&'g mut self, name: &str, len: usize) -> error::Result<Dimension<'g>> {
-        let _l = LOCK.lock().unwrap();
         super::dimension::add_dimension_at(self.id(), name, len)
     }
 
@@ -175,7 +173,9 @@ impl<'f> GroupMut<'f> {
         let byte_name = super::utils::short_name_to_bytes(name)?;
         let mut grpid = 0;
         unsafe {
-            error::checked(nc_def_grp(ncid, byte_name.as_ptr() as *const _, &mut grpid))?;
+            error::checked(super::with_lock(|| {
+                nc_def_grp(ncid, byte_name.as_ptr() as *const _, &mut grpid)
+            }))?;
         }
 
         Ok(Self(
@@ -192,7 +192,6 @@ impl<'f> GroupMut<'f> {
     where
         'f: 'g,
     {
-        let _l = LOCK.lock().unwrap();
         Self::add_group_at(self.id(), name)
     }
 
@@ -209,7 +208,6 @@ impl<'f> GroupMut<'f> {
         T: Numeric,
         'f: 'g,
     {
-        let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.id(), T::NCTYPE, name, dims)
     }
     /// Adds a variable with a basic type of string
@@ -218,7 +216,6 @@ impl<'f> GroupMut<'f> {
         name: &str,
         dims: &[&str],
     ) -> error::Result<VariableMut<'g>> {
-        let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.id(), NC_STRING, name, dims)
     }
     /// Adds a variable from a set of unique identifiers, recursing upwards
@@ -231,7 +228,6 @@ impl<'f> GroupMut<'f> {
     where
         T: Numeric,
     {
-        let _l = LOCK.lock().unwrap();
         super::variable::add_variable_from_identifiers(self.id(), name, dims, T::NCTYPE)
     }
 }
@@ -239,11 +235,15 @@ impl<'f> GroupMut<'f> {
 pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<Item = Group<'f>>> {
     let mut num_grps = 0;
     unsafe {
-        error::checked(nc_inq_grps(ncid, &mut num_grps, std::ptr::null_mut()))?;
+        error::checked(super::with_lock(|| {
+            nc_inq_grps(ncid, &mut num_grps, std::ptr::null_mut())
+        }))?;
     }
     let mut grps = vec![0; num_grps.try_into()?];
     unsafe {
-        error::checked(nc_inq_grps(ncid, std::ptr::null_mut(), grps.as_mut_ptr()))?;
+        error::checked(super::with_lock(|| {
+            nc_inq_grps(ncid, std::ptr::null_mut(), grps.as_mut_ptr())
+        }))?;
     }
     Ok(grps.into_iter().map(|id| Group {
         ncid: id,
@@ -254,7 +254,9 @@ pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<I
 pub(crate) fn group_from_name<'f>(ncid: nc_type, name: &str) -> error::Result<Option<Group<'f>>> {
     let byte_name = super::utils::short_name_to_bytes(name)?;
     let mut grpid = 0;
-    let e = unsafe { nc_inq_grp_ncid(ncid, byte_name.as_ptr() as *const _, &mut grpid) };
+    let e = unsafe {
+        super::with_lock(|| nc_inq_grp_ncid(ncid, byte_name.as_ptr() as *const _, &mut grpid))
+    };
     if e == NC_ENOGRP {
         return Ok(None);
     } else {

@@ -6,7 +6,6 @@ use super::dimension::{self, Dimension};
 use super::error;
 use super::group::{Group, GroupMut};
 use super::variable::{Numeric, Variable, VariableMut};
-use super::LOCK;
 use netcdf_sys::*;
 use std::ffi::CString;
 use std::marker::PhantomData;
@@ -20,9 +19,8 @@ pub(crate) struct RawFile {
 impl Drop for RawFile {
     fn drop(&mut self) {
         unsafe {
-            let _g = LOCK.lock().unwrap();
             // Can't really do much with an error here
-            let _err = error::checked(nc_close(self.ncid));
+            let _err = error::checked(super::with_lock(|| nc_close(self.ncid)));
         }
     }
 }
@@ -37,8 +35,9 @@ impl RawFile {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = 0;
         unsafe {
-            let _l = LOCK.lock().unwrap();
-            error::checked(nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid))?;
+            error::checked(super::with_lock(|| {
+                nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid)
+            }))?;
         }
         Ok(File(Self { ncid }))
     }
@@ -50,8 +49,9 @@ impl RawFile {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         unsafe {
-            let _g = LOCK.lock().unwrap();
-            error::checked(nc_open(f.as_ptr(), NC_WRITE, &mut ncid))?;
+            error::checked(super::with_lock(|| {
+                nc_open(f.as_ptr(), NC_WRITE, &mut ncid)
+            }))?;
         }
 
         Ok(MutableFile(File(Self { ncid })))
@@ -64,8 +64,9 @@ impl RawFile {
         let f = CString::new(path.to_str().unwrap()).unwrap();
         let mut ncid: nc_type = -1;
         unsafe {
-            let _g = LOCK.lock().unwrap();
-            error::checked(nc_create(f.as_ptr(), NC_NETCDF4 | NC_CLOBBER, &mut ncid))?;
+            error::checked(super::with_lock(|| {
+                nc_create(f.as_ptr(), NC_NETCDF4 | NC_CLOBBER, &mut ncid)
+            }))?;
         }
 
         Ok(MutableFile(File(Self { ncid })))
@@ -79,14 +80,15 @@ impl RawFile {
         let cstr = std::ffi::CString::new(name.unwrap_or("/")).unwrap();
         let mut ncid = 0;
         unsafe {
-            let _l = LOCK.lock().unwrap();
-            error::checked(nc_open_mem(
-                cstr.as_ptr(),
-                NC_NOWRITE,
-                mem.len(),
-                mem.as_ptr() as *const u8 as *mut _,
-                &mut ncid,
-            ))?;
+            error::checked(super::with_lock(|| {
+                nc_open_mem(
+                    cstr.as_ptr(),
+                    NC_NOWRITE,
+                    mem.len(),
+                    mem.as_ptr() as *const u8 as *mut _,
+                    &mut ncid,
+                )
+            }))?;
         }
 
         Ok(MemFile(File(Self { ncid }), PhantomData))
@@ -109,15 +111,19 @@ impl File {
         let name = {
             let mut pathlen = 0;
             unsafe {
-                error::checked(nc_inq_path(self.0.ncid, &mut pathlen, std::ptr::null_mut()))?;
+                error::checked(super::with_lock(|| {
+                    nc_inq_path(self.0.ncid, &mut pathlen, std::ptr::null_mut())
+                }))?;
             }
             let mut name = vec![0_u8; pathlen as _];
             unsafe {
-                error::checked(nc_inq_path(
-                    self.0.ncid,
-                    std::ptr::null_mut(),
-                    name.as_mut_ptr() as *mut _,
-                ))?;
+                error::checked(super::with_lock(|| {
+                    nc_inq_path(
+                        self.0.ncid,
+                        std::ptr::null_mut(),
+                        name.as_mut_ptr() as *mut _,
+                    )
+                }))?;
             }
             name
         };
@@ -128,7 +134,8 @@ impl File {
     /// Main entrypoint for interacting with the netcdf file.
     pub fn root(&self) -> Option<Group> {
         let mut format = 0;
-        unsafe { error::checked(nc_inq_format(self.ncid(), &mut format)) }.unwrap();
+        unsafe { error::checked(super::with_lock(|| nc_inq_format(self.ncid(), &mut format))) }
+            .unwrap();
 
         match format {
             NC_FORMAT_NETCDF4 | NC_FORMAT_NETCDF4_CLASSIC => Some(Group {
@@ -156,12 +163,10 @@ impl File {
 
     /// Get a single attribute
     pub fn attribute<'f>(&'f self, name: &str) -> Option<Attribute<'f>> {
-        let _l = super::LOCK.lock().unwrap();
         Attribute::find_from_name(self.ncid(), None, name).unwrap()
     }
     /// Get all attributes in the root group
     pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
-        let _l = super::LOCK.lock().unwrap();
         crate::attribute::AttributeIterator::new(self.0.ncid, None)
             .unwrap()
             .map(Result::unwrap)
@@ -259,13 +264,11 @@ impl MutableFile {
     where
         T: Into<AttrValue>,
     {
-        let _l = LOCK.lock().unwrap();
         Attribute::put(self.ncid(), NC_GLOBAL, name, val.into())
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension<'f>(&'f mut self, name: &str, len: usize) -> error::Result<Dimension<'f>> {
-        let _l = LOCK.lock().unwrap();
         super::dimension::add_dimension_at(self.ncid(), name, len)
     }
     /// Adds a dimension with unbounded size
@@ -275,7 +278,6 @@ impl MutableFile {
 
     /// Add an empty group to the dataset
     pub fn add_group<'f>(&'f mut self, name: &str) -> error::Result<GroupMut<'f>> {
-        let _l = LOCK.lock().unwrap();
         GroupMut::add_group_at(self.ncid(), name)
     }
 
@@ -291,7 +293,6 @@ impl MutableFile {
     where
         T: Numeric,
     {
-        let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.ncid(), T::NCTYPE, name, dims)
     }
     /// Adds a variable with a basic type of string
@@ -300,7 +301,6 @@ impl MutableFile {
         name: &str,
         dims: &[&str],
     ) -> error::Result<VariableMut<'f>> {
-        let _l = LOCK.lock().unwrap();
         VariableMut::add_from_str(self.ncid(), NC_STRING, name, dims)
     }
     /// Adds a variable from a set of unique identifiers, recursing upwards
@@ -313,7 +313,6 @@ impl MutableFile {
     where
         T: Numeric,
     {
-        let _l = LOCK.lock().unwrap();
         super::variable::add_variable_from_identifiers(self.ncid(), name, dims, T::NCTYPE)
     }
 }
