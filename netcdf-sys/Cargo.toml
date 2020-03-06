@@ -36,7 +36,7 @@ exclude = [
 [dependencies]
 libz-sys = { version = "1.0.25" }
 curl-sys = { version = "0.4.25", optional = true }
-hdf5-sys = { version = "0.6.1", features = ["hl", "deprecated", "zlib"] }
+hdf5-sys = { version = "0.6.0", features = ["hl", "deprecated", "zlib"] }
 
 [dev-dependencies]
 lazy_static = "1.4.0"
