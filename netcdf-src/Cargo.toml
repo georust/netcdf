@@ -1,0 +1,18 @@
+[package]
+name = "netcdf-src"
+version = "0.1.0"
+authors = ["Magnus Ulimoen <magnusu@met.no>"]
+edition = "2018"
+description = "Build scripts for building `netCDF` from source"
+build = "build.rs"
+license-file = "source/COPYRIGHT"
+links = "netcdfsrc"
+
+[features]
+dap = []
+
+[dependencies]
+hdf5-sys = { version = "*", features=["hl", "deprecated", "zlib"] }
+
+[build-dependencies]
+cmake = "0.1.42"

@@ -6,6 +6,9 @@ extern crate hdf5_sys;
 #[cfg(feature = "dap")]
 extern crate curl_sys;
 
+#[cfg(feature = "static")]
+extern crate netcdf_src;
+
 mod netcdf_bindings;
 mod netcdf_const;
 pub use netcdf_bindings::*;
