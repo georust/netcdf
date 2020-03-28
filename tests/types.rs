@@ -263,3 +263,34 @@ fn put_get_enum() {
     var.raw_values(&mut bytes_copy, &[0, 0], &[5, 2]).unwrap();
     assert_eq!(bytes, bytes_copy);
 }
+
+#[test]
+fn put_get_vlen() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("test_put_get_enum.nc");
+
+    {
+        let mut file = netcdf::create(&path).unwrap();
+        file.add_dimension("x", 9).unwrap();
+        let v = file.add_vlen_type::<i32>("v").unwrap();
+
+        let mut var = file
+            .add_variable_with_type("var", &["x"], &v.into())
+            .unwrap();
+
+        let buf = (0..9).collect::<Vec<i32>>();
+
+        for i in 0..9 {
+            var.put_vlen(&buf[i..], &[i]).unwrap();
+        }
+    }
+
+    let file = netcdf::open(&path).unwrap();
+    let var = file.variable("var").unwrap();
+
+    let buf = (0..9).collect::<Vec<i32>>();
+    for i in 0..9 {
+        let v = var.vlen::<i32>(&[i]).unwrap();
+        assert_eq!(v, &buf[i..]);
+    }
+}

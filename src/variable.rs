@@ -946,6 +946,46 @@ impl<'g> Variable<'g> {
             )
         }))
     }
+
+    /// Get a vlen element
+    pub fn vlen<T: Numeric>(&self, index: &[usize]) -> error::Result<Vec<T>> {
+        if let super::types::VariableType::Vlen(v) = self.vartype() {
+            if v.typ().id() != T::NCTYPE {
+                return Err(error::Error::TypeMismatch);
+            }
+        } else {
+            return Err(error::Error::TypeMismatch);
+        };
+
+        self.check_indices(index, false)?;
+
+        let mut vlen = nc_vlen_t {
+            len: 0,
+            p: std::ptr::null_mut(),
+        };
+
+        let count = index.iter().map(|_| 1).collect::<Vec<usize>>();
+
+        error::checked(super::with_lock(|| unsafe {
+            nc_get_vara(
+                self.ncid,
+                self.varid,
+                index.as_ptr(),
+                count.as_ptr(),
+                &mut vlen as *mut _ as *mut _,
+            )
+        }))?;
+
+        let mut v = Vec::<T>::with_capacity(vlen.len);
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(vlen.p as *const T, v.as_mut_ptr(), vlen.len);
+            v.set_len(vlen.len);
+        }
+        error::checked(super::with_lock(|| unsafe { nc_free_vlen(&mut vlen) })).unwrap();
+
+        Ok(v)
+    }
 }
 
 impl<'g> VariableMut<'g> {
@@ -1181,6 +1221,36 @@ impl<'g> VariableMut<'g> {
                 start.as_ptr(),
                 count.as_ptr(),
                 buf.as_ptr() as *const _,
+            )
+        }))
+    }
+
+    /// Get a vlen element
+    pub fn put_vlen<T: Numeric>(&mut self, vec: &[T], index: &[usize]) -> error::Result<()> {
+        if let super::types::VariableType::Vlen(v) = self.vartype() {
+            if v.typ().id() != T::NCTYPE {
+                return Err(error::Error::TypeMismatch);
+            }
+        } else {
+            return Err(error::Error::TypeMismatch);
+        };
+
+        self.check_indices(index, true)?;
+
+        let vlen = nc_vlen_t {
+            len: vec.len(),
+            p: vec.as_ptr() as *const _ as *mut _,
+        };
+
+        let count = index.iter().map(|_| 1).collect::<Vec<usize>>();
+
+        error::checked(super::with_lock(|| unsafe {
+            nc_put_vara(
+                self.ncid,
+                self.varid,
+                index.as_ptr(),
+                count.as_ptr(),
+                &vlen as *const _ as *const _,
             )
         }))
     }

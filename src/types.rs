@@ -40,7 +40,7 @@ impl BasicType {
         }
     }
     /// `nc_type` of the type
-    fn id(self) -> nc_type {
+    pub(crate) fn id(self) -> nc_type {
         use super::Numeric;
         match self {
             Self::Byte => i8::NCTYPE,
