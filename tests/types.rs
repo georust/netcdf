@@ -209,4 +209,57 @@ fn read_compound_simple_nc4() {
         assert!(subtypes[0].dimensions().is_none());
         assert!(subtypes[1].dimensions().is_none());
     }
+
+    let var = group.variable("data").unwrap();
+
+    if let VariableType::Compound(_) = var.vartype() {
+    } else {
+        panic!();
+    }
+
+    let mut raws = vec![0_u8; 12 * 6 * 2 * 4];
+    var.raw_values(&mut raws, &[0, 0], &[6, 12]).unwrap();
+
+    use std::convert::TryInto;
+    let intlen = 4;
+    for i in 0..6 * 12 {
+        let i1 = i32::from_le_bytes(raws[2 * intlen * i..][..intlen].try_into().unwrap());
+        let i2 = i32::from_le_bytes(
+            raws[2 * intlen * i + intlen..][..intlen]
+                .try_into()
+                .unwrap(),
+        );
+        assert_eq!(i1, 42);
+        assert_eq!(i2, -42);
+    }
+}
+
+#[test]
+fn put_get_enum() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("test_put_get_enum.nc");
+
+    let bytes = (0..2 * 5).map(|i| i % 3 + 1).collect::<Vec<_>>();
+
+    {
+        let mut file = netcdf::create(&path).unwrap();
+        let e = file
+            .add_enum_type("e", &[("one", 1_u8), ("two", 2), ("three", 3)])
+            .unwrap();
+        file.add_dimension("x", 2).unwrap();
+        file.add_dimension("y", 5).unwrap();
+
+        let mut var = file
+            .add_variable_with_type("var", &["y", "x"], &e.into())
+            .unwrap();
+
+        var.put_raw_values(&bytes, &[0, 0], &[5, 2]).unwrap();
+    }
+
+    let file = netcdf::open(&path).unwrap();
+    let var = file.variable("var").unwrap();
+
+    let mut bytes_copy = vec![0_u8; 5 * 2];
+    var.raw_values(&mut bytes_copy, &[0, 0], &[5, 2]).unwrap();
+    assert_eq!(bytes, bytes_copy);
 }

@@ -271,6 +271,16 @@ impl<'f> GroupMut<'f> {
     {
         super::variable::add_variable_from_identifiers(self.id(), name, dims, T::NCTYPE)
     }
+
+    /// Create a variable with the specified type
+    pub fn add_variable_with_type(
+        &'f mut self,
+        name: &str,
+        dims: &[&str],
+        typ: &super::types::VariableType,
+    ) -> error::Result<VariableMut<'f>> {
+        VariableMut::add_from_str(self.id(), typ.id(), name, dims)
+    }
 }
 
 pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<Item = Group<'f>>> {

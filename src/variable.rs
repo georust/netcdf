@@ -918,6 +918,34 @@ impl<'g> Variable<'g> {
         unsafe { T::get_values_strided(self, indices, &slice_len, strides, buffer.as_mut_ptr())? };
         Ok(slice_len.iter().product())
     }
+
+    /// Get values of any type as bytes
+    pub fn raw_values(
+        &self,
+        buf: &mut [u8],
+        start: &[usize],
+        count: &[usize],
+    ) -> error::Result<()> {
+        let typ = self.vartype();
+        match typ {
+            super::types::VariableType::String | super::types::VariableType::Vlen(_) => {
+                return Err(error::Error::TypeMismatch)
+            }
+            _ => (),
+        }
+        self.check_indices(start, false)?;
+        self.check_sizelen(buf.len() / typ.size(), start, count, false)?;
+
+        error::checked(super::with_lock(|| unsafe {
+            nc_get_vara(
+                self.ncid,
+                self.varid,
+                start.as_ptr(),
+                count.as_ptr(),
+                buf.as_mut_ptr() as *mut _,
+            )
+        }))
+    }
 }
 
 impl<'g> VariableMut<'g> {
@@ -1127,6 +1155,34 @@ impl<'g> VariableMut<'g> {
             }))?;
         }
         Ok(())
+    }
+
+    /// Get values of any type as bytes
+    pub fn put_raw_values(
+        &mut self,
+        buf: &[u8],
+        start: &[usize],
+        count: &[usize],
+    ) -> error::Result<()> {
+        let typ = self.vartype();
+        match typ {
+            super::types::VariableType::String | super::types::VariableType::Vlen(_) => {
+                return Err(error::Error::TypeMismatch)
+            }
+            _ => (),
+        }
+        self.check_indices(start, true)?;
+        self.check_sizelen(buf.len() / typ.size(), start, count, true)?;
+
+        error::checked(super::with_lock(|| unsafe {
+            nc_put_vara(
+                self.ncid,
+                self.varid,
+                start.as_ptr(),
+                count.as_ptr(),
+                buf.as_ptr() as *const _,
+            )
+        }))
     }
 }
 

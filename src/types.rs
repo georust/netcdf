@@ -659,7 +659,7 @@ impl VariableType {
     }
 
     /// Size in bytes of the type
-    fn size(&self) -> usize {
+    pub(crate) fn size(&self) -> usize {
         match self {
             Self::Basic(b) => b.size(),
             Self::String => panic!("A string does not have a defined size"),
@@ -671,7 +671,7 @@ impl VariableType {
     }
 
     /// Id of this type
-    fn id(&self) -> nc_type {
+    pub(crate) fn id(&self) -> nc_type {
         match self {
             Self::Basic(b) => b.id(),
             Self::String => NC_STRING,
