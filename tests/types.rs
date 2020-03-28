@@ -108,3 +108,54 @@ fn add_vlen() {
         assert!(&typ.typ().is_i32());
     }
 }
+
+#[test]
+fn add_enum() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("test_add_enum.nc");
+
+    {
+        let mut file = netcdf::create(&path).unwrap();
+
+        let e = file
+            .add_enum_type::<i32>("e", &[("a", 0), ("b", 1), ("c", 2), ("d", 3)])
+            .unwrap();
+        assert_eq!(&e.name(), "e");
+        assert!(e.typ().is_i32());
+        for member in e.members::<i32>().unwrap() {
+            match member.0.as_str() {
+                "a" => assert_eq!(member.1, 0),
+                "b" => assert_eq!(member.1, 1),
+                "c" => assert_eq!(member.1, 2),
+                "d" => assert_eq!(member.1, 3),
+                _ => panic!(),
+            }
+        }
+        assert_eq!(&e.name_from_value(0).unwrap(), "a");
+        assert_eq!(&e.name_from_value(1).unwrap(), "b");
+        assert_eq!(&e.name_from_value(2).unwrap(), "c");
+        assert_eq!(&e.name_from_value(3).unwrap(), "d");
+        assert!(&e.name_from_value(4).is_none());
+
+        let mut g = file.add_group("g").unwrap();
+        let e = g
+            .add_enum_type::<i64>("e", &[("e", -32), ("f", 41), ("g", 1241232), ("h", 0)])
+            .unwrap();
+        assert_eq!(&e.name(), "e");
+        assert!(e.typ().is_i64());
+        for member in e.members::<i64>().unwrap() {
+            match member.0.as_str() {
+                "e" => assert_eq!(member.1, -32),
+                "f" => assert_eq!(member.1, 41),
+                "g" => assert_eq!(member.1, 1241232),
+                "h" => assert_eq!(member.1, 0),
+                _ => panic!(),
+            }
+        }
+        assert_eq!(&e.name_from_value(-32).unwrap(), "e");
+        assert_eq!(&e.name_from_value(41).unwrap(), "f");
+        assert_eq!(&e.name_from_value(1241232).unwrap(), "g");
+        assert_eq!(&e.name_from_value(0).unwrap(), "h");
+        assert!(&e.name_from_value(4).is_none());
+    }
+}

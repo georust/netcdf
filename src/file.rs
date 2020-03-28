@@ -300,14 +300,27 @@ impl MutableFile {
         VariableMut::add_from_str(self.ncid(), T::NCTYPE, name, dims)
     }
     /// Add an opaque datatype, with `size` bytes
-    pub fn add_opaque_type<'f>(&'f mut self, name: &str, size: usize) -> error::Result<super::types::OpaqueType>
-    {
+    pub fn add_opaque_type<'f>(
+        &'f mut self,
+        name: &str,
+        size: usize,
+    ) -> error::Result<super::types::OpaqueType> {
         super::types::OpaqueType::add(self.ncid(), name, size)
     }
     /// Add a variable length datatype
-    pub fn add_vlen_type<'f, T: Numeric>(&'f mut self, name: &str) -> error::Result<super::types::VlenType>
-    {
+    pub fn add_vlen_type<'f, T: Numeric>(
+        &'f mut self,
+        name: &str,
+    ) -> error::Result<super::types::VlenType> {
         super::types::VlenType::add::<T>(self.ncid(), name)
+    }
+    /// Add an enum datatype
+    pub fn add_enum_type<'f, T: Numeric>(
+        &'f mut self,
+        name: &str,
+        mappings: &[(&str, T)],
+    ) -> error::Result<super::types::EnumType> {
+        super::types::EnumType::add::<T>(self.ncid(), name, mappings)
     }
     /// Adds a variable with a basic type of string
     pub fn add_string_variable<'f>(
