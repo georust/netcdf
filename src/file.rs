@@ -299,6 +299,11 @@ impl MutableFile {
     {
         VariableMut::add_from_str(self.ncid(), T::NCTYPE, name, dims)
     }
+    /// Add an opaque datatype, with `size` bytes
+    pub fn add_opaque_type<'f>(&'f mut self, name: &str, size: usize) -> error::Result<super::types::OpaqueType>
+    {
+        super::types::OpaqueType::add(self.ncid(), name, size)
+    }
     /// Adds a variable with a basic type of string
     pub fn add_string_variable<'f>(
         &'f mut self,

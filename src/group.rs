@@ -158,6 +158,12 @@ impl<'f> GroupMut<'f> {
         self.groups().map(|g| GroupMut(g, PhantomData))
     }
 
+    /// Add an opaque datatype, with `size` bytes
+    pub fn add_opaque_type(&'f mut self, name: &str, size: usize) -> error::Result<super::types::OpaqueType>
+    {
+        super::types::OpaqueType::add(self.id(), name, size)
+    }
+
     /// Add an attribute to the group
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where

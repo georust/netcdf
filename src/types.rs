@@ -63,13 +63,62 @@ impl BasicType {
     }
 }
 
+#[derive(Clone, Debug)]
+/// A set of bytes which with unspecified endianess
+pub struct OpaqueType {
+    ncid: nc_type,
+    id: nc_type,
+}
+
+impl OpaqueType {
+    /// Get the name of this opaque type
+    pub fn name(&self) -> String {
+        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_opaque(
+                self.ncid,
+                self.id,
+                name.as_mut_ptr() as *mut _,
+                std::ptr::null_mut(),
+            )
+        }))
+        .unwrap();
+
+        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
+        String::from_utf8(name[..pos].to_vec()).unwrap()
+    }
+    /// Number of bytes this type occupies
+    pub fn size(&self) -> usize {
+        let mut numbytes = 0;
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_opaque(self.ncid, self.id, std::ptr::null_mut(), &mut numbytes)
+        }))
+        .unwrap();
+        numbytes
+    }
+    pub(crate) fn add(location: nc_type, name: &str, size: usize) -> error::Result<Self> {
+        let cname = super::utils::short_name_to_bytes(name)?;
+        let mut id = 0;
+        error::checked(super::with_lock(|| unsafe { nc_def_opaque(location, size, cname.as_ptr() as *const _, &mut id) }))?;
+
+        Ok(Self {
+            ncid: location,
+            id,
+        })
+    }
+}
+
+
+
 /// Description of the variable
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum VariableType {
     /// A basic numeric type
     Basic(BasicType),
     /// A string type
     String,
+    /// Some bytes
+    Opaque(OpaqueType),
 }
 
 impl VariableType {
@@ -85,7 +134,10 @@ impl VariableType {
 #[allow(missing_docs)]
 impl VariableType {
     pub fn is_string(&self) -> bool {
-        self == &Self::String
+        match self {
+            Self::String => true,
+            _ => false,
+        }
     }
     pub fn is_i8(&self) -> bool {
         self.as_basic().map(|x| x.is_i8()).unwrap_or(false)

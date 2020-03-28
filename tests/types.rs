@@ -26,45 +26,67 @@ fn test_roundtrip_types() {
             "i8" => {
                 assert!(var.vartype().as_basic().unwrap().is_i8());
                 assert!(var.vartype().is_i8());
-            },
+            }
             "u8" => {
                 assert!(var.vartype().as_basic().unwrap().is_u8());
                 assert!(var.vartype().is_u8());
-            },
+            }
             "i16" => {
                 assert!(var.vartype().as_basic().unwrap().is_i16());
                 assert!(var.vartype().is_i16());
-            },
+            }
             "u16" => {
                 assert!(var.vartype().as_basic().unwrap().is_u16());
                 assert!(var.vartype().is_u16());
-            },
+            }
             "i32" => {
                 assert!(var.vartype().as_basic().unwrap().is_i32());
                 assert!(var.vartype().is_i32());
-            },
+            }
             "u32" => {
                 assert!(var.vartype().as_basic().unwrap().is_u32());
                 assert!(var.vartype().is_u32());
-            },
+            }
             "i64" => {
                 assert!(var.vartype().as_basic().unwrap().is_i64());
                 assert!(var.vartype().is_i64());
-            },
+            }
             "u64" => {
                 assert!(var.vartype().as_basic().unwrap().is_u64());
                 assert!(var.vartype().is_u64());
-            },
+            }
             "f32" => {
                 assert!(var.vartype().as_basic().unwrap().is_f32());
                 assert!(var.vartype().is_f32());
-            },
+            }
             "f64" => {
                 assert!(var.vartype().as_basic().unwrap().is_f64());
                 assert!(var.vartype().is_f64());
-            },
+            }
             "string" => assert!(var.vartype().is_string()),
             _ => panic!("Got an unexpected varname: {}", var.name()),
         }
     }
+}
+
+#[test]
+fn add_opaque() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("test_opaque.nc");
+
+    {
+        let mut file = netcdf::create(&path).unwrap();
+
+        let typ = file.add_opaque_type("opa", 42).unwrap();
+        assert_eq!(&typ.name(), "opa");
+        assert_eq!(typ.size(), 42);
+
+        let mut g = file.add_group("g").unwrap();
+        let gtyp = g.add_opaque_type("oma", 43).unwrap();
+        assert_eq!(&gtyp.name(), "oma");
+        assert_eq!(gtyp.size(), 43);
+    }
+
+    // let file = netcdf::open(&path).unwrap();
+    // let var = file.typ("opa").unwrap();
 }
