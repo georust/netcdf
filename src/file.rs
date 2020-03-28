@@ -201,7 +201,7 @@ impl File {
     }
     /// Return all types in the root group
     pub fn types(&self) -> error::Result<impl Iterator<Item = super::types::VariableType>> {
-        super::types::all_at_location(self.ncid()).map(|x| x.map(|x| x.unwrap()))
+        super::types::all_at_location(self.ncid()).map(|x| x.map(Result::unwrap))
     }
 }
 

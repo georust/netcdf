@@ -122,7 +122,7 @@ impl<'f> Group<'f> {
     /// Return all types in this group
     pub fn types(&self) -> impl Iterator<Item = super::types::VariableType> {
         super::types::all_at_location(self.ncid)
-            .map(|x| x.map(|x| x.unwrap()))
+            .map(|x| x.map(Result::unwrap))
             .unwrap()
     }
 }

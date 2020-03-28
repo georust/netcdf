@@ -1533,7 +1533,7 @@ extern "C" {
     pub fn nc_set_base_pe(ncid: c_int, pe: c_int) -> c_int;
     pub fn nc_inq_base_pe(ncid: c_int, pe: *mut c_int) -> c_int;
     pub fn nctypelen(datatype: nc_type) -> c_int;
-    pub fn nc_advise(cdf_routine_name: *const c_char, err: c_int, fmt: *const c_char, ...) -> ();
+    pub fn nc_advise(cdf_routine_name: *const c_char, err: c_int, fmt: *const c_char, ...);
     pub fn nccreate(path: *const c_char, cmode: c_int) -> c_int;
     pub fn ncopen(path: *const c_char, mode: c_int) -> c_int;
     pub fn ncsetfill(ncid: c_int, fillmode: c_int) -> c_int;

@@ -31,7 +31,7 @@ pub enum BasicType {
 
 impl BasicType {
     /// Size of the type in bytes
-    fn size(&self) -> usize {
+    fn size(self) -> usize {
         match self {
             Self::Byte | Self::Ubyte => 1,
             Self::Short | Self::Ushort => 2,
@@ -39,8 +39,8 @@ impl BasicType {
             Self::Int64 | Self::Uint64 | Self::Double => 8,
         }
     }
-    /// nc_type
-    fn id(&self) -> nc_type {
+    /// `nc_type` of the type
+    fn id(self) -> nc_type {
         use super::Numeric;
         match self {
             Self::Byte => i8::NCTYPE,
@@ -112,7 +112,10 @@ impl OpaqueType {
         }))
         .unwrap();
 
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
+        let pos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
         String::from_utf8(name[..pos].to_vec()).unwrap()
     }
     /// Number of bytes this type occupies
@@ -125,10 +128,10 @@ impl OpaqueType {
         numbytes
     }
     pub(crate) fn add(location: nc_type, name: &str, size: usize) -> error::Result<Self> {
-        let cname = super::utils::short_name_to_bytes(name)?;
+        let name = super::utils::short_name_to_bytes(name)?;
         let mut id = 0;
         error::checked(super::with_lock(|| unsafe {
-            nc_def_opaque(location, size, cname.as_ptr() as *const _, &mut id)
+            nc_def_opaque(location, size, name.as_ptr() as *const _, &mut id)
         }))?;
 
         Ok(Self { ncid: location, id })
@@ -157,7 +160,10 @@ impl VlenType {
         }))
         .unwrap();
 
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
+        let pos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
         String::from_utf8(name[..pos].to_vec()).unwrap()
     }
 
@@ -165,10 +171,10 @@ impl VlenType {
     where
         T: super::Numeric,
     {
-        let cname = super::utils::short_name_to_bytes(name)?;
+        let name = super::utils::short_name_to_bytes(name)?;
         let mut id = 0;
         error::checked(super::with_lock(|| unsafe {
-            nc_def_vlen(location, cname.as_ptr() as *const _, T::NCTYPE, &mut id)
+            nc_def_vlen(location, name.as_ptr() as *const _, T::NCTYPE, &mut id)
         }))?;
 
         Ok(Self { ncid: location, id })
@@ -217,19 +223,19 @@ impl EnumType {
         name: &str,
         mappings: &[(&str, T)],
     ) -> error::Result<EnumType> {
-        let cname = super::utils::short_name_to_bytes(name)?;
+        let name = super::utils::short_name_to_bytes(name)?;
         let mut id = 0;
         error::checked(super::with_lock(|| unsafe {
-            nc_def_enum(ncid, T::NCTYPE, cname.as_ptr() as *const _, &mut id)
+            nc_def_enum(ncid, T::NCTYPE, name.as_ptr() as *const _, &mut id)
         }))?;
 
         for (name, val) in mappings {
-            let cname = super::utils::short_name_to_bytes(name)?;
+            let name = super::utils::short_name_to_bytes(name)?;
             error::checked(super::with_lock(|| unsafe {
                 nc_insert_enum(
                     ncid,
                     id,
-                    cname.as_ptr() as *const _,
+                    name.as_ptr() as *const _,
                     val as *const T as *const _,
                 )
             }))?;
@@ -284,7 +290,10 @@ impl EnumType {
             )
         });
 
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
+        let pos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
         let name = String::from_utf8(name[..pos].to_vec()).unwrap();
         Ok((name, t.assume_init()))
     }
@@ -310,9 +319,7 @@ impl EnumType {
             return Err(error::Error::TypeMismatch);
         }
 
-        Ok((0..nummembers)
-            .into_iter()
-            .map(move |idx| unsafe { self.member_at::<T>(idx) }.unwrap()))
+        Ok((0..nummembers).map(move |idx| unsafe { self.member_at::<T>(idx) }.unwrap()))
     }
 
     /// Name of the type
@@ -330,15 +337,18 @@ impl EnumType {
         }))
         .unwrap();
 
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
+        let pos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
         String::from_utf8(name[..pos].to_vec()).unwrap()
     }
 
     /// Get the name from the enum value
     pub fn name_from_value(&self, value: i64) -> Option<String> {
-        let mut cname = [0_u8; NC_MAX_NAME as usize + 1];
+        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
         let e = super::with_lock(|| unsafe {
-            nc_inq_enum_ident(self.ncid, self.id, value, cname.as_mut_ptr() as *mut _)
+            nc_inq_enum_ident(self.ncid, self.id, value, name.as_mut_ptr() as *mut _)
         });
         if e == NC_EINVAL {
             return None;
@@ -346,8 +356,11 @@ impl EnumType {
 
         error::checked(e).unwrap();
 
-        let pos = cname.iter().position(|&x| x == 0).unwrap_or(cname.len());
-        Some(String::from_utf8(cname[..pos].to_vec()).unwrap())
+        let pos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
+        Some(String::from_utf8(name[..pos].to_vec()).unwrap())
     }
 
     /// Size in bytes of this type
@@ -365,11 +378,11 @@ pub struct CompoundType {
 
 impl CompoundType {
     pub(crate) fn add(ncid: nc_type, name: &str) -> error::Result<CompoundBuilder> {
-        let cname = super::utils::short_name_to_bytes(name)?;
+        let name = super::utils::short_name_to_bytes(name)?;
 
         Ok(CompoundBuilder {
             ncid,
-            name: cname,
+            name,
             size: 0,
             comp: Vec::new(),
         })
@@ -559,34 +572,34 @@ impl VariableType {
         }
     }
     pub fn is_i8(&self) -> bool {
-        self.as_basic().map(|x| x.is_i8()).unwrap_or(false)
+        self.as_basic().map_or(false, BasicType::is_i8)
     }
     pub fn is_u8(&self) -> bool {
-        self.as_basic().map(|x| x.is_u8()).unwrap_or(false)
+        self.as_basic().map_or(false, BasicType::is_u8)
     }
     pub fn is_i16(&self) -> bool {
-        self.as_basic().map(|x| x.is_i16()).unwrap_or(false)
+        self.as_basic().map_or(false, BasicType::is_i16)
     }
     pub fn is_u16(&self) -> bool {
-        self.as_basic().map(|x| x.is_u16()).unwrap_or(false)
+        self.as_basic().map_or(false, BasicType::is_u16)
     }
     pub fn is_i32(&self) -> bool {
-        self.as_basic().map(|x| x.is_i32()).unwrap_or(false)
+        self.as_basic().map_or(false, BasicType::is_i32)
     }
     pub fn is_u32(&self) -> bool {
-        self.as_basic().map(|x| x.is_u32()).unwrap_or(false)
+        self.as_basic().map_or(false, BasicType::is_u32)
     }
     pub fn is_i64(&self) -> bool {
-        self.as_basic().map(|x| x.is_i64()).unwrap_or(false)
+        self.as_basic().map_or(false, BasicType::is_i64)
     }
     pub fn is_u64(&self) -> bool {
-        self.as_basic().map(|x| x.is_u64()).unwrap_or(false)
+        self.as_basic().map_or(false, BasicType::is_u64)
     }
     pub fn is_f32(&self) -> bool {
-        self.as_basic().map(|x| x.is_f32()).unwrap_or(false)
+        self.as_basic().map_or(false, BasicType::is_f32)
     }
     pub fn is_f64(&self) -> bool {
-        self.as_basic().map(|x| x.is_f64()).unwrap_or(false)
+        self.as_basic().map_or(false, BasicType::is_f64)
     }
 }
 
@@ -614,11 +627,11 @@ pub(crate) fn all_at_location(
     ncid: nc_type,
 ) -> error::Result<impl Iterator<Item = error::Result<VariableType>>> {
     let typeids = {
-        let mut ntypeids = 0;
+        let mut num_typeids = 0;
         error::checked(with_lock(|| unsafe {
-            nc_inq_typeids(ncid, &mut ntypeids, std::ptr::null_mut())
+            nc_inq_typeids(ncid, &mut num_typeids, std::ptr::null_mut())
         }))?;
-        let mut typeids = vec![0; ntypeids as _];
+        let mut typeids = vec![0; num_typeids as _];
         error::checked(with_lock(|| unsafe {
             nc_inq_typeids(ncid, std::ptr::null_mut(), typeids.as_mut_ptr())
         }))?;
