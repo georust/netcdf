@@ -56,6 +56,22 @@ impl BasicType {
             Self::Double => f64::NCTYPE,
         }
     }
+
+    /// `rusty` name of the type
+    pub fn name(self) -> &'static str {
+        match self {
+            BasicType::Byte => "i8",
+            BasicType::Ubyte => "u8",
+            BasicType::Short => "i16",
+            BasicType::Ushort => "u16",
+            BasicType::Int => "i32",
+            BasicType::Uint => "u32",
+            BasicType::Int64 => "i64",
+            BasicType::Uint64 => "u64",
+            BasicType::Float => "f32",
+            BasicType::Double => "f64",
+        }
+    }
 }
 
 #[allow(missing_docs)]
@@ -685,6 +701,19 @@ impl VariableType {
             Self::Opaque(o) => o.id,
             Self::Vlen(v) => v.id,
             Self::Compound(c) => c.id,
+        }
+    }
+
+    /// Get the name of the type. The basic numeric types will
+    /// have `rusty` names (u8/i32/f64/string)
+    pub fn name(&self) -> String {
+        match self {
+            Self::Basic(b) => b.name().into(),
+            Self::String => "string".into(),
+            Self::Enum(e) => e.name(),
+            Self::Opaque(o) => o.name(),
+            Self::Vlen(v) => v.name(),
+            Self::Compound(c) => c.name(),
         }
     }
 }
