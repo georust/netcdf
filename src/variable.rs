@@ -919,7 +919,15 @@ impl<'g> Variable<'g> {
         Ok(slice_len.iter().product())
     }
 
-    /// Get values of any type as bytes
+    /// Get values of any type as bytes, with no further interpretation
+    /// of the values.
+    ///
+    /// # Note
+    ///
+    /// When working with compound types, variable length arrays and
+    /// strings will be allocated in `buf`, and this library will
+    /// not keep track of the allocations.
+    /// This can lead to memory leaks.
     pub fn raw_values(
         &self,
         buf: &mut [u8],
@@ -1198,7 +1206,15 @@ impl<'g> VariableMut<'g> {
     }
 
     /// Get values of any type as bytes
-    pub fn put_raw_values(
+    ///
+    /// # Safety
+    ///
+    /// When working with compound types, variable length arrays and
+    /// strings create pointers from the buffer, and tries to copy
+    /// memory from these locations. Compound types which does not
+    /// have these elements will be safe to access, and can treat
+    /// this function as safe
+    pub unsafe fn put_raw_values(
         &mut self,
         buf: &[u8],
         start: &[usize],
@@ -1214,6 +1230,7 @@ impl<'g> VariableMut<'g> {
         self.check_indices(start, true)?;
         self.check_sizelen(buf.len() / typ.size(), start, count, true)?;
 
+        #[allow(unused_unsafe)]
         error::checked(super::with_lock(|| unsafe {
             nc_put_vara(
                 self.ncid,

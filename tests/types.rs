@@ -253,7 +253,9 @@ fn put_get_enum() {
             .add_variable_with_type("var", &["y", "x"], &e.into())
             .unwrap();
 
-        var.put_raw_values(&bytes, &[0, 0], &[5, 2]).unwrap();
+        unsafe {
+            var.put_raw_values(&bytes, &[0, 0], &[5, 2]).unwrap();
+        }
     }
 
     let file = netcdf::open(&path).unwrap();
