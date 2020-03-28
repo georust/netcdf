@@ -3,6 +3,7 @@
 use super::error;
 use crate::with_lock;
 use netcdf_sys::*;
+use std::convert::TryInto;
 
 /// Basic numeric types
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -280,11 +281,12 @@ impl EnumType {
     unsafe fn member_at<T: super::Numeric>(&self, idx: usize) -> error::Result<(String, T)> {
         let mut name = [0_u8; NC_MAX_NAME as usize + 1];
         let mut t = std::mem::MaybeUninit::<T>::uninit();
+        let idx = idx.try_into()?;
         super::with_lock(|| {
             nc_inq_enum_member(
                 self.ncid,
                 self.id,
-                idx as _,
+                idx,
                 name.as_mut_ptr() as *mut _,
                 t.as_mut_ptr() as *mut _,
             )
@@ -455,13 +457,9 @@ impl CompoundField {
     /// Name of the compound field
     pub fn name(&self) -> String {
         let mut name = [0_u8; NC_MAX_NAME as usize + 1];
+        let idx = self.id.try_into().unwrap();
         error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_fieldname(
-                self.ncid,
-                self.parent,
-                self.id as _,
-                name.as_mut_ptr() as *mut _,
-            )
+            nc_inq_compound_fieldname(self.ncid, self.parent, idx, name.as_mut_ptr() as *mut _)
         }))
         .unwrap();
 
@@ -475,8 +473,9 @@ impl CompoundField {
     /// type of the field
     pub fn typ(&self) -> VariableType {
         let mut typ = 0;
+        let id = self.id.try_into().unwrap();
         error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_fieldtype(self.ncid, self.parent, self.id as _, &mut typ)
+            nc_inq_compound_fieldtype(self.ncid, self.parent, id, &mut typ)
         }))
         .unwrap();
 
@@ -486,11 +485,12 @@ impl CompoundField {
     /// Offset in bytes of this field in the compound type
     pub fn offset(&self) -> usize {
         let mut offset = 0;
+        let id = self.id.try_into().unwrap();
         error::checked(super::with_lock(|| unsafe {
             nc_inq_compound_field(
                 self.ncid,
                 self.parent,
-                self.id as _,
+                id,
                 std::ptr::null_mut(),
                 &mut offset,
                 std::ptr::null_mut(),
@@ -505,23 +505,24 @@ impl CompoundField {
 
     /// Get dimensionality of this compound field
     pub fn dimensions(&self) -> Option<Vec<usize>> {
-        let mut ndims = 0;
+        let mut num_dims = 0;
+        let id = self.id.try_into().unwrap();
         error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_fieldndims(self.ncid, self.parent, self.id as _, &mut ndims)
+            nc_inq_compound_fieldndims(self.ncid, self.parent, id, &mut num_dims)
         }))
         .unwrap();
 
-        if ndims == 0 {
+        if num_dims == 0 {
             return None;
         }
 
-        let mut dims = vec![0; ndims as _];
+        let mut dims = vec![0; num_dims.try_into().unwrap()];
         error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_fielddim_sizes(self.ncid, self.parent, self.id as _, dims.as_mut_ptr())
+            nc_inq_compound_fielddim_sizes(self.ncid, self.parent, id, dims.as_mut_ptr())
         }))
         .unwrap();
 
-        Some(dims.iter().map(|&x| x as _).collect())
+        Some(dims.iter().map(|&x| x.try_into().unwrap()).collect())
     }
 }
 
@@ -574,7 +575,7 @@ impl CompoundBuilder {
         self.comp.push((
             var.clone(),
             super::utils::short_name_to_bytes(name)?,
-            Some(dims.iter().map(|&x| x as i32).collect()),
+            Some(dims.iter().map(|&x| x.try_into().unwrap()).collect()),
         ));
 
         self.size += var.size() * dims.iter().product::<usize>();
@@ -609,6 +610,7 @@ impl CompoundBuilder {
                     offset += typ.size();
                 }
                 Some(dims) => {
+                    let dimlen = dims.len().try_into().unwrap();
                     error::checked(super::with_lock(|| unsafe {
                         nc_insert_array_compound(
                             self.ncid,
@@ -616,11 +618,15 @@ impl CompoundBuilder {
                             name.as_ptr() as *const _,
                             offset,
                             typ.id(),
-                            dims.len() as _,
+                            dimlen,
                             dims.as_ptr(),
                         )
                     }))?;
-                    offset += typ.size() * dims.iter().product::<i32>() as usize;
+                    offset += typ.size()
+                        * dims
+                            .iter()
+                            .map(|x: &i32| -> usize { (*x).try_into().unwrap() })
+                            .product::<usize>();
                 }
             }
         }
@@ -771,7 +777,7 @@ pub(crate) fn all_at_location(
         error::checked(with_lock(|| unsafe {
             nc_inq_typeids(ncid, &mut num_typeids, std::ptr::null_mut())
         }))?;
-        let mut typeids = vec![0; num_typeids as _];
+        let mut typeids = vec![0; num_typeids.try_into()?];
         error::checked(with_lock(|| unsafe {
             nc_inq_typeids(ncid, std::ptr::null_mut(), typeids.as_mut_ptr())
         }))?;
