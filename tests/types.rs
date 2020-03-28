@@ -1,3 +1,5 @@
+mod common;
+
 #[test]
 fn test_roundtrip_types() {
     let d = tempfile::tempdir().unwrap();
@@ -178,4 +180,33 @@ fn add_compound() {
     builder.add_type("e", &e.into()).unwrap();
     builder.add_type("c", &c.into()).unwrap();
     builder.build().unwrap();
+}
+
+#[test]
+fn read_compound_simple_nc4() {
+    use netcdf::types::VariableType;
+    let path = common::test_location().join("simple_nc4.nc");
+    let file = netcdf::open(&path).unwrap();
+
+    let group = file.group("grp2").unwrap().unwrap();
+    for typ in group.types() {
+        let c = match typ {
+            VariableType::Compound(c) => c,
+            _ => panic!(),
+        };
+        assert_eq!(&c.name(), "sample_compound_type");
+        let subtypes = c.fields().collect::<Vec<_>>();
+        assert_eq!(subtypes.len(), 2);
+
+        assert_eq!(&subtypes[0].name(), "i1");
+        assert_eq!(&subtypes[1].name(), "i2");
+        assert!(subtypes[0].typ().is_i32());
+        assert!(subtypes[1].typ().is_i32());
+
+        assert_eq!(subtypes[0].offset(), 0);
+        assert_eq!(subtypes[1].offset(), std::mem::size_of::<i32>());
+
+        assert!(subtypes[0].dimensions().is_none());
+        assert!(subtypes[1].dimensions().is_none());
+    }
 }

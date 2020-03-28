@@ -403,6 +403,126 @@ impl CompoundType {
         .unwrap();
         size
     }
+
+    /// Get the name of this type
+    pub fn name(&self) -> String {
+        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_compound(
+                self.ncid,
+                self.id,
+                name.as_mut_ptr() as *mut _,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        }))
+        .unwrap();
+
+        let pos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
+        String::from_utf8(name[..pos].to_vec()).unwrap()
+    }
+
+    /// Get the fields of the compound
+    pub fn fields(&self) -> impl Iterator<Item = CompoundField> {
+        let ncid = self.ncid;
+        let parent_id = self.id;
+
+        let mut nfields = 0;
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_compound_nfields(ncid, parent_id, &mut nfields)
+        }))
+        .unwrap();
+
+        (0..nfields).map(move |x| CompoundField {
+            ncid,
+            parent: parent_id,
+            id: x,
+        })
+    }
+}
+
+/// Subfield of a compound
+pub struct CompoundField {
+    ncid: nc_type,
+    parent: nc_type,
+    id: usize,
+}
+
+impl CompoundField {
+    /// Name of the compound field
+    pub fn name(&self) -> String {
+        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_compound_fieldname(
+                self.ncid,
+                self.parent,
+                self.id as _,
+                name.as_mut_ptr() as *mut _,
+            )
+        }))
+        .unwrap();
+
+        let pos = name
+            .iter()
+            .position(|&x| x == 0)
+            .unwrap_or_else(|| name.len());
+        String::from_utf8(name[..pos].to_vec()).unwrap()
+    }
+
+    /// type of the field
+    pub fn typ(&self) -> VariableType {
+        let mut typ = 0;
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_compound_fieldtype(self.ncid, self.parent, self.id as _, &mut typ)
+        }))
+        .unwrap();
+
+        VariableType::from_id(self.ncid, typ).unwrap()
+    }
+
+    /// Offset in bytes of this field in the compound type
+    pub fn offset(&self) -> usize {
+        let mut offset = 0;
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_compound_field(
+                self.ncid,
+                self.parent,
+                self.id as _,
+                std::ptr::null_mut(),
+                &mut offset,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        }))
+        .unwrap();
+
+        offset
+    }
+
+    /// Get dimensionality of this compound field
+    pub fn dimensions(&self) -> Option<Vec<usize>> {
+        let mut ndims = 0;
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_compound_fieldndims(self.ncid, self.parent, self.id as _, &mut ndims)
+        }))
+        .unwrap();
+
+        if ndims == 0 {
+            return None;
+        }
+
+        let mut dims = vec![0; ndims as _];
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_compound_fielddim_sizes(self.ncid, self.parent, self.id as _, dims.as_mut_ptr())
+        }))
+        .unwrap();
+
+        Some(dims.iter().map(|&x| x as _).collect())
+    }
 }
 
 /// A builder for a compound type
@@ -605,7 +725,7 @@ impl VariableType {
 
 impl VariableType {
     /// Get the variable type from the id
-    pub(crate) fn from_id(_ncid: nc_type, xtype: nc_type) -> error::Result<Self> {
+    pub(crate) fn from_id(ncid: nc_type, xtype: nc_type) -> error::Result<Self> {
         match xtype {
             NC_BYTE => Ok(Self::Basic(BasicType::Byte)),
             NC_UBYTE => Ok(Self::Basic(BasicType::Ubyte)),
@@ -618,7 +738,27 @@ impl VariableType {
             NC_FLOAT => Ok(Self::Basic(BasicType::Float)),
             NC_DOUBLE => Ok(Self::Basic(BasicType::Double)),
             NC_STRING => Ok(Self::String),
-            _ => Err(format!("{} is still an unknown type", xtype).into()),
+            xtype => {
+                let mut base_xtype = 0;
+                error::checked(super::with_lock(|| unsafe {
+                    nc_inq_user_type(
+                        ncid,
+                        xtype,
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        &mut base_xtype,
+                    )
+                }))?;
+                match base_xtype {
+                    NC_VLEN => Ok(VlenType { ncid, id: xtype }.into()),
+                    NC_OPAQUE => Ok(OpaqueType { ncid, id: xtype }.into()),
+                    NC_ENUM => Ok(EnumType { ncid, id: xtype }.into()),
+                    NC_COMPOUND => Ok(CompoundType { ncid, id: xtype }.into()),
+                    _ => panic!("Unexpected base type: {}", base_xtype),
+                }
+            }
         }
     }
 }
@@ -655,5 +795,15 @@ impl Into<VariableType> for BasicType {
 impl Into<VariableType> for EnumType {
     fn into(self) -> VariableType {
         VariableType::Enum(self)
+    }
+}
+impl Into<VariableType> for VlenType {
+    fn into(self) -> VariableType {
+        VariableType::Vlen(self)
+    }
+}
+impl Into<VariableType> for OpaqueType {
+    fn into(self) -> VariableType {
+        VariableType::Opaque(self)
     }
 }
