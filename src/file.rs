@@ -322,6 +322,15 @@ impl MutableFile {
     ) -> error::Result<super::types::EnumType> {
         super::types::EnumType::add::<T>(self.ncid(), name, mappings)
     }
+
+    /// Build a compound type
+    pub fn add_compound_type(
+        &mut self,
+        name: &str,
+    ) -> error::Result<super::types::CompoundBuilder> {
+        super::types::CompoundType::add(self.ncid(), name)
+    }
+
     /// Adds a variable with a basic type of string
     pub fn add_string_variable<'f>(
         &'f mut self,

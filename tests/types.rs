@@ -159,3 +159,23 @@ fn add_enum() {
         assert!(&e.name_from_value(4).is_none());
     }
 }
+
+#[test]
+fn add_compound() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("test_add_compound.nc");
+    let mut file = netcdf::create(&path).unwrap();
+
+    let mut builder = file.add_compound_type("c").unwrap();
+    builder.add::<u8>("u8").unwrap();
+    builder.add::<i8>("i8").unwrap();
+    builder.add_array::<i32>("ai32", &[1, 2, 3]).unwrap();
+
+    let c = builder.build().unwrap();
+    let e = file.add_enum_type("e", &[("a", 1), ("b", 2)]).unwrap();
+
+    let mut builder = file.add_compound_type("cc").unwrap();
+    builder.add_type("e", &e.into()).unwrap();
+    builder.add_type("c", &c.into()).unwrap();
+    builder.build().unwrap();
+}

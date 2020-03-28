@@ -29,6 +29,34 @@ pub enum BasicType {
     Double,
 }
 
+impl BasicType {
+    /// Size of the type in bytes
+    fn size(&self) -> usize {
+        match self {
+            Self::Byte | Self::Ubyte => 1,
+            Self::Short | Self::Ushort => 2,
+            Self::Int | Self::Uint | Self::Float => 4,
+            Self::Int64 | Self::Uint64 | Self::Double => 8,
+        }
+    }
+    /// nc_type
+    fn id(&self) -> nc_type {
+        use super::Numeric;
+        match self {
+            Self::Byte => i8::NCTYPE,
+            Self::Ubyte => u8::NCTYPE,
+            Self::Short => i16::NCTYPE,
+            Self::Ushort => u16::NCTYPE,
+            Self::Int => i32::NCTYPE,
+            Self::Uint => u32::NCTYPE,
+            Self::Int64 => i64::NCTYPE,
+            Self::Uint64 => u64::NCTYPE,
+            Self::Float => f32::NCTYPE,
+            Self::Double => f64::NCTYPE,
+        }
+    }
+}
+
 #[allow(missing_docs)]
 impl BasicType {
     pub fn is_i8(self) -> bool {
@@ -321,6 +349,154 @@ impl EnumType {
         let pos = cname.iter().position(|&x| x == 0).unwrap_or(cname.len());
         Some(String::from_utf8(cname[..pos].to_vec()).unwrap())
     }
+
+    /// Size in bytes of this type
+    fn size(&self) -> usize {
+        self.typ().size()
+    }
+}
+
+/// A type consisting of other types
+#[derive(Debug, Clone)]
+pub struct CompoundType {
+    ncid: nc_type,
+    id: nc_type,
+}
+
+impl CompoundType {
+    pub(crate) fn add(ncid: nc_type, name: &str) -> error::Result<CompoundBuilder> {
+        let cname = super::utils::short_name_to_bytes(name)?;
+
+        Ok(CompoundBuilder {
+            ncid,
+            name: cname,
+            size: 0,
+            comp: Vec::new(),
+        })
+    }
+
+    /// Size in bytes of this type
+    fn size(&self) -> usize {
+        let mut size = 0;
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_compound(
+                self.ncid,
+                self.id,
+                std::ptr::null_mut(),
+                &mut size,
+                std::ptr::null_mut(),
+            )
+        }))
+        .unwrap();
+        size
+    }
+}
+
+/// A builder for a compound type
+#[must_use]
+pub struct CompoundBuilder {
+    ncid: nc_type,
+    name: [u8; NC_MAX_NAME as usize + 1],
+    size: usize,
+    comp: Vec<(
+        VariableType,
+        [u8; NC_MAX_NAME as usize + 1],
+        Option<Vec<i32>>,
+    )>,
+}
+
+impl CompoundBuilder {
+    /// Add a type to the compound
+    pub fn add_type(&mut self, name: &str, var: &VariableType) -> error::Result<&mut Self> {
+        self.comp
+            .push((var.clone(), super::utils::short_name_to_bytes(name)?, None));
+
+        self.size += var.size();
+        Ok(self)
+    }
+
+    /// Add a basic numeric type
+    pub fn add<T: super::Numeric>(&mut self, name: &str) -> error::Result<&mut Self> {
+        let var = VariableType::from_id(self.ncid, T::NCTYPE)?;
+        self.add_type(name, &var)
+    }
+
+    /// Add an array of a basic type
+    pub fn add_array<T: super::Numeric>(
+        &mut self,
+        name: &str,
+        dims: &[usize],
+    ) -> error::Result<&mut Self> {
+        let var = VariableType::from_id(self.ncid, T::NCTYPE)?;
+        self.add_array_type(name, &var, dims)
+    }
+
+    /// Add a type as an array
+    pub fn add_array_type(
+        &mut self,
+        name: &str,
+        var: &VariableType,
+        dims: &[usize],
+    ) -> error::Result<&mut Self> {
+        self.comp.push((
+            var.clone(),
+            super::utils::short_name_to_bytes(name)?,
+            Some(dims.iter().map(|&x| x as i32).collect()),
+        ));
+
+        self.size += var.size() * dims.iter().product::<usize>();
+        Ok(self)
+    }
+
+    /// Finalize the compound type
+    pub fn build(self) -> error::Result<CompoundType> {
+        let mut id = 0;
+        error::checked(super::with_lock(|| unsafe {
+            nc_def_compound(
+                self.ncid,
+                self.size,
+                self.name.as_ptr() as *const _,
+                &mut id,
+            )
+        }))?;
+
+        let mut offset = 0;
+        for (typ, name, dims) in &self.comp {
+            match dims {
+                None => {
+                    error::checked(super::with_lock(|| unsafe {
+                        nc_insert_compound(
+                            self.ncid,
+                            id,
+                            name.as_ptr() as *const _,
+                            offset,
+                            typ.id(),
+                        )
+                    }))?;
+                    offset += typ.size();
+                }
+                Some(dims) => {
+                    error::checked(super::with_lock(|| unsafe {
+                        nc_insert_array_compound(
+                            self.ncid,
+                            id,
+                            name.as_ptr() as *const _,
+                            offset,
+                            typ.id(),
+                            dims.len() as _,
+                            dims.as_ptr(),
+                        )
+                    }))?;
+                    offset += typ.size() * dims.iter().product::<i32>() as usize;
+                }
+            }
+        }
+
+        Ok(CompoundType {
+            ncid: self.ncid,
+            id,
+        })
+    }
 }
 
 /// Description of the variable
@@ -336,6 +512,8 @@ pub enum VariableType {
     Vlen(VlenType),
     /// Enum type
     Enum(EnumType),
+    /// Compound type
+    Compound(CompoundType),
 }
 
 impl VariableType {
@@ -344,6 +522,30 @@ impl VariableType {
         match self {
             Self::Basic(x) => Some(*x),
             _ => None,
+        }
+    }
+
+    /// Size in bytes of the type
+    fn size(&self) -> usize {
+        match self {
+            Self::Basic(b) => b.size(),
+            Self::String => panic!("A string does not have a defined size"),
+            Self::Enum(e) => e.size(),
+            Self::Opaque(o) => o.size(),
+            Self::Vlen(_) => panic!("A variable length array does not have a defined size"),
+            Self::Compound(c) => c.size(),
+        }
+    }
+
+    /// Id of this type
+    fn id(&self) -> nc_type {
+        match self {
+            Self::Basic(b) => b.id(),
+            Self::String => NC_STRING,
+            Self::Enum(e) => e.id,
+            Self::Opaque(o) => o.id,
+            Self::Vlen(v) => v.id,
+            Self::Compound(c) => c.id,
         }
     }
 }
@@ -425,4 +627,20 @@ pub(crate) fn all_at_location(
     Ok(typeids
         .into_iter()
         .map(move |x| VariableType::from_id(ncid, x)))
+}
+
+impl Into<VariableType> for CompoundType {
+    fn into(self) -> VariableType {
+        VariableType::Compound(self)
+    }
+}
+impl Into<VariableType> for BasicType {
+    fn into(self) -> VariableType {
+        VariableType::Basic(self)
+    }
+}
+impl Into<VariableType> for EnumType {
+    fn into(self) -> VariableType {
+        VariableType::Enum(self)
+    }
 }

@@ -184,6 +184,14 @@ impl<'f> GroupMut<'f> {
         super::types::EnumType::add::<T>(self.id(), name, mappings)
     }
 
+    /// Build a compound type
+    pub fn add_compound_type(
+        &mut self,
+        name: &str,
+    ) -> error::Result<super::types::CompoundBuilder> {
+        super::types::CompoundType::add(self.id(), name)
+    }
+
     /// Add an attribute to the group
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where
