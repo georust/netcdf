@@ -118,6 +118,13 @@ impl<'f> Group<'f> {
     {
         groups_at_ncid(self.id()).unwrap()
     }
+
+    /// Return all types in this group
+    pub fn types(&self) -> impl Iterator<Item = super::types::VariableType> {
+        super::types::all_at_location(self.ncid)
+            .map(|x| x.map(|x| x.unwrap()))
+            .unwrap()
+    }
 }
 
 impl<'f> GroupMut<'f> {

@@ -199,6 +199,10 @@ impl File {
     pub fn groups<'f>(&'f self) -> error::Result<impl Iterator<Item = Group<'f>>> {
         super::group::groups_at_ncid(self.ncid())
     }
+    /// Return all types in the root group
+    pub fn types(&self) -> error::Result<impl Iterator<Item = super::types::VariableType>> {
+        super::types::all_at_location(self.ncid()).map(|x| x.map(|x| x.unwrap()))
+    }
 }
 
 /// Mutable access to file

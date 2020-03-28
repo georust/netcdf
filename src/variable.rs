@@ -5,6 +5,7 @@ use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
+use super::types::VariableType;
 #[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
 use netcdf_sys::*;
@@ -132,11 +133,9 @@ impl<'g> Variable<'g> {
     pub fn dimensions(&self) -> &[Dimension] {
         &self.dimensions
     }
-    /// Get the type of this variable. This will be an integer
-    /// such as `NC_FLOAT`, `NC_DOUBLE`, `NC_INT` from
-    /// the `netcdf-sys` crate
-    pub fn vartype(&self) -> nc_type {
-        self.vartype
+    /// Get the type of this variable
+    pub fn vartype(&self) -> VariableType {
+        VariableType::from_id(self.ncid, self.vartype).unwrap()
     }
     /// Get current length of the variable
     pub fn len(&self) -> usize {
