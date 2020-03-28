@@ -108,6 +108,64 @@ impl OpaqueType {
     }
 }
 
+/// Type of variable length
+#[derive(Debug, Clone)]
+pub struct VlenType {
+    ncid: nc_type,
+    id: nc_type,
+}
+
+
+impl VlenType {
+    /// Name of the type
+    pub fn name(&self) -> String {
+        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
+        error::checked(super::with_lock(|| unsafe {
+            nc_inq_vlen(
+                self.ncid,
+                self.id,
+                name.as_mut_ptr() as *mut _,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        }))
+        .unwrap();
+
+        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
+        String::from_utf8(name[..pos].to_vec()).unwrap()
+    }
+
+    pub(crate) fn add<T>(location: nc_type, name: &str) -> error::Result<Self> where T: super::Numeric {
+        let cname = super::utils::short_name_to_bytes(name)?;
+        let mut id = 0;
+        error::checked(super::with_lock(|| unsafe { nc_def_vlen(location, cname.as_ptr() as *const _, T::NCTYPE, &mut id) }))?;
+
+        Ok(Self {
+            ncid: location,
+            id,
+        })
+    }
+
+    /// Internal type
+    pub fn typ(&self) -> BasicType {
+        let mut bastyp = 0;
+        error::checked(super::with_lock(|| unsafe { nc_inq_vlen(self.ncid, self.id, std::ptr::null_mut(), std::ptr::null_mut(), &mut bastyp)})).unwrap();
+
+        match bastyp {
+            NC_BYTE => BasicType::Byte,
+            NC_UBYTE => BasicType::Ubyte,
+            NC_SHORT => BasicType::Short,
+            NC_USHORT => BasicType::Ushort,
+            NC_INT => BasicType::Int,
+            NC_UINT => BasicType::Uint,
+            NC_INT64 => BasicType::Int64,
+            NC_UINT64 => BasicType::Uint64,
+            NC_FLOAT => BasicType::Float,
+            NC_DOUBLE => BasicType::Double,
+            _ => panic!("Did not expect typeid {} in this context", bastyp),
+        }
+    }
+}
 
 
 /// Description of the variable
@@ -119,6 +177,8 @@ pub enum VariableType {
     String,
     /// Some bytes
     Opaque(OpaqueType),
+    /// Variable length array
+    Vlen(VlenType),
 }
 
 impl VariableType {

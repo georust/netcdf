@@ -90,3 +90,21 @@ fn add_opaque() {
     // let file = netcdf::open(&path).unwrap();
     // let var = file.typ("opa").unwrap();
 }
+
+#[test]
+fn add_vlen() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("test_add_vlen.nc");
+
+    {
+        let mut file = netcdf::create(&path).unwrap();
+
+        let typ = file.add_vlen_type::<u32>("v").unwrap();
+        assert_eq!(&typ.name(), "v");
+        assert!(typ.typ().is_u32());
+        let mut g = file.add_group("g").unwrap();
+        let typ = g.add_vlen_type::<i32>("w").unwrap();
+        assert_eq!(&typ.name(), "w");
+        assert!(&typ.typ().is_i32());
+    }
+}

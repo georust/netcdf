@@ -304,6 +304,11 @@ impl MutableFile {
     {
         super::types::OpaqueType::add(self.ncid(), name, size)
     }
+    /// Add a variable length datatype
+    pub fn add_vlen_type<'f, T: Numeric>(&'f mut self, name: &str) -> error::Result<super::types::VlenType>
+    {
+        super::types::VlenType::add::<T>(self.ncid(), name)
+    }
     /// Adds a variable with a basic type of string
     pub fn add_string_variable<'f>(
         &'f mut self,

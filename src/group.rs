@@ -164,6 +164,12 @@ impl<'f> GroupMut<'f> {
         super::types::OpaqueType::add(self.id(), name, size)
     }
 
+    /// Add a variable length datatype
+    pub fn add_vlen_type<T: Numeric>(&'f mut self, name: &str) -> error::Result<super::types::VlenType>
+    {
+        super::types::VlenType::add::<T>(self.id(), name)
+    }
+
     /// Add an attribute to the group
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where
