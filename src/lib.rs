@@ -64,6 +64,7 @@
 #![warn(missing_docs)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::missing_errors_doc)]
+#![allow(clippy::wildcard_imports)]
 
 use lazy_static::lazy_static;
 use netcdf_sys::nc_type;
@@ -74,6 +75,7 @@ pub mod dimension;
 pub mod error;
 pub mod file;
 pub mod group;
+pub mod types;
 pub mod variable;
 
 pub use attribute::*;
@@ -127,7 +129,7 @@ pub(crate) fn with_lock<F: FnMut() -> nc_type>(mut f: F) -> nc_type {
 }
 
 pub(crate) mod utils {
-    use super::*;
+    use super::error;
     use netcdf_sys::{NC_EMAXNAME, NC_MAX_NAME};
     /// Use this function for short netcdf names to avoid the allocation
     /// for a `CString`

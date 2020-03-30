@@ -5,6 +5,7 @@ use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
+use super::types::VariableType;
 #[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
 use netcdf_sys::*;
@@ -132,11 +133,9 @@ impl<'g> Variable<'g> {
     pub fn dimensions(&self) -> &[Dimension] {
         &self.dimensions
     }
-    /// Get the type of this variable. This will be an integer
-    /// such as `NC_FLOAT`, `NC_DOUBLE`, `NC_INT` from
-    /// the `netcdf-sys` crate
-    pub fn vartype(&self) -> nc_type {
-        self.vartype
+    /// Get the type of this variable
+    pub fn vartype(&self) -> VariableType {
+        VariableType::from_id(self.ncid, self.vartype).unwrap()
     }
     /// Get current length of the variable
     pub fn len(&self) -> usize {
@@ -919,6 +918,82 @@ impl<'g> Variable<'g> {
         unsafe { T::get_values_strided(self, indices, &slice_len, strides, buffer.as_mut_ptr())? };
         Ok(slice_len.iter().product())
     }
+
+    /// Get values of any type as bytes, with no further interpretation
+    /// of the values.
+    ///
+    /// # Note
+    ///
+    /// When working with compound types, variable length arrays and
+    /// strings will be allocated in `buf`, and this library will
+    /// not keep track of the allocations.
+    /// This can lead to memory leaks.
+    pub fn raw_values(
+        &self,
+        buf: &mut [u8],
+        start: &[usize],
+        count: &[usize],
+    ) -> error::Result<()> {
+        let typ = self.vartype();
+        match typ {
+            super::types::VariableType::String | super::types::VariableType::Vlen(_) => {
+                return Err(error::Error::TypeMismatch)
+            }
+            _ => (),
+        }
+        self.check_indices(start, false)?;
+        self.check_sizelen(buf.len() / typ.size(), start, count, false)?;
+
+        error::checked(super::with_lock(|| unsafe {
+            nc_get_vara(
+                self.ncid,
+                self.varid,
+                start.as_ptr(),
+                count.as_ptr(),
+                buf.as_mut_ptr() as *mut _,
+            )
+        }))
+    }
+
+    /// Get a vlen element
+    pub fn vlen<T: Numeric>(&self, index: &[usize]) -> error::Result<Vec<T>> {
+        if let super::types::VariableType::Vlen(v) = self.vartype() {
+            if v.typ().id() != T::NCTYPE {
+                return Err(error::Error::TypeMismatch);
+            }
+        } else {
+            return Err(error::Error::TypeMismatch);
+        };
+
+        self.check_indices(index, false)?;
+
+        let mut vlen = nc_vlen_t {
+            len: 0,
+            p: std::ptr::null_mut(),
+        };
+
+        let count = index.iter().map(|_| 1).collect::<Vec<usize>>();
+
+        error::checked(super::with_lock(|| unsafe {
+            nc_get_vara(
+                self.ncid,
+                self.varid,
+                index.as_ptr(),
+                count.as_ptr(),
+                &mut vlen as *mut _ as *mut _,
+            )
+        }))?;
+
+        let mut v = Vec::<T>::with_capacity(vlen.len);
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(vlen.p as *const T, v.as_mut_ptr(), vlen.len);
+            v.set_len(vlen.len);
+        }
+        error::checked(super::with_lock(|| unsafe { nc_free_vlen(&mut vlen) })).unwrap();
+
+        Ok(v)
+    }
 }
 
 impl<'g> VariableMut<'g> {
@@ -1128,6 +1203,73 @@ impl<'g> VariableMut<'g> {
             }))?;
         }
         Ok(())
+    }
+
+    /// Get values of any type as bytes
+    ///
+    /// # Safety
+    ///
+    /// When working with compound types, variable length arrays and
+    /// strings create pointers from the buffer, and tries to copy
+    /// memory from these locations. Compound types which does not
+    /// have these elements will be safe to access, and can treat
+    /// this function as safe
+    pub unsafe fn put_raw_values(
+        &mut self,
+        buf: &[u8],
+        start: &[usize],
+        count: &[usize],
+    ) -> error::Result<()> {
+        let typ = self.vartype();
+        match typ {
+            super::types::VariableType::String | super::types::VariableType::Vlen(_) => {
+                return Err(error::Error::TypeMismatch)
+            }
+            _ => (),
+        }
+        self.check_indices(start, true)?;
+        self.check_sizelen(buf.len() / typ.size(), start, count, true)?;
+
+        #[allow(unused_unsafe)]
+        error::checked(super::with_lock(|| unsafe {
+            nc_put_vara(
+                self.ncid,
+                self.varid,
+                start.as_ptr(),
+                count.as_ptr(),
+                buf.as_ptr() as *const _,
+            )
+        }))
+    }
+
+    /// Get a vlen element
+    pub fn put_vlen<T: Numeric>(&mut self, vec: &[T], index: &[usize]) -> error::Result<()> {
+        if let super::types::VariableType::Vlen(v) = self.vartype() {
+            if v.typ().id() != T::NCTYPE {
+                return Err(error::Error::TypeMismatch);
+            }
+        } else {
+            return Err(error::Error::TypeMismatch);
+        };
+
+        self.check_indices(index, true)?;
+
+        let vlen = nc_vlen_t {
+            len: vec.len(),
+            p: vec.as_ptr() as *const _ as *mut _,
+        };
+
+        let count = index.iter().map(|_| 1).collect::<Vec<usize>>();
+
+        error::checked(super::with_lock(|| unsafe {
+            nc_put_vara(
+                self.ncid,
+                self.varid,
+                index.as_ptr(),
+                count.as_ptr(),
+                &vlen as *const _ as *const _,
+            )
+        }))
     }
 }
 

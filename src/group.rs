@@ -118,6 +118,13 @@ impl<'f> Group<'f> {
     {
         groups_at_ncid(self.id()).unwrap()
     }
+
+    /// Return all types in this group
+    pub fn types(&self) -> impl Iterator<Item = super::types::VariableType> {
+        super::types::all_at_location(self.ncid)
+            .map(|x| x.map(Result::unwrap))
+            .unwrap()
+    }
 }
 
 impl<'f> GroupMut<'f> {
@@ -149,6 +156,40 @@ impl<'f> GroupMut<'f> {
         'f: 'g,
     {
         self.groups().map(|g| GroupMut(g, PhantomData))
+    }
+
+    /// Add an opaque datatype, with `size` bytes
+    pub fn add_opaque_type(
+        &'f mut self,
+        name: &str,
+        size: usize,
+    ) -> error::Result<super::types::OpaqueType> {
+        super::types::OpaqueType::add(self.id(), name, size)
+    }
+
+    /// Add a variable length datatype
+    pub fn add_vlen_type<T: Numeric>(
+        &'f mut self,
+        name: &str,
+    ) -> error::Result<super::types::VlenType> {
+        super::types::VlenType::add::<T>(self.id(), name)
+    }
+
+    /// Add an enum datatype
+    pub fn add_enum_type<T: Numeric>(
+        &'f mut self,
+        name: &str,
+        mappings: &[(&str, T)],
+    ) -> error::Result<super::types::EnumType> {
+        super::types::EnumType::add::<T>(self.id(), name, mappings)
+    }
+
+    /// Build a compound type
+    pub fn add_compound_type(
+        &mut self,
+        name: &str,
+    ) -> error::Result<super::types::CompoundBuilder> {
+        super::types::CompoundType::add(self.id(), name)
     }
 
     /// Add an attribute to the group
@@ -229,6 +270,16 @@ impl<'f> GroupMut<'f> {
         T: Numeric,
     {
         super::variable::add_variable_from_identifiers(self.id(), name, dims, T::NCTYPE)
+    }
+
+    /// Create a variable with the specified type
+    pub fn add_variable_with_type(
+        &'f mut self,
+        name: &str,
+        dims: &[&str],
+        typ: &super::types::VariableType,
+    ) -> error::Result<VariableMut<'f>> {
+        VariableMut::add_from_str(self.id(), typ.id(), name, dims)
     }
 }
 

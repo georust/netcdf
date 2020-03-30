@@ -23,15 +23,13 @@ Supported:
 * Reading from memory (read only for now)
 * Unlimited dimensions
 * string variables
-
+* user defined types (variable length, enum, compound, opaque)
 
 Not (yet) supported:
 
-* user defined types
-* enum types
+* some exotic user defined types
 
-All variable data is read into a 1-dimensional buffer, with the resulting layout with the last variable varying the fastest.
-The data can also be read into an [ndarray](https://github.com/rust-ndarray/rust-ndarray).
+All variable data is read into a contiguous buffer, or inta an [ndarray](https://github.com/rust-ndarray/rust-ndarray) if the `ndarray` feature is activated.
 
 ## Building
 
