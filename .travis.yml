@@ -33,7 +33,7 @@ addons:
 before_script:
   - export PATH=$HOME/.cargo/bin:$PATH
   - cargo install cargo-update || echo "cargo-update already installed"
-  - cargo install cargo-travis || echo "cargo-travis already installed"
+  - cargo install --git https://github.com/roblabla/cargo-travis --branch cargo-metadata || echo "cargo-travis already installed"
   - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo +stable install cargo-tarpaulin || true
   - cargo install-update -a # update outdated cached binaries
   - rustup component add clippy
