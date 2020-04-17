@@ -5,8 +5,23 @@ authors = ["Magnus Ulimoen <magnusu@met.no>"]
 edition = "2018"
 description = "Build scripts for building `netCDF` from source"
 build = "build.rs"
+repository = "https://github.com/georust/netcdf"
 license-file = "source/COPYRIGHT"
 links = "netcdfsrc"
+exclude = [
+    "source/unit_test/**",
+    "source/NUG/**",
+    "source/dap4_test/**",
+    "source/examples/**",
+    "source/nc_test/**",
+    "source/h5_test/**",
+    "source/nc_perf/**",
+    "source/ncdump/**",
+    "source/hdf4_test/**",
+    "source/ncgen/**",
+    "source/ncgen3/**",
+    "source/nctest/**",
+]
 
 [features]
 dap = []
