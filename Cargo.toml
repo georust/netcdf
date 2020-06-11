@@ -1,6 +1,6 @@
 [package]
 name = "netcdf"
-version = "0.4.1"
+version = "0.4.2"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -12,6 +12,7 @@ documentation = "https://docs.rs/crate/netcdf"
 keywords = ["netcdf", "hdf", "hdf5", "libnetcdf", "netcdf4"]
 edition = "2018"
 readme = "README.md"
+exclude = ["examples/**", "tests/**"]
 
 [features]
 default = ["ndarray"]

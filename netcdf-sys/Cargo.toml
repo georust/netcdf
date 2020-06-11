@@ -1,6 +1,6 @@
 [package]
 name = "netcdf-sys"
-version = "0.2.1"
+version = "0.2.2"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -13,6 +13,7 @@ keywords = ["netcdf", "hdf", "hdf5", "cdm", "ffi"]
 edition = "2018"
 links = "netcdf"
 build = "build.rs"
+exclude = ["testdata/**"]
 
 [dev-dependencies]
 lazy_static = "1.4.0"
