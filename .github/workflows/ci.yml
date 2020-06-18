@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches:
+    - master
+  schedule:
+  - cron: '0 0 15 * *'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Install rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        profile: minimal
+        components: rustfmt, clippy
+    - name: Check formatting
+      run: cargo fmt -- --check
+    - name: Documentation
+      run: cargo doc --workspace
+    - name: Clippy
+      run: cargo clippy --workspace -- -D warnings
+
+  test:
+    name: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build:
+        - stable
+        - beta
+        - nightly
+        include:
+        - build: stable
+          os: ubuntu-18.04
+          rust: stable
+        - build: beta
+          os: ubuntu-18.04
+          rust: beta
+        - build: nightly
+          os: ubuntu-18.04
+          rust: nightly
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install netcdf
+      run: sudo apt-get install libnetcdf-dev
+
+    - name: Install rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+        profile: minimal
+        override: true
+
+    - name: Build
+      run: cargo build --verbose --workspace
+
+    - name: Test
+      run: cargo test --verbose --workspace
+      if: matrix.os == 'ubuntu-18.04'
+
+  tarpaulin:
+    name: tarpaulin
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Install netcdf
+      run: sudo apt-get install libnetcdf-dev
+    - name: Install rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+    - name: Install tarpaulin
+      uses: actions-rs/install@v0.1
+      with:
+        crate: cargo-tarpaulin
+        version: latest
+        use-tool-cache: true
+
+    - name: Tarpaulin
+      run: cargo tarpaulin --verbose --out Xml --ignore-tests
+
+    - name: Upload to codecov
+      uses: codecov/codecov-action@v1.0.2
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
