@@ -1,13 +1,12 @@
 # netcdf
 
 [![Docs](https://docs.rs/netcdf/badge.svg)](https://docs.rs/netcdf)
-[![Build Status](https://travis-ci.org/georust/netcdf.svg?branch=master)](https://travis-ci.org/georust/netcdf)
+![Build Status](https://github.com/georust/netcdf/workflows/CI/badge.svg)
 [![Crates.io](https://img.shields.io/crates/d/netcdf.svg)](https://crates.io/crates/netcdf)
 [![](http://meritbadge.herokuapp.com/netcdf)](https://crates.io/crates/netcdf)
-[![Coverage Status](https://coveralls.io/repos/github/georust/netcdf/badge.svg?branch=master)](https://coveralls.io/github/georust/netcdf?branch=master)
 [![codecov](https://codecov.io/gh/georust/netcdf/branch/master/graph/badge.svg)](https://codecov.io/gh/georust/netcdf)
 ![Crates.io](https://img.shields.io/crates/l/netcdf)
-[![dependency status](https://deps.rs/repo/github/georust/netcdf/status.svg)](https://deps.rs/repo/github/georust/netcdf)
+<!-- [![dependency status](https://deps.rs/repo/github/georust/netcdf/status.svg)](https://deps.rs/repo/github/georust/netcdf) -->
 
 Medium-level [netCDF](http://www.unidata.ucar.edu/software/netcdf/) bindings for Rust, allowing easy reading and writing of array-like structures to a file.
 
