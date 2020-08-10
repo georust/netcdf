@@ -33,7 +33,3 @@ members = [
     "netcdf-sys",
     "netcdf-src",
 ]
-
-[patch]
-[patch.crates-io]
-hdf5-sys = { git = "https://github.com/magnusuMET/hdf5-rust", branch = "feature/static_build" }

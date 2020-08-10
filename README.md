@@ -9,6 +9,7 @@
 <!-- [![dependency status](https://deps.rs/repo/github/georust/netcdf/status.svg)](https://deps.rs/repo/github/georust/netcdf) -->
 
 Medium-level [netCDF](http://www.unidata.ucar.edu/software/netcdf/) bindings for Rust, allowing easy reading and writing of array-like structures to a file.
+netCDF can read and write `hdf5` files, which is a commonly used file format in scientific computing.
 
 ## Status
 
@@ -32,14 +33,10 @@ All variable data is read into a contiguous buffer, or inta an [ndarray](https:/
 
 ## Building
 
-This crate depends on libnetcdf. The Travis build runs on Ubuntu 16.04 Xenial and installs libnetcdf via apt, which results in netcdf v.4.4.0. netcdf is not widely tested on other versions of netcdf.
+This crate depends on `libnetcdf`, but a static build from source is also supported, which can be enabled using the `static` feature.
 
-You can build the library and run the tests via Docker like this:
+The crate is built on several platforms using github actions.
 
-```
-docker build . -t netcdf
-docker run -it --rm netcdf
-```
 
 ## Documentation
 

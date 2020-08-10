@@ -27,7 +27,7 @@ exclude = [
 dap = []
 
 [dependencies]
-hdf5-sys = { version = "*", features=["hl", "deprecated", "zlib"] }
+hdf5-sys = { version = "0.7.0", features = ["hl", "deprecated", "zlib"] }
 
 [build-dependencies]
-cmake = "0.1.42"
+cmake = "0.1.44"

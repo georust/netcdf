@@ -13,6 +13,7 @@ keywords = ["netcdf", "hdf", "hdf5", "cdm", "ffi"]
 edition = "2018"
 links = "netcdf"
 build = "build.rs"
+readme = "README.md"
 exclude = [
     "testdata/**",
     "source/conda.recipe/**",
@@ -36,7 +37,7 @@ exclude = [
 [dependencies]
 libz-sys = { version = "1.0.25" }
 curl-sys = { version = "0.4.25", optional = true }
-hdf5-sys = { version = "0.6.0", features = ["hl", "deprecated", "zlib"] }
+hdf5-sys = { version = "0.7.0" }
 netcdf-src = { path = "../netcdf-src", version = "0.1.0", optional = true }
 
 [dev-dependencies]
@@ -45,6 +46,6 @@ lazy_static = "1.4.0"
 [features]
 default = []
 memio = []
-static = ["libz-sys/static", "hdf5-sys/static", "netcdf-src"]
+static = ["libz-sys/static", "hdf5-sys/static", "hdf5-sys/hl", "hdf5-sys/deprecated", "hdf5-sys/zlib", "netcdf-src"]
 # TODO: Link static curl (but only when using "dap") "curl-sys/static-curl", "curl-sys/static-ssl"
 dap = ["curl-sys"]
