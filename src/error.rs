@@ -52,11 +52,7 @@ impl Error {
     /// Was the error due to ambiguity of the
     /// indices or lengths?
     pub fn is_ambigous(&self) -> bool {
-        if let Self::Ambiguous = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Ambiguous)
     }
 }
 

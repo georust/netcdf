@@ -13,12 +13,10 @@ pub struct nc_vlen_t {
 }
 
 pub type nclong = c_int;
-#[link(name = "netcdf")]
 extern "C" {
     pub static mut ncerr: c_int;
     pub static mut ncopts: c_int;
 }
-#[link(name = "netcdf")]
 extern "C" {
     pub fn nc_inq_libvers() -> *const c_char;
     pub fn nc_strerror(ncerr: c_int) -> *const c_char;

@@ -63,7 +63,9 @@ fn find_variable() {
     assert!(group.variable("vvvvv").is_none());
 
     for mut var in group.variables_mut() {
-        var.compression(3).unwrap();
+        if var.dimensions().len() > 0 {
+            var.compression(3).unwrap();
+        }
         if var.name() == "z" {
             var.chunking(&[1]).unwrap();
         } else {

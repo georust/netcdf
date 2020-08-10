@@ -18,6 +18,9 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
+      with: {submodules: true}
+    - name: Install netCDF
+      run: sudo apt-get install libnetcdf-dev
     - name: Install rust
       uses: actions-rs/toolchain@v1
       with:
@@ -28,13 +31,13 @@ jobs:
     - name: Check formatting
       run: cargo fmt -- --check
     - name: Documentation
-      run: cargo doc --workspace
+      run: cargo doc --workspace --exclude netcdf-src
     - name: Clippy
-      run: cargo clippy --workspace -- -D warnings
+      run: cargo clippy --workspace --exclude netcdf-src -- -D warnings
 
-  test:
-    name: test
-    runs-on: ${{ matrix.os }}
+  test_apt:
+    name: test apt
+    runs-on: ubuntu-18.04
     strategy:
       matrix:
         build:
@@ -43,17 +46,15 @@ jobs:
         - nightly
         include:
         - build: stable
-          os: ubuntu-18.04
           rust: stable
         - build: beta
-          os: ubuntu-18.04
           rust: beta
         - build: nightly
-          os: ubuntu-18.04
           rust: nightly
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
+      with: {submodules: false}
 
     - name: Install netcdf
       run: sudo apt-get install libnetcdf-dev
@@ -66,37 +67,63 @@ jobs:
         override: true
 
     - name: Build
-      run: cargo build --verbose --workspace
+      run: cargo build --verbose --workspace --exclude netcdf-src
 
     - name: Test
-      run: cargo test --verbose --workspace
+      run: cargo test --verbose --workspace --exclude netcdf-src
       if: matrix.os == 'ubuntu-18.04'
 
-  tarpaulin:
-    name: tarpaulin
-    runs-on: ubuntu-18.04
+  conda:
+    name: conda
+    runs-on: ${{matrix.os}}-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu, channel: conda-forge, rust: stable}
+          - {os: windows, channel: conda-forge, rust: stable}
+          - {os: macos, channel: conda-forge, rust: stable}
+    defaults:
+      run:
+        shell: bash -l {0}
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-    - name: Install netcdf
-      run: sudo apt-get install libnetcdf-dev
-    - name: Install rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
-    - name: Install tarpaulin
-      uses: actions-rs/install@v0.1
-      with:
-        crate: cargo-tarpaulin
-        version: latest
-        use-tool-cache: true
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with: {submodules: true}
+      - name: Install Rust (${{matrix.rust}})
+        uses: actions-rs/toolchain@v1
+        with: {toolchain: '${{matrix.rust}}', profile: minimal, override: true}
+      - name: Install conda
+        uses: goanpeca/setup-miniconda@v1
+        with: {auto-update-conda: false, activate-environment: testenv}
+      - name: Install netCDF
+        run: conda install -y -c ${{matrix.channel}} libnetcdf=4.7.4
+      - name: Build and test
+        run: |
+          export HDF5_DIR="$CONDA_PREFIX"
+          [ "${{runner.os}}" != "Windows" ] && export RUSTFLAGS="-C link-args=-Wl,-rpath,$CONDA_PREFIX/lib"
+          cargo test -vv --workspace --exclude netcdf-src
 
-    - name: Tarpaulin
-      run: cargo tarpaulin --verbose --out Xml --ignore-tests
-
-    - name: Upload to codecov
-      uses: codecov/codecov-action@v1.0.2
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
+  static_builds:
+    name: static builds
+    runs-on: ${{matrix.os}}-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu, rust: stable}
+          - {os: windows, rust: stable-msvc}
+          - {os: windows, rust: stable-gnu}
+          - {os: macos, rust: stable}
+    defaults:
+      run:
+          shell: bash -l {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with: {submodules: true}
+      - name: Install Rust (${{matrix.rust}})
+        uses: actions-rs/toolchain@v1
+        with: {toolchain: '${{matrix.rust}}', profile: minimal, override: true}
+      - name: Build and test
+        run: cargo test -vv --workspace --features static
