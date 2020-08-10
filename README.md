@@ -35,7 +35,7 @@ All variable data is read into a contiguous buffer, or inta an [ndarray](https:/
 
 This crate depends on `libnetcdf`, but a static build from source is also supported, which can be enabled using the `static` feature.
 
-The crate is built on several platforms using github actions.
+The crate is built on several platforms using github actions, and is currently known to build form from source on all major platforms (linux, macos, windows (gnu+msvc)), and through the package installers `conda` and `apt`.
 
 
 ## Documentation

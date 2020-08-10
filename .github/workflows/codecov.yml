@@ -1,0 +1,34 @@
+name: codecov
+on: [push]
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  tarpaulin:
+    name: tarpaulin
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Install netcdf
+      run: sudo apt-get install libnetcdf-dev
+    - name: Install rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+    - name: Install tarpaulin
+      uses: actions-rs/install@v0.1
+      with:
+        crate: cargo-tarpaulin
+        version: latest
+        use-tool-cache: true
+
+    - name: Tarpaulin
+      run: cargo tarpaulin --verbose --out Xml --ignore-tests
+
+    - name: Upload to codecov
+      uses: codecov/codecov-action@v1.0.2
+      with:
+          token: ${{ secrets.CODECOV_TOKEN }}
