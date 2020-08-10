@@ -31,9 +31,9 @@ jobs:
     - name: Check formatting
       run: cargo fmt -- --check
     - name: Documentation
-      run: cargo doc --workspace --exclude netcdf-src
+      run: cargo doc
     - name: Clippy
-      run: cargo clippy --workspace --exclude netcdf-src -- -D warnings
+      run: cargo clippy -- -D warnings
 
   test_apt:
     name: test apt
@@ -67,11 +67,10 @@ jobs:
         override: true
 
     - name: Build
-      run: cargo build --verbose --workspace --exclude netcdf-src
+      run: cargo build --verbose
 
     - name: Test
-      run: cargo test --verbose --workspace --exclude netcdf-src
-      if: matrix.os == 'ubuntu-18.04'
+      run: cargo test --verbose
 
   conda:
     name: conda
@@ -102,7 +101,7 @@ jobs:
         run: |
           export HDF5_DIR="$CONDA_PREFIX"
           [ "${{runner.os}}" != "Windows" ] && export RUSTFLAGS="-C link-args=-Wl,-rpath,$CONDA_PREFIX/lib"
-          cargo test -vv --workspace --exclude netcdf-src
+          cargo test -vv
 
   static_builds:
     name: static builds
@@ -126,4 +125,4 @@ jobs:
         uses: actions-rs/toolchain@v1
         with: {toolchain: '${{matrix.rust}}', profile: minimal, override: true}
       - name: Build and test
-        run: cargo test -vv --workspace --features static
+        run: cargo test -vv --features static
