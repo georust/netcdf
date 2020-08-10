@@ -1,6 +1,6 @@
 [package]
 name = "netcdf-sys"
-version = "0.3.0"
+version = "0.3.1"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -49,3 +49,6 @@ memio = []
 static = ["libz-sys/static", "hdf5-sys/static", "hdf5-sys/hl", "hdf5-sys/deprecated", "hdf5-sys/zlib", "netcdf-src"]
 # TODO: Link static curl (but only when using "dap") "curl-sys/static-curl", "curl-sys/static-ssl"
 dap = ["curl-sys"]
+
+[package.metadata.docs.rs]
+features = ["static"]
