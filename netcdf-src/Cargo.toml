@@ -21,6 +21,7 @@ exclude = [
     "source/ncgen/**",
     "source/ncgen3/**",
     "source/nctest/**",
+    "source/ncdap_test/**",
 ]
 
 [features]

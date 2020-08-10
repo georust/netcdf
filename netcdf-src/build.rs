@@ -29,6 +29,7 @@ fn main() {
         .define("HDF5_INCLUDE_DIR", hdf5_incdir)
         //
         .define("ENABLE_DAP", "OFF") // TODO: feature flag, requires curl
+        .define("ENABLE_DAP_REMOTE_TESTS", "OFF")
         //
         .profile("RelWithDebInfo"); // TODO: detect opt-level
 
