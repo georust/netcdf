@@ -721,10 +721,7 @@ impl VariableType {
 #[allow(missing_docs)]
 impl VariableType {
     pub fn is_string(&self) -> bool {
-        match self {
-            Self::String => true,
-            _ => false,
-        }
+        matches!(self, Self::String)
     }
     pub fn is_i8(&self) -> bool {
         self.as_basic().map_or(false, BasicType::is_i8)
