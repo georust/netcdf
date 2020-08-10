@@ -34,3 +34,4 @@ members = [
     "netcdf-sys",
     "netcdf-src",
 ]
+default-members = [".", "netcdf-sys"]
