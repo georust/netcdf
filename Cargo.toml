@@ -1,6 +1,6 @@
 [package]
 name = "netcdf"
-version = "0.5.0"
+version = "0.5.1"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -35,3 +35,6 @@ members = [
     "netcdf-src",
 ]
 default-members = [".", "netcdf-sys"]
+
+[package.metadata.docs.rs]
+features = ["static"]

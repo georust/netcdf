@@ -1,3 +1,4 @@
 [submodule "netcdf-sys/source"]
 	path = netcdf-src/source
-	url = https://github.com/Unidata/netcdf-c.git
+	url = https://github.com/magnusuMET/netcdf-c.git
+        branch = bugfix/v4.7.4-build_patched
