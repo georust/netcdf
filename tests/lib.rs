@@ -1550,7 +1550,7 @@ fn open_to_find_unlim_dim() {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn invalid_utf8_as_path() {
     let d = tempfile::tempdir().unwrap();
 
