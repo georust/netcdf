@@ -42,7 +42,7 @@ fn root_dims() {
     let f = test_location().join("simple_xy.nc");
 
     let file = netcdf::open(&f).unwrap();
-    assert_eq!(f.to_str().unwrap(), file.path().unwrap());
+    assert_eq!(f, file.path().unwrap());
 
     assert_eq!(file.dimension("x").unwrap().len(), 6);
     assert_eq!(file.dimension("y").unwrap().len(), 12);
@@ -315,7 +315,7 @@ fn create() {
     let f = d.path().join("create.nc");
 
     let file = netcdf::create(&f).unwrap();
-    assert_eq!(f.to_str().unwrap(), file.path().unwrap());
+    assert_eq!(f, file.path().unwrap());
 }
 
 #[test]
@@ -1547,4 +1547,21 @@ fn open_to_find_unlim_dim() {
     let dim = &var.dimensions()[0];
     assert_eq!(dim.len(), 6);
     assert!(dim.is_unlimited());
+}
+
+#[test]
+#[cfg(all(unix, not(target_os = "macos")))]
+fn invalid_utf8_as_path() {
+    let d = tempfile::tempdir().unwrap();
+
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+    let bytes = b"\xff\xff.nc";
+    let path = OsStr::from_bytes(&bytes[..]);
+    let path = std::path::PathBuf::from(path);
+    let fullpath = d.path().join(&path);
+    let file = netcdf::create(&fullpath).unwrap();
+
+    let retrieved_path = file.path().unwrap();
+    assert_eq!(fullpath, retrieved_path);
 }

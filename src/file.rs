@@ -7,7 +7,6 @@ use super::error;
 use super::group::{Group, GroupMut};
 use super::variable::{Numeric, Variable, VariableMut};
 use netcdf_sys::*;
-use std::ffi::CString;
 use std::marker::PhantomData;
 use std::path;
 
@@ -25,6 +24,23 @@ impl Drop for RawFile {
     }
 }
 
+#[cfg(unix)]
+fn get_ffi_from_path(path: &path::Path) -> Vec<u8> {
+    use std::os::unix::ffi::OsStrExt;
+    let mut bytes = path
+        .as_os_str()
+        .as_bytes()
+        .iter()
+        .copied()
+        .collect::<Vec<u8>>();
+    bytes.push(0);
+    bytes
+}
+#[cfg(not(unix))]
+fn get_ffi_from_path(path: &path::Path) -> std::ffi::CString {
+    std::ffi::CString::new(path.to_str().unwrap()).unwrap()
+}
+
 impl RawFile {
     /// Open a `netCDF` file in read only mode.
     ///
@@ -32,11 +48,11 @@ impl RawFile {
     /// a generic `Path` object, and ensure read-only on
     /// the `File`
     pub(crate) fn open(path: &path::Path) -> error::Result<File> {
-        let f = CString::new(path.to_str().unwrap()).unwrap();
+        let f = get_ffi_from_path(path);
         let mut ncid: nc_type = 0;
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid)
+                nc_open(f.as_ptr().cast(), NC_NOWRITE, &mut ncid)
             }))?;
         }
         Ok(File(Self { ncid }))
@@ -46,11 +62,11 @@ impl RawFile {
     /// Open a netCDF file in append mode (read/write).
     /// The file must already exist.
     pub(crate) fn append(path: &path::Path) -> error::Result<MutableFile> {
-        let f = CString::new(path.to_str().unwrap()).unwrap();
+        let f = get_ffi_from_path(path);
         let mut ncid: nc_type = -1;
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_open(f.as_ptr(), NC_WRITE, &mut ncid)
+                nc_open(f.as_ptr().cast(), NC_WRITE, &mut ncid)
             }))?;
         }
 
@@ -61,11 +77,11 @@ impl RawFile {
     ///
     /// Will overwrite existing file if any
     pub(crate) fn create(path: &path::Path) -> error::Result<MutableFile> {
-        let f = CString::new(path.to_str().unwrap()).unwrap();
+        let f = get_ffi_from_path(path);
         let mut ncid: nc_type = -1;
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_create(f.as_ptr(), NC_NETCDF4 | NC_CLOBBER, &mut ncid)
+                nc_create(f.as_ptr().cast(), NC_NETCDF4 | NC_CLOBBER, &mut ncid)
             }))?;
         }
 
@@ -107,8 +123,8 @@ impl File {
     ///
     /// Netcdf layer could fail, or the resulting path
     /// could contain an invalid UTF8 sequence
-    pub fn path(&self) -> error::Result<String> {
-        let name = {
+    pub fn path(&self) -> error::Result<std::path::PathBuf> {
+        let name: Vec<u8> = {
             let mut pathlen = 0;
             unsafe {
                 error::checked(super::with_lock(|| {
@@ -129,7 +145,16 @@ impl File {
             name
         };
 
-        Ok(String::from_utf8(name)?)
+        #[cfg(not(unix))]
+        {
+            Ok(std::path::PathBuf::from(String::from_utf8(name)?))
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            let osstr = std::ffi::OsStr::from_bytes(&name);
+            Ok(std::path::PathBuf::from(osstr))
+        }
     }
 
     /// Main entrypoint for interacting with the netcdf file.
