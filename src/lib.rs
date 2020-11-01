@@ -94,6 +94,16 @@ where
     RawFile::create(name.as_ref())
 }
 
+/// Open a netcdf file in create mode with classic model
+///
+/// Will overwrite exising file
+pub fn create_classic<P>(name: P) -> error::Result<MutableFile>
+where
+    P: AsRef<std::path::Path>,
+{
+    RawFile::create_classic(name.as_ref())
+}
+
 /// Open a netcdf file in append mode
 pub fn append<P>(name: P) -> error::Result<MutableFile>
 where

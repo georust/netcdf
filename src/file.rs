@@ -88,6 +88,22 @@ impl RawFile {
         Ok(MutableFile(File(Self { ncid })))
     }
 
+    pub(crate) fn create_classic(path: &path::Path) -> error::Result<MutableFile> {
+        let f = get_ffi_from_path(path);
+        let mut ncid: nc_type = -1;
+        unsafe {
+            error::checked(super::with_lock(|| {
+                nc_create(
+                    f.as_ptr().cast(),
+                    NC_NETCDF4 | NC_CLOBBER | NC_CLASSIC_MODEL,
+                    &mut ncid,
+                )
+            }))?;
+        }
+
+        Ok(MutableFile(File(Self { ncid })))
+    }
+
     #[cfg(feature = "memory")]
     pub(crate) fn open_from_memory<'buffer>(
         name: Option<&str>,
