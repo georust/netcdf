@@ -7,7 +7,7 @@
 //! ```no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Open file simple_xy.nc:
-//! let file = netcdf::open("simle_xy.nc")?;
+//! let file = netcdf::open("simple_xy.nc")?;
 //!
 //! // Access any variable, attribute, or dimension through lookups on hashmaps
 //! let var = &file.variable("data").expect("Could not find variable 'data'");
@@ -47,7 +47,7 @@
 //! Append:
 //! ```no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // You can also modify a Variable inside an existing netCDF file
+//! // You can also modify a Variable inside an existing `netCDF` file
 //! // open it in read/write mode
 //! let mut file = netcdf::append("crabs2.nc")?;
 //! // get a mutable binding of the variable "crab_coolness_level"
@@ -86,38 +86,62 @@ pub use variable::*;
 
 /// Open a netcdf file in create mode
 ///
-/// Will overwrite exising file
+/// Will create a `netCDF4` file and overwrite existing file
 pub fn create<P>(name: P) -> error::Result<MutableFile>
 where
     P: AsRef<std::path::Path>,
 {
-    RawFile::create(name.as_ref())
+    RawFile::create_with(name.as_ref(), Options::NETCDF4)
 }
 
-/// Open a netcdf file in append mode
+/// Open a `netCDF` file in create mode with the given options
+pub fn create_with<P>(name: P, options: Options) -> error::Result<MutableFile>
+where
+    P: AsRef<std::path::Path>,
+{
+    RawFile::create_with(name.as_ref(), options)
+}
+
+/// Open a `netCDF` file in append mode
 pub fn append<P>(name: P) -> error::Result<MutableFile>
 where
     P: AsRef<std::path::Path>,
 {
-    RawFile::append(name.as_ref())
+    append_with(name, Options::default())
 }
 
-/// Open a netcdf file in read mode
+/// Open a `netCDF` file in append mode with the given options
+pub fn append_with<P>(name: P, options: Options) -> error::Result<MutableFile>
+where
+    P: AsRef<std::path::Path>,
+{
+    RawFile::append_with(name.as_ref(), options)
+}
+
+/// Open a `netCDF` file in read mode
 pub fn open<P>(name: P) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
 {
-    RawFile::open(name.as_ref())
+    open_with(name, Options::default())
+}
+
+/// Open a `netCDF` file in read mode
+pub fn open_with<P>(name: P, options: Options) -> error::Result<File>
+where
+    P: AsRef<std::path::Path>,
+{
+    RawFile::open_with(name.as_ref(), options)
 }
 
 #[cfg(feature = "memory")]
-/// Open a netcdf file from a buffer
+/// Open a `netCDF` file from a buffer
 pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<MemFile<'a>> {
     RawFile::open_from_memory(name, mem)
 }
 
 lazy_static! {
-    /// Use this when accessing netcdf functions
+    /// Use this when accessing `netCDF` functions
     pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());
 }
 
@@ -131,7 +155,7 @@ pub(crate) fn with_lock<F: FnMut() -> nc_type>(mut f: F) -> nc_type {
 pub(crate) mod utils {
     use super::error;
     use netcdf_sys::{NC_EMAXNAME, NC_MAX_NAME};
-    /// Use this function for short netcdf names to avoid the allocation
+    /// Use this function for short `netCDF` names to avoid the allocation
     /// for a `CString`
     pub(crate) fn short_name_to_bytes(name: &str) -> error::Result<[u8; NC_MAX_NAME as usize + 1]> {
         if name.len() > NC_MAX_NAME as _ {

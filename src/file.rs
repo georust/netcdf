@@ -41,47 +41,57 @@ fn get_ffi_from_path(path: &path::Path) -> std::ffi::CString {
     std::ffi::CString::new(path.to_str().unwrap()).unwrap()
 }
 
+bitflags::bitflags! {
+    /// Options for opening, creating, and appending files
+    #[derive(Default)]
+    pub struct Options: nc_type {
+        /// Open with write permissions (use `append` for a mutable file)
+        const WRITE = NC_WRITE;
+        /// Overwrite existing file
+        const NOCLOBBER = NC_NOCLOBBER;
+        /// Reads file into memory
+        const DISKLESS = NC_DISKLESS;
+        /// Use 64 bit dimensions and sizes (`CDF-5` format)
+        const _64BIT_DATA = NC_64BIT_DATA;
+        /// Use 64 bit file offsets
+        const _64BIT_OFFSET = NC_64BIT_OFFSET;
+        /// Use a subset compatible with older software
+        const CLASSIC = NC_CLASSIC_MODEL;
+        /// Limits internal caching
+        const SHARE = NC_SHARE;
+        /// Use the `hdf5` storage format
+        const NETCDF4 = NC_NETCDF4;
+        /// Read from memory
+        const INMEMORY = NC_INMEMORY;
+    }
+}
+
 impl RawFile {
     /// Open a `netCDF` file in read only mode.
-    ///
-    /// Consider using [`netcdf::open`] instead to open with
-    /// a generic `Path` object, and ensure read-only on
-    /// the `File`
-    pub(crate) fn open(path: &path::Path) -> error::Result<File> {
+    pub(crate) fn open_with(path: &path::Path, options: Options) -> error::Result<File> {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = 0;
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_open(f.as_ptr().cast(), NC_NOWRITE, &mut ncid)
+                nc_open(f.as_ptr().cast(), options.bits(), &mut ncid)
             }))?;
         }
         Ok(File(Self { ncid }))
     }
 
-    #[allow(clippy::doc_markdown)]
-    /// Open a netCDF file in append mode (read/write).
-    /// The file must already exist.
-    pub(crate) fn append(path: &path::Path) -> error::Result<MutableFile> {
-        let f = get_ffi_from_path(path);
-        let mut ncid: nc_type = -1;
-        unsafe {
-            error::checked(super::with_lock(|| {
-                nc_open(f.as_ptr().cast(), NC_WRITE, &mut ncid)
-            }))?;
-        }
-
-        Ok(MutableFile(File(Self { ncid })))
+    /// Open a `netCDF` file in append mode (read/write).
+    pub(crate) fn append_with(path: &path::Path, options: Options) -> error::Result<MutableFile> {
+        let file = Self::open_with(path, options | Options::WRITE)?;
+        Ok(MutableFile(file))
     }
-    #[allow(clippy::doc_markdown)]
-    /// Open a netCDF file in creation mode.
-    ///
-    /// Will overwrite existing file if any
-    pub(crate) fn create(path: &path::Path) -> error::Result<MutableFile> {
+
+    /// Create a new `netCDF` file
+    pub(crate) fn create_with(path: &path::Path, options: Options) -> error::Result<MutableFile> {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = -1;
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_create(f.as_ptr().cast(), NC_NETCDF4 | NC_CLOBBER, &mut ncid)
+                nc_create(f.as_ptr().cast(), options.bits(), &mut ncid)
             }))?;
         }
 

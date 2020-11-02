@@ -23,6 +23,7 @@ static = ["netcdf-sys/static"]
 lazy_static = "1.4.0"
 ndarray = { version = "0.13.0", optional = true }
 netcdf-sys = { path = "netcdf-sys", version = "0.3.0" }
+bitflags = "1.2.1"
 
 [dev-dependencies]
 tempfile = "3.1.0"
