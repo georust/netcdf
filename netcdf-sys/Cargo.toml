@@ -1,6 +1,6 @@
 [package]
 name = "netcdf-sys"
-version = "0.3.2"
+version = "0.3.3"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -16,22 +16,6 @@ build = "build.rs"
 readme = "README.md"
 exclude = [
     "testdata/**",
-    "source/conda.recipe/**",
-    "source/ctest_scripts/**",
-    "source/dap4_test/**",
-#   "source/docs/**",
-    "source/debug/**",
-    "source/examples/**",
-    "source/h5test/**",
-    "source/ncdump/**",
-    "source/ncgen/**",
-    "source/ncgen3/**",
-    "source/nc_perf/**",
-    "source/nctest/**",
-    "source/nc_test/**",
-#   "source/nc_test4/**",
-    "source/NUG/**",
-    "source/unit_test/**",
 ]
 
 [dependencies]
