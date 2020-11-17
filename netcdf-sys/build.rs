@@ -14,7 +14,13 @@ fn main() {
         println!("cargo:rustc-link-lib=static={}", netcdf_lib);
         println!("cargo:rustc-link-search=native={}", netcdf_path);
     } else {
-        // Link to the system netcdf
-        println!("cargo:rustc-link-lib=netcdf");
+        println!("cargo:rerun-if-env-changed=NETCDF_DIR");
+        if let Ok(dir) = std::env::var("NETCDF_DIR") {
+            println!("cargo:rustc-link-search={}/lib", dir);
+            println!("cargo:rustc-link-lib=netcdf");
+        } else {
+            // Link to the system netcdf
+            println!("cargo:rustc-link-lib=netcdf");
+        }
     }
 }
