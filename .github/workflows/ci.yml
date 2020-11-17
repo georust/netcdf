@@ -93,7 +93,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with: {toolchain: '${{matrix.rust}}', profile: minimal, override: true}
       - name: Install conda
-        uses: goanpeca/setup-miniconda@v1
+        uses: conda-incubator/setup-miniconda@v2
         with: {auto-update-conda: false, activate-environment: testenv}
       - name: Install netCDF
         run: conda install -y -c ${{matrix.channel}} libnetcdf=4.7.4
