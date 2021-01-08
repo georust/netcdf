@@ -317,9 +317,9 @@ impl EnumType {
     }
 
     /// Get all members of the enum
-    pub fn members<'f, T: super::Numeric>(
-        &'f self,
-    ) -> error::Result<impl Iterator<Item = (String, T)> + 'f> {
+    pub fn members<T: super::Numeric>(
+        &self,
+    ) -> error::Result<impl Iterator<Item = (String, T)> + '_> {
         let mut typ = 0;
         let mut nummembers = 0;
         error::checked(super::with_lock(|| unsafe {
