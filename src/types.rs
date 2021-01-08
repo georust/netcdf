@@ -10,6 +10,8 @@ use std::convert::TryInto;
 pub enum BasicType {
     /// Signed 1 byte integer
     Byte,
+    /// ISO/ASCII character
+    Char,
     /// Unsigned 1 byte integer
     Ubyte,
     /// Signed 2 byte integer
@@ -34,7 +36,7 @@ impl BasicType {
     /// Size of the type in bytes
     fn size(self) -> usize {
         match self {
-            Self::Byte | Self::Ubyte => 1,
+            Self::Byte | Self::Ubyte | Self::Char => 1,
             Self::Short | Self::Ushort => 2,
             Self::Int | Self::Uint | Self::Float => 4,
             Self::Int64 | Self::Uint64 | Self::Double => 8,
@@ -45,6 +47,7 @@ impl BasicType {
         use super::Numeric;
         match self {
             Self::Byte => i8::NCTYPE,
+            Self::Char => NC_CHAR,
             Self::Ubyte => u8::NCTYPE,
             Self::Short => i16::NCTYPE,
             Self::Ushort => u16::NCTYPE,
@@ -61,6 +64,7 @@ impl BasicType {
     pub fn name(self) -> &'static str {
         match self {
             BasicType::Byte => "i8",
+            BasicType::Char => "char",
             BasicType::Ubyte => "u8",
             BasicType::Short => "i16",
             BasicType::Ushort => "u16",
@@ -78,6 +82,9 @@ impl BasicType {
 impl BasicType {
     pub fn is_i8(self) -> bool {
         self == Self::Byte
+    }
+    pub fn is_char(self) -> bool {
+        self == Self::Char
     }
     pub fn is_u8(self) -> bool {
         self == Self::Ubyte
@@ -759,6 +766,7 @@ impl VariableType {
     /// Get the variable type from the id
     pub(crate) fn from_id(ncid: nc_type, xtype: nc_type) -> error::Result<Self> {
         match xtype {
+            NC_CHAR => Ok(Self::Basic(BasicType::Char)),
             NC_BYTE => Ok(Self::Basic(BasicType::Byte)),
             NC_UBYTE => Ok(Self::Basic(BasicType::Ubyte)),
             NC_SHORT => Ok(Self::Basic(BasicType::Short)),
