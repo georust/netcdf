@@ -39,7 +39,7 @@ fn main() {
 
     let netcdf = netcdf_config.build();
 
-    println!("cargo:lib={}", "netcdf");
+    println!("cargo:lib=netcdf");
     let search_path = format!("{}/lib", netcdf.display());
     if std::path::Path::new(&search_path).exists() {
         println!("cargo:search={}", search_path);
