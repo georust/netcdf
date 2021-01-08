@@ -296,3 +296,27 @@ fn put_get_vlen() {
         assert_eq!(v, &buf[i..]);
     }
 }
+
+#[test]
+fn char() {
+    use netcdf::types::BasicType;
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("test_char.nc");
+
+    let mut f = netcdf::create(&path).unwrap();
+
+    f.add_dimension("x", 2).unwrap();
+
+    let mut var = f
+        .add_variable_with_type("x", &["x"], &BasicType::Char.into())
+        .unwrap();
+
+    let vals = ['2' as char as u8, '3' as char as u8];
+    unsafe {
+        var.put_raw_values(&vals, &[0], &[vals.len()]).unwrap();
+    }
+
+    let mut retrieved_vals = [0, 0];
+    var.raw_values(&mut retrieved_vals, &[0], &[2]).unwrap();
+    assert_eq!(vals, retrieved_vals);
+}
