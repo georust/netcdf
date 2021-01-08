@@ -317,9 +317,9 @@ impl EnumType {
     }
 
     /// Get all members of the enum
-    pub fn members<'f, T: super::Numeric>(
-        &'f self,
-    ) -> error::Result<impl Iterator<Item = (String, T)> + 'f> {
+    pub fn members<T: super::Numeric>(
+        &self,
+    ) -> error::Result<impl Iterator<Item = (String, T)> + '_> {
         let mut typ = 0;
         let mut nummembers = 0;
         error::checked(super::with_lock(|| unsafe {
@@ -814,28 +814,32 @@ pub(crate) fn all_at_location(
         .map(move |x| VariableType::from_id(ncid, x)))
 }
 
-impl Into<VariableType> for CompoundType {
-    fn into(self) -> VariableType {
-        VariableType::Compound(self)
+impl From<CompoundType> for VariableType {
+    fn from(v: CompoundType) -> Self {
+        Self::Compound(v)
     }
 }
-impl Into<VariableType> for BasicType {
-    fn into(self) -> VariableType {
-        VariableType::Basic(self)
+
+impl From<BasicType> for VariableType {
+    fn from(v: BasicType) -> Self {
+        Self::Basic(v)
     }
 }
-impl Into<VariableType> for EnumType {
-    fn into(self) -> VariableType {
-        VariableType::Enum(self)
+
+impl From<EnumType> for VariableType {
+    fn from(v: EnumType) -> Self {
+        Self::Enum(v)
     }
 }
-impl Into<VariableType> for VlenType {
-    fn into(self) -> VariableType {
-        VariableType::Vlen(self)
+
+impl From<VlenType> for VariableType {
+    fn from(v: VlenType) -> Self {
+        Self::Vlen(v)
     }
 }
-impl Into<VariableType> for OpaqueType {
-    fn into(self) -> VariableType {
-        VariableType::Opaque(self)
+
+impl From<OpaqueType> for VariableType {
+    fn from(v: OpaqueType) -> Self {
+        Self::Opaque(v)
     }
 }

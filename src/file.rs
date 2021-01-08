@@ -232,7 +232,7 @@ impl File {
     /// # Errors
     ///
     /// Not a `netCDF-4` file
-    pub fn groups<'f>(&'f self) -> error::Result<impl Iterator<Item = Group<'f>>> {
+    pub fn groups(&self) -> error::Result<impl Iterator<Item = Group>> {
         super::group::groups_at_ncid(self.ncid())
     }
     /// Return all types in the root group
@@ -295,7 +295,7 @@ impl MutableFile {
     /// # Errors
     ///
     /// File does not support groups
-    pub fn groups_mut<'f>(&'f mut self) -> error::Result<impl Iterator<Item = GroupMut<'f>>> {
+    pub fn groups_mut(&mut self) -> error::Result<impl Iterator<Item = GroupMut>> {
         self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
 
@@ -347,23 +347,23 @@ impl MutableFile {
     }
 
     /// Add an opaque datatype, with `size` bytes
-    pub fn add_opaque_type<'f>(
-        &'f mut self,
+    pub fn add_opaque_type(
+        &mut self,
         name: &str,
         size: usize,
     ) -> error::Result<super::types::OpaqueType> {
         super::types::OpaqueType::add(self.ncid(), name, size)
     }
     /// Add a variable length datatype
-    pub fn add_vlen_type<'f, T: Numeric>(
-        &'f mut self,
+    pub fn add_vlen_type<T: Numeric>(
+        &mut self,
         name: &str,
     ) -> error::Result<super::types::VlenType> {
         super::types::VlenType::add::<T>(self.ncid(), name)
     }
     /// Add an enum datatype
-    pub fn add_enum_type<'f, T: Numeric>(
-        &'f mut self,
+    pub fn add_enum_type<T: Numeric>(
+        &mut self,
         name: &str,
         mappings: &[(&str, T)],
     ) -> error::Result<super::types::EnumType> {
