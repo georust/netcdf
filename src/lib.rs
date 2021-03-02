@@ -1,63 +1,81 @@
 //! Rust bindings for Unidata's [libnetcdf](http://www.unidata.ucar.edu/software/netcdf/)
 //!
+//! This crate allows one to store and retrieve multi-dimensional arrays from a
+//! `netCDF` supported format, which can be a `netCDF` file, a subset of `hdf5` files,
+//! or from a DAP url.
+//!
+//!
+//! `netCDF` files are self-contained, they contain metadata about the data contained in them.
+//! See the [`CF Conventions`](http://cfconventions.org/) for conventions used for climate and
+//! forecast models.
+//!
+//! To explore the documentation, see the `Functions` section, in particular
+//! `open()`, `create(), and `append()`.
+//!
+//! For more information see:
+//! * [The official introduction to `netCDF`](https://www.unidata.ucar.edu/software/netcdf/docs/netcdf_introduction.html)
+//! * [The `netCDF-c` repository](https://github.com/Unidata/netcdf-c)
+//!
 //! # Examples
 //!
-//! Read:
+//! How to read a variable from a file:
 //!
 //! ```no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Open file simple_xy.nc:
+//! // Open the file `simple_xy.nc`:
 //! let file = netcdf::open("simple_xy.nc")?;
 //!
-//! // Access any variable, attribute, or dimension through lookups on hashmaps
+//! // Get the variable in this file with the name "data"
 //! let var = &file.variable("data").expect("Could not find variable 'data'");
 //!
-//! // Read variable as numeric types
+//! // Read a single datapoint from the variable as a numeric type
 //! let data_i32 = var.value::<i32>(None)?;
 //! let data_f32 : f32 = var.value(None)?;
 //!
-//! // You can also use values() to read the variable, data will be read as the type given as type parameter (in this case T=i32)
-//! // Pass (None, None) when you don't care about the hyperslab indexes (get all data)
+//! // If your variable is multi-dimensional you might want to get a certain index
+//! let data_i32 = var.value::<i32>(Some(&[40, 0, 0]))?;
+//!
+//! // You can use `values()` to get all the data from the variable.
+//! // Passing `None` as both arguments will give you the entire slice
 //! # #[cfg(feature = "ndarray")]
 //! let data = var.values::<i32>(None, None)?;
+//!
+//! // A subset can also be selected, the following will extract the slice at
+//! // `(40, 0, 0)` and get a dataset of size `100, 100` from this
+//! # #[cfg(feature = "ndarray")]
+//! let data = var.values::<i32>(Some(&[40, 0 ,0]), Some(&[1, 100, 100]))?;
 //! # Ok(()) }
 //! ```
 //!
-//! Write:
+//! How to create a new file and write to it:
 //!
 //! ```no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Write
-//! let mut file = netcdf::create("crabs2.nc")?;
+//! // Create a new file with default settings
+//! let mut file = netcdf::create("crabs.nc")?;
 //!
-//! let dim_name = "ncrabs";
-//! file.add_dimension(dim_name, 10)?;
+//! // We must create a dimension which corresponds to our data
+//! file.add_dimension("ncrabs", 10)?;
+//! // These dimensions can also be unlimited and will be resized when writing
+//! file.add_unlimited_dimension("time")?;
 //!
-//! let var_name = "crab_coolness_level";
-//! let data : Vec<i32> = vec![42; 10];
-//! // Variable type written to file
+//! // A variable can now be declared, and must be created from the dimension names.
 //! let mut var = file.add_variable::<i32>(
-//!             var_name,
-//!             &[dim_name],
+//!             "crab_coolness_level",
+//!             &["time", "ncrabs"],
 //! )?;
-//! var.put_values(&data, None, None);
-//! # Ok(()) }
-//! ```
+//! // Metadata can be added to the variable
+//! var.add_attribute("units", "Kelvin");
+//! var.add_attribute("add_offset", 273.15_f32);
 //!
-//! Append:
-//! ```no_run
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // You can also modify a Variable inside an existing `netCDF` file
-//! // open it in read/write mode
-//! let mut file = netcdf::append("crabs2.nc")?;
-//! // get a mutable binding of the variable "crab_coolness_level"
-//! let mut var = file.variable_mut("crab_coolness_level").unwrap();
+//! // Data can then be created and added to the variable
+//! let data : Vec<i32> = vec![42; 10];
+//! var.put_values(&data, Some(&[0, 0]), None);
+//! // (This puts data at offset (0, 0) until all the data has been consumed)
 //!
-//! let data : Vec<i32> = vec![100; 10];
-//! // write 5 first elements of the vector `data` into `var` starting at index 2;
-//! var.put_values(&data[..5], Some(&[2]), Some(&[5]));
-//! // Change the first value of `var` into '999'
-//! var.put_value(999.0f32, Some(&[0]));
+//! // Values can be added along the unlimited dimension, which
+//! // resizes along the `time` axis
+//! var.put_values(&data, Some(&[1, 0]), None);
 //! # Ok(()) }
 //! ```
 
@@ -126,7 +144,7 @@ where
     open_with(name, Options::default())
 }
 
-/// Open a `netCDF` file in read mode
+/// Open a `netCDF` file in read mode with the given options
 pub fn open_with<P>(name: P, options: Options) -> error::Result<File>
 where
     P: AsRef<std::path::Path>,
