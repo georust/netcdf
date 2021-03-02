@@ -970,7 +970,7 @@ fn add_conflicting_variables() {
             true
         }
         e => {
-            panic!(e)
+            panic!("{}", e)
         }
     });
     assert_eq!(10, file.variable("x").unwrap().dimensions()[0].len());
