@@ -5,4 +5,10 @@ This library can also build `hdf5` and `netcdf` from source, to allow a fully st
 
 ## Detection of netCDF
 
-By default the crate uses the system installed `netCDF`. The environment variable `NETCDF_DIR` can be used to use a particular version of `netCDF`. This variable is ignored if compiling from sources.
+The detection of `netCDF` has this priority order:
+* `static` feature will choose the built static library
+* `NETCDF_DIR` environment variable
+* `nc-config`
+* Default linker-available `netcdf`
+
+If an include file is not found, some features might not be available, despite being included in the library.
