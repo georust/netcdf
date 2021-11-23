@@ -353,6 +353,10 @@ impl<'g> Variable<'g> {
 /// This trait allow an implicit cast when fetching
 /// a netCDF variable. These methods are not be called
 /// directly, but used through methods on `Variable`
+///
+/// # Safety
+/// This trait maps directly to netCDF semantics and needs
+/// to upheld invariants therein.
 pub unsafe trait Numeric
 where
     Self: Sized,
@@ -915,7 +919,7 @@ impl<'g> Variable<'g> {
         if buffer.len() < slice_len.iter().product() {
             return Err("buffer too small".into());
         }
-        unsafe { T::get_values_strided(self, indices, &slice_len, strides, buffer.as_mut_ptr())? };
+        unsafe { T::get_values_strided(self, indices, slice_len, strides, buffer.as_mut_ptr())? };
         Ok(slice_len.iter().product())
     }
 
