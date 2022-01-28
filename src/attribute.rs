@@ -864,16 +864,24 @@ impl From<String> for AttrValue {
         Self::Str(x)
     }
 }
-
 impl From<Vec<String>> for AttrValue {
     fn from(x: Vec<String>) -> Self {
         Self::Strs(x)
     }
 }
-
 impl From<&[String]> for AttrValue {
     fn from(x: &[String]) -> Self {
         Self::Strs(x.to_vec())
+    }
+}
+impl From<&[&str]> for AttrValue {
+    fn from(x: &[&str]) -> Self {
+        Self::Strs(x.iter().map(|&s| String::from(s)).collect())
+    }
+}
+impl From<Vec<&str>> for AttrValue {
+    fn from(x: Vec<&str>) -> Self {
+        Self::from(x.as_slice())
     }
 }
 
