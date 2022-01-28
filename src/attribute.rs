@@ -866,6 +866,12 @@ impl From<Vec<String>> for AttrValue {
     }
 }
 
+impl From<&[String]> for AttrValue {
+    fn from(x: &[String]) -> Self {
+        Self::Strs(x.to_vec())
+    }
+}
+
 #[test]
 fn conversion() {
     let x = 1.0f32;

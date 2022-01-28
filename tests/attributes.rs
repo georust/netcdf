@@ -118,6 +118,8 @@ fn all_attr_types() {
         file.add_attribute("attr_double", 3.2 as f64).unwrap();
         file.add_attribute("attr_text", "Hello world!").unwrap();
         file.add_attribute("attr_str", strs.clone()).unwrap();
+        file.add_attribute("attr_str_slice", strs.as_slice())
+            .unwrap();
 
         file.add_attribute("attr_text_utf8", u8string).unwrap();
     }
@@ -171,8 +173,12 @@ fn all_attr_types() {
             file.attribute("attr_text").unwrap().value().unwrap()
         );
         assert_eq!(
-            AttrValue::Strs(strs),
+            AttrValue::Strs(strs.clone()),
             file.attribute("attr_str").unwrap().value().unwrap()
+        );
+        assert_eq!(
+            AttrValue::Strs(strs),
+            file.attribute("attr_str_slice").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Str(u8string.into()),
