@@ -40,14 +40,11 @@ impl<'f> Group<'f> {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_inq_grpname(self.ncid, name.as_mut_ptr() as *mut _)
+                nc_inq_grpname(self.ncid, name.as_mut_ptr().cast())
             }))
             .unwrap();
         }
-        let zeropos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
+        let zeropos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         name.resize(zeropos, 0);
 
         String::from_utf8(name).expect("Group did not have a valid name")
@@ -215,7 +212,7 @@ impl<'f> GroupMut<'f> {
         let mut grpid = 0;
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_def_grp(ncid, byte_name.as_ptr() as *const _, &mut grpid)
+                nc_def_grp(ncid, byte_name.as_ptr().cast(), &mut grpid)
             }))?;
         }
 
@@ -306,13 +303,13 @@ pub(crate) fn group_from_name<'f>(ncid: nc_type, name: &str) -> error::Result<Op
     let byte_name = super::utils::short_name_to_bytes(name)?;
     let mut grpid = 0;
     let e = unsafe {
-        super::with_lock(|| nc_inq_grp_ncid(ncid, byte_name.as_ptr() as *const _, &mut grpid))
+        super::with_lock(|| nc_inq_grp_ncid(ncid, byte_name.as_ptr().cast(), &mut grpid))
     };
     if e == NC_ENOGRP {
         return Ok(None);
-    } else {
-        error::checked(e)?;
     }
+    error::checked(e)?;
+
     Ok(Some(Group {
         ncid: grpid,
         _file: PhantomData,

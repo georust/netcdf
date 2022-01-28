@@ -53,15 +53,12 @@ impl<'g> Dimension<'g> {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_inq_dimname(self.id.ncid, self.id.dimid, name.as_mut_ptr() as *mut _)
+                nc_inq_dimname(self.id.ncid, self.id.dimid, name.as_mut_ptr().cast())
             }))
             .unwrap();
         }
 
-        let zeropos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
+        let zeropos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         name.resize(zeropos, 0);
         String::from_utf8(name).expect("Dimension did not have a valid name")
     }
@@ -76,26 +73,24 @@ impl<'g> Dimension<'g> {
 pub(crate) fn from_name_toid(loc: nc_type, name: &str) -> error::Result<Option<nc_type>> {
     let mut dimid = 0;
     let cname = super::utils::short_name_to_bytes(name)?;
-    let e =
-        unsafe { super::with_lock(|| nc_inq_dimid(loc, cname.as_ptr() as *const _, &mut dimid)) };
+    let e = unsafe { super::with_lock(|| nc_inq_dimid(loc, cname.as_ptr().cast(), &mut dimid)) };
     if e == NC_EBADDIM {
         return Ok(None);
-    } else {
-        error::checked(e)?;
     }
+    error::checked(e)?;
+
     Ok(Some(dimid))
 }
 
 pub(crate) fn from_name<'f>(loc: nc_type, name: &str) -> error::Result<Option<Dimension<'f>>> {
     let mut dimid = 0;
     let cname = super::utils::short_name_to_bytes(name)?;
-    let e =
-        unsafe { super::with_lock(|| nc_inq_dimid(loc, cname.as_ptr() as *const _, &mut dimid)) };
+    let e = unsafe { super::with_lock(|| nc_inq_dimid(loc, cname.as_ptr().cast(), &mut dimid)) };
     if e == NC_EBADDIM {
         return Ok(None);
-    } else {
-        error::checked(e)?;
     }
+    error::checked(e)?;
+
     let mut dimlen = 0;
     unsafe {
         error::checked(super::with_lock(|| nc_inq_dimlen(loc, dimid, &mut dimlen)))?;
@@ -116,7 +111,7 @@ pub(crate) fn from_name<'f>(loc: nc_type, name: &str) -> error::Result<Option<Di
             }
             unsafe { unlimdims.set_len(nunlim.try_into()?) }
             if unlimdims.contains(&dimid) {
-                dimlen = 0
+                dimlen = 0;
             }
         }
     }
@@ -232,13 +227,12 @@ pub(crate) fn dimension_from_name<'f>(
 ) -> error::Result<Option<Dimension<'f>>> {
     let cname = super::utils::short_name_to_bytes(name)?;
     let mut dimid = 0;
-    let e =
-        unsafe { super::with_lock(|| nc_inq_dimid(ncid, cname.as_ptr() as *const _, &mut dimid)) };
+    let e = unsafe { super::with_lock(|| nc_inq_dimid(ncid, cname.as_ptr().cast(), &mut dimid)) };
     if e == NC_EBADDIM {
         return Ok(None);
-    } else {
-        error::checked(e)?;
     }
+    error::checked(e)?;
+
     let mut dimlen = 0;
     unsafe {
         error::checked(super::with_lock(|| nc_inq_dimlen(ncid, dimid, &mut dimlen))).unwrap();
@@ -260,7 +254,7 @@ pub(crate) fn dimension_from_name<'f>(
             }
             unsafe { unlimdims.set_len(nunlim.try_into()?) }
             if unlimdims.contains(&dimid) {
-                dimlen = 0
+                dimlen = 0;
             }
         }
     }
@@ -280,7 +274,7 @@ pub(crate) fn add_dimension_at<'f>(
     let mut dimid = 0;
     unsafe {
         error::checked(super::with_lock(|| {
-            nc_def_dim(ncid, cname.as_ptr() as *const _, len, &mut dimid)
+            nc_def_dim(ncid, cname.as_ptr().cast(), len, &mut dimid)
         }))?;
     }
     Ok(Dimension {

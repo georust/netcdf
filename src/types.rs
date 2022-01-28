@@ -130,16 +130,13 @@ impl OpaqueType {
             nc_inq_opaque(
                 self.ncid,
                 self.id,
-                name.as_mut_ptr() as *mut _,
+                name.as_mut_ptr().cast(),
                 std::ptr::null_mut(),
             )
         }))
         .unwrap();
 
-        let pos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
+        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         String::from_utf8(name[..pos].to_vec()).unwrap()
     }
     /// Number of bytes this type occupies
@@ -155,7 +152,7 @@ impl OpaqueType {
         let name = super::utils::short_name_to_bytes(name)?;
         let mut id = 0;
         error::checked(super::with_lock(|| unsafe {
-            nc_def_opaque(location, size, name.as_ptr() as *const _, &mut id)
+            nc_def_opaque(location, size, name.as_ptr().cast(), &mut id)
         }))?;
 
         Ok(Self { ncid: location, id })
@@ -177,17 +174,14 @@ impl VlenType {
             nc_inq_vlen(
                 self.ncid,
                 self.id,
-                name.as_mut_ptr() as *mut _,
+                name.as_mut_ptr().cast(),
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
             )
         }))
         .unwrap();
 
-        let pos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
+        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         String::from_utf8(name[..pos].to_vec()).unwrap()
     }
 
@@ -198,7 +192,7 @@ impl VlenType {
         let name = super::utils::short_name_to_bytes(name)?;
         let mut id = 0;
         error::checked(super::with_lock(|| unsafe {
-            nc_def_vlen(location, name.as_ptr() as *const _, T::NCTYPE, &mut id)
+            nc_def_vlen(location, name.as_ptr().cast(), T::NCTYPE, &mut id)
         }))?;
 
         Ok(Self { ncid: location, id })
@@ -250,18 +244,13 @@ impl EnumType {
         let name = super::utils::short_name_to_bytes(name)?;
         let mut id = 0;
         error::checked(super::with_lock(|| unsafe {
-            nc_def_enum(ncid, T::NCTYPE, name.as_ptr() as *const _, &mut id)
+            nc_def_enum(ncid, T::NCTYPE, name.as_ptr().cast(), &mut id)
         }))?;
 
         for (name, val) in mappings {
             let name = super::utils::short_name_to_bytes(name)?;
             error::checked(super::with_lock(|| unsafe {
-                nc_insert_enum(
-                    ncid,
-                    id,
-                    name.as_ptr() as *const _,
-                    val as *const T as *const _,
-                )
+                nc_insert_enum(ncid, id, name.as_ptr().cast(), (val as *const T).cast())
             }))?;
         }
 
@@ -310,15 +299,12 @@ impl EnumType {
                 self.ncid,
                 self.id,
                 idx,
-                name.as_mut_ptr() as *mut _,
-                t.as_mut_ptr() as *mut _,
+                name.as_mut_ptr().cast(),
+                t.as_mut_ptr().cast(),
             )
         });
 
-        let pos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
+        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         let name = String::from_utf8(name[..pos].to_vec()).unwrap();
         Ok((name, t.assume_init()))
     }
@@ -354,7 +340,7 @@ impl EnumType {
             nc_inq_enum(
                 self.ncid,
                 self.id,
-                name.as_mut_ptr() as *mut _,
+                name.as_mut_ptr().cast(),
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
@@ -362,10 +348,7 @@ impl EnumType {
         }))
         .unwrap();
 
-        let pos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
+        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         String::from_utf8(name[..pos].to_vec()).unwrap()
     }
 
@@ -373,7 +356,7 @@ impl EnumType {
     pub fn name_from_value(&self, value: i64) -> Option<String> {
         let mut name = [0_u8; NC_MAX_NAME as usize + 1];
         let e = super::with_lock(|| unsafe {
-            nc_inq_enum_ident(self.ncid, self.id, value, name.as_mut_ptr() as *mut _)
+            nc_inq_enum_ident(self.ncid, self.id, value, name.as_mut_ptr().cast())
         });
         if e == NC_EINVAL {
             return None;
@@ -381,10 +364,7 @@ impl EnumType {
 
         error::checked(e).unwrap();
 
-        let pos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
+        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         Some(String::from_utf8(name[..pos].to_vec()).unwrap())
     }
 
@@ -436,17 +416,14 @@ impl CompoundType {
             nc_inq_compound(
                 self.ncid,
                 self.id,
-                name.as_mut_ptr() as *mut _,
+                name.as_mut_ptr().cast(),
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
             )
         }))
         .unwrap();
 
-        let pos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
+        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         String::from_utf8(name[..pos].to_vec()).unwrap()
     }
 
@@ -482,14 +459,11 @@ impl CompoundField {
         let mut name = [0_u8; NC_MAX_NAME as usize + 1];
         let idx = self.id.try_into().unwrap();
         error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_fieldname(self.ncid, self.parent, idx, name.as_mut_ptr() as *mut _)
+            nc_inq_compound_fieldname(self.ncid, self.parent, idx, name.as_mut_ptr().cast())
         }))
         .unwrap();
 
-        let pos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
+        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         String::from_utf8(name[..pos].to_vec()).unwrap()
     }
 
@@ -609,12 +583,7 @@ impl CompoundBuilder {
     pub fn build(self) -> error::Result<CompoundType> {
         let mut id = 0;
         error::checked(super::with_lock(|| unsafe {
-            nc_def_compound(
-                self.ncid,
-                self.size,
-                self.name.as_ptr() as *const _,
-                &mut id,
-            )
+            nc_def_compound(self.ncid, self.size, self.name.as_ptr().cast(), &mut id)
         }))?;
 
         let mut offset = 0;
@@ -622,13 +591,7 @@ impl CompoundBuilder {
             match dims {
                 None => {
                     error::checked(super::with_lock(|| unsafe {
-                        nc_insert_compound(
-                            self.ncid,
-                            id,
-                            name.as_ptr() as *const _,
-                            offset,
-                            typ.id(),
-                        )
+                        nc_insert_compound(self.ncid, id, name.as_ptr().cast(), offset, typ.id())
                     }))?;
                     offset += typ.size();
                 }
@@ -638,7 +601,7 @@ impl CompoundBuilder {
                         nc_insert_array_compound(
                             self.ncid,
                             id,
-                            name.as_ptr() as *const _,
+                            name.as_ptr().cast(),
                             offset,
                             typ.id(),
                             dimlen,

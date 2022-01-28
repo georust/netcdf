@@ -35,7 +35,7 @@ jobs:
     - name: Documentation
       run: cargo doc
     - name: Clippy
-      run: cargo clippy -- -D warnings
+      run: cargo clippy --workspace -- -D warnings
 
   test_apt:
     name: test apt
@@ -131,3 +131,16 @@ jobs:
         run: sudo xcode-select -s "/Applications/Xcode_11.7.app"
       - name: Build and test
         run: cargo test -vv --features static
+
+  addr_san:
+    name: Address sanitizer
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with: {submodules: true}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with: {toolchain: nightly, profile: minimal, override: true}
+      - name: Run test with sanitizer
+        run: env RUSTFLAGS="-Z sanitizer=address" cargo test --features netcdf-sys/static --target x86_64-unknown-linux-gnu --workspace

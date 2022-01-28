@@ -43,7 +43,7 @@ impl<'a> Attribute<'a> {
             .name
             .iter()
             .position(|&x| x == 0)
-            .unwrap_or_else(|| self.name.len());
+            .unwrap_or(self.name.len());
         std::str::from_utf8(&self.name[..zeropos])
             .expect("Attribute name contains invalid sequence")
     }
@@ -55,7 +55,7 @@ impl<'a> Attribute<'a> {
                 nc_inq_attlen(
                     self.ncid,
                     self.varid,
-                    self.name.as_ptr() as *const _,
+                    self.name.as_ptr().cast(),
                     &mut nelems,
                 )
             }))?;
@@ -70,7 +70,7 @@ impl<'a> Attribute<'a> {
                 nc_inq_atttype(
                     self.ncid,
                     self.varid,
-                    self.name.as_ptr() as *const _,
+                    self.name.as_ptr().cast(),
                     &mut atttype,
                 )
             }))?;
@@ -96,7 +96,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_uchar(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 &mut value,
                             )
                         }))?;
@@ -110,7 +110,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_uchar(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 values.as_mut_ptr(),
                             )
                         }))?;
@@ -126,7 +126,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_schar(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 &mut value,
                             )
                         }))?;
@@ -140,7 +140,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_schar(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 values.as_mut_ptr(),
                             )
                         }))?;
@@ -156,7 +156,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_short(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 &mut value,
                             )
                         }))?;
@@ -170,7 +170,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_short(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 values.as_mut_ptr(),
                             )
                         }))?;
@@ -186,7 +186,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_ushort(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 &mut value,
                             )
                         }))?;
@@ -200,7 +200,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_ushort(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 values.as_mut_ptr(),
                             )
                         }))?;
@@ -216,7 +216,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_int(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 &mut value,
                             )
                         }))?;
@@ -230,7 +230,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_int(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 values.as_mut_ptr(),
                             )
                         }))?;
@@ -246,7 +246,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_uint(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 &mut value,
                             )
                         }))?;
@@ -260,7 +260,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_uint(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 values.as_mut_ptr(),
                             )
                         }))?;
@@ -276,7 +276,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_longlong(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 &mut value,
                             )
                         }))?;
@@ -290,7 +290,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_longlong(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 values.as_mut_ptr(),
                             )
                         }))?;
@@ -307,7 +307,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_ulonglong(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 &mut value,
                             )
                         }))?;
@@ -321,7 +321,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_ulonglong(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 values.as_mut_ptr(),
                             )
                         }))?;
@@ -338,7 +338,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_float(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 &mut value,
                             )
                         }))?;
@@ -352,7 +352,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_float(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 values.as_mut_ptr(),
                             )
                         }))?;
@@ -368,7 +368,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_double(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 &mut value,
                             )
                         }))?;
@@ -382,7 +382,7 @@ impl<'a> Attribute<'a> {
                             nc_get_att_double(
                                 self.ncid,
                                 self.varid,
-                                self.name.as_ptr() as *const _,
+                                self.name.as_ptr().cast(),
                                 values.as_mut_ptr(),
                             )
                         }))?;
@@ -398,15 +398,12 @@ impl<'a> Attribute<'a> {
                         nc_get_att_text(
                             self.ncid,
                             self.varid,
-                            self.name.as_ptr() as *const _,
-                            buf.as_mut_ptr() as *mut _,
+                            self.name.as_ptr().cast(),
+                            buf.as_mut_ptr().cast(),
                         )
                     }))?;
                 }
-                let pos = buf
-                    .iter()
-                    .position(|&x| x == 0)
-                    .unwrap_or_else(|| buf.len());
+                let pos = buf.iter().position(|&x| x == 0).unwrap_or(buf.len());
                 Ok(AttrValue::Str(String::from(String::from_utf8_lossy(
                     &buf[..pos],
                 ))))
@@ -419,8 +416,8 @@ impl<'a> Attribute<'a> {
                         nc_get_att_string(
                             self.ncid,
                             self.varid,
-                            self.name.as_ptr() as *const _,
-                            buf.as_mut_ptr() as *mut *mut _,
+                            self.name.as_ptr().cast(),
+                            buf.as_mut_ptr().cast(),
                         )
                     }))?;
 
@@ -484,7 +481,7 @@ impl<'a> Iterator for AttributeIterator<'a> {
                     self.ncid,
                     self.varid.unwrap_or(NC_GLOBAL),
                     self.current_natt.try_into().unwrap(),
-                    name.as_mut_ptr() as *mut _,
+                    name.as_mut_ptr().cast(),
                 )
             })) {
                 return Some(Err(e));
@@ -546,130 +543,130 @@ impl<'a> Attribute<'a> {
         error::checked(unsafe {
             match val {
                 AttrValue::Uchar(x) => super::with_lock(|| {
-                    nc_put_att_uchar(ncid, varid, cname.as_ptr() as *const _, NC_UBYTE, 1, &x)
+                    nc_put_att_uchar(ncid, varid, cname.as_ptr().cast(), NC_UBYTE, 1, &x)
                 }),
                 AttrValue::Uchars(x) => super::with_lock(|| {
                     nc_put_att_uchar(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         NC_UBYTE,
                         x.len(),
                         x.as_ptr(),
                     )
                 }),
                 AttrValue::Schar(x) => super::with_lock(|| {
-                    nc_put_att_schar(ncid, varid, cname.as_ptr() as *const _, NC_BYTE, 1, &x)
+                    nc_put_att_schar(ncid, varid, cname.as_ptr().cast(), NC_BYTE, 1, &x)
                 }),
                 AttrValue::Schars(x) => super::with_lock(|| {
                     nc_put_att_schar(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         NC_BYTE,
                         x.len(),
                         x.as_ptr(),
                     )
                 }),
                 AttrValue::Ushort(x) => super::with_lock(|| {
-                    nc_put_att_ushort(ncid, varid, cname.as_ptr() as *const _, NC_USHORT, 1, &x)
+                    nc_put_att_ushort(ncid, varid, cname.as_ptr().cast(), NC_USHORT, 1, &x)
                 }),
                 AttrValue::Ushorts(x) => super::with_lock(|| {
                     nc_put_att_ushort(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         NC_USHORT,
                         x.len(),
                         x.as_ptr(),
                     )
                 }),
                 AttrValue::Short(x) => super::with_lock(|| {
-                    nc_put_att_short(ncid, varid, cname.as_ptr() as *const _, NC_SHORT, 1, &x)
+                    nc_put_att_short(ncid, varid, cname.as_ptr().cast(), NC_SHORT, 1, &x)
                 }),
                 AttrValue::Shorts(x) => super::with_lock(|| {
                     nc_put_att_short(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         NC_SHORT,
                         x.len(),
                         x.as_ptr(),
                     )
                 }),
                 AttrValue::Uint(x) => super::with_lock(|| {
-                    nc_put_att_uint(ncid, varid, cname.as_ptr() as *const _, NC_UINT, 1, &x)
+                    nc_put_att_uint(ncid, varid, cname.as_ptr().cast(), NC_UINT, 1, &x)
                 }),
                 AttrValue::Uints(x) => super::with_lock(|| {
                     nc_put_att_uint(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         NC_UINT,
                         x.len(),
                         x.as_ptr(),
                     )
                 }),
                 AttrValue::Int(x) => super::with_lock(|| {
-                    nc_put_att_int(ncid, varid, cname.as_ptr() as *const _, NC_INT, 1, &x)
+                    nc_put_att_int(ncid, varid, cname.as_ptr().cast(), NC_INT, 1, &x)
                 }),
                 AttrValue::Ints(x) => super::with_lock(|| {
                     nc_put_att_int(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         NC_INT,
                         x.len(),
                         x.as_ptr(),
                     )
                 }),
                 AttrValue::Ulonglong(x) => super::with_lock(|| {
-                    nc_put_att_ulonglong(ncid, varid, cname.as_ptr() as *const _, NC_UINT64, 1, &x)
+                    nc_put_att_ulonglong(ncid, varid, cname.as_ptr().cast(), NC_UINT64, 1, &x)
                 }),
                 AttrValue::Ulonglongs(x) => super::with_lock(|| {
                     nc_put_att_ulonglong(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         NC_UINT64,
                         x.len(),
                         x.as_ptr(),
                     )
                 }),
                 AttrValue::Longlong(x) => super::with_lock(|| {
-                    nc_put_att_longlong(ncid, varid, cname.as_ptr() as *const _, NC_INT64, 1, &x)
+                    nc_put_att_longlong(ncid, varid, cname.as_ptr().cast(), NC_INT64, 1, &x)
                 }),
                 AttrValue::Longlongs(x) => super::with_lock(|| {
                     nc_put_att_longlong(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         NC_INT64,
                         x.len(),
                         x.as_ptr(),
                     )
                 }),
                 AttrValue::Float(x) => super::with_lock(|| {
-                    nc_put_att_float(ncid, varid, cname.as_ptr() as *const _, NC_FLOAT, 1, &x)
+                    nc_put_att_float(ncid, varid, cname.as_ptr().cast(), NC_FLOAT, 1, &x)
                 }),
                 AttrValue::Floats(x) => super::with_lock(|| {
                     nc_put_att_float(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         NC_FLOAT,
                         x.len(),
                         x.as_ptr(),
                     )
                 }),
                 AttrValue::Double(x) => super::with_lock(|| {
-                    nc_put_att_double(ncid, varid, cname.as_ptr() as *const _, NC_DOUBLE, 1, &x)
+                    nc_put_att_double(ncid, varid, cname.as_ptr().cast(), NC_DOUBLE, 1, &x)
                 }),
                 AttrValue::Doubles(x) => super::with_lock(|| {
                     nc_put_att_double(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         NC_DOUBLE,
                         x.len(),
                         x.as_ptr(),
@@ -679,9 +676,9 @@ impl<'a> Attribute<'a> {
                     nc_put_att_text(
                         ncid,
                         varid,
-                        cname.as_ptr() as *const _,
+                        cname.as_ptr().cast(),
                         x.len(),
-                        x.as_ptr() as *const _,
+                        x.as_ptr().cast(),
                     )
                 }),
                 AttrValue::Strs(ref x) => {
@@ -698,7 +695,7 @@ impl<'a> Attribute<'a> {
                         nc_put_att_string(
                             ncid,
                             varid,
-                            cname.as_ptr() as *const _,
+                            cname.as_ptr().cast(),
                             cstring_pointers.len(),
                             cstring_pointers.as_ptr() as *mut *const _,
                         )
@@ -734,7 +731,7 @@ impl<'a> Attribute<'a> {
                 nc_inq_attid(
                     ncid,
                     varid.unwrap_or(NC_GLOBAL),
-                    attname.as_ptr() as *const _,
+                    attname.as_ptr().cast(),
                     std::ptr::null_mut(),
                 )
             })
