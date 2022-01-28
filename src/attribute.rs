@@ -4,7 +4,9 @@
 use super::error;
 use netcdf_sys::*;
 use std::convert::TryInto;
+use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
+use std::os::raw::c_char;
 
 /// Extra properties of a variable or a group can be represented
 /// with attributes. Primarily added with `add_attribute` on
@@ -409,6 +411,33 @@ impl<'a> Attribute<'a> {
                     &buf[..pos],
                 ))))
             }
+            NC_STRING => {
+                let mut buf: Vec<*mut c_char> = vec![std::ptr::null_mut(); attlen];
+                let result;
+                unsafe {
+                    error::checked(super::with_lock(|| {
+                        nc_get_att_string(
+                            self.ncid,
+                            self.varid,
+                            self.name.as_ptr() as *const _,
+                            buf.as_mut_ptr() as *mut *mut _,
+                        )
+                    }))?;
+
+                    result = buf
+                        .iter()
+                        .map(|cstr_pointer| {
+                            if cstr_pointer.is_null() {
+                                String::new()
+                            } else {
+                                CStr::from_ptr(*cstr_pointer).to_string_lossy().to_string()
+                            }
+                        })
+                        .collect();
+                    super::with_lock(|| nc_free_string(attlen, buf.as_mut_ptr()));
+                }
+                Ok(AttrValue::Strs(result))
+            }
             x => Err(error::Error::TypeUnknown(x)),
         }
     }
@@ -500,6 +529,7 @@ pub enum AttrValue {
     Double(f64),
     Doubles(Vec<f64>),
     Str(String),
+    Strs(Vec<String>),
 }
 
 impl<'a> Attribute<'a> {
@@ -654,6 +684,26 @@ impl<'a> Attribute<'a> {
                         x.as_ptr() as *const _,
                     )
                 }),
+                AttrValue::Strs(ref x) => {
+                    let cstrings: Vec<CString> = x
+                        .iter()
+                        .map(String::as_str)
+                        .map(CString::new)
+                        .collect::<Result<Vec<CString>, _>>()?;
+
+                    let cstring_pointers: Vec<*const c_char> =
+                        cstrings.iter().map(|cs| cs.as_ptr()).collect();
+
+                    super::with_lock(|| {
+                        nc_put_att_string(
+                            ncid,
+                            varid,
+                            cname.as_ptr() as *const _,
+                            cstring_pointers.len(),
+                            cstring_pointers.as_ptr() as *mut *const _,
+                        )
+                    })
+                }
             }
         })?;
 
@@ -812,6 +862,26 @@ impl From<&str> for AttrValue {
 impl From<String> for AttrValue {
     fn from(x: String) -> Self {
         Self::Str(x)
+    }
+}
+impl From<Vec<String>> for AttrValue {
+    fn from(x: Vec<String>) -> Self {
+        Self::Strs(x)
+    }
+}
+impl From<&[String]> for AttrValue {
+    fn from(x: &[String]) -> Self {
+        Self::Strs(x.to_vec())
+    }
+}
+impl From<&[&str]> for AttrValue {
+    fn from(x: &[&str]) -> Self {
+        Self::Strs(x.iter().map(|&s| String::from(s)).collect())
+    }
+}
+impl From<Vec<&str>> for AttrValue {
+    fn from(x: Vec<&str>) -> Self {
+        Self::from(x.as_slice())
     }
 }
 
