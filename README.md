@@ -29,7 +29,7 @@ Not (yet) supported:
 
 * some exotic user defined types
 
-All variable data is read into a contiguous buffer, or inta an [ndarray](https://github.com/rust-ndarray/rust-ndarray) if the `ndarray` feature is activated.
+All variable data is read into a contiguous buffer, or into an [ndarray](https://github.com/rust-ndarray/rust-ndarray) if the `ndarray` feature is activated.
 
 ## Building
 
