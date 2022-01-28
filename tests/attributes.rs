@@ -101,6 +101,7 @@ fn global_attrs() {
 fn all_attr_types() {
     let d = tempfile::tempdir().unwrap();
     let u8string = "Testing utf8 with æøå and even 😀";
+    let strs = vec!["Hi!".to_string(), "Hello!".to_string()];
     {
         let f = d.path().join("all_attr_types.nc");
         let mut file = netcdf::create(&f).unwrap();
@@ -116,6 +117,7 @@ fn all_attr_types() {
         file.add_attribute("attr_float", 3.2 as f32).unwrap();
         file.add_attribute("attr_double", 3.2 as f64).unwrap();
         file.add_attribute("attr_text", "Hello world!").unwrap();
+        file.add_attribute("attr_str", strs.clone()).unwrap();
 
         file.add_attribute("attr_text_utf8", u8string).unwrap();
     }
@@ -167,6 +169,10 @@ fn all_attr_types() {
         assert_eq!(
             AttrValue::Str("Hello world!".into()),
             file.attribute("attr_text").unwrap().value().unwrap()
+        );
+        assert_eq!(
+            AttrValue::Strs(strs),
+            file.attribute("attr_str").unwrap().value().unwrap()
         );
         assert_eq!(
             AttrValue::Str(u8string.into()),

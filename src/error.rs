@@ -46,6 +46,8 @@ pub enum Error {
     WrongDataset,
     /// Name is not valid utf-8
     Utf8Conversion(std::string::FromUtf8Error),
+    /// String contains NULL characters
+    NulError(std::ffi::NulError),
 }
 
 impl Error {
@@ -99,6 +101,12 @@ impl From<std::string::FromUtf8Error> for Error {
     }
 }
 
+impl From<std::ffi::NulError> for Error {
+    fn from(e: std::ffi::NulError) -> Self {
+        Self::NulError(e)
+    }
+}
+
 use std::fmt;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -134,6 +142,7 @@ impl fmt::Display for Error {
             Self::Conversion(e) => e.fmt(f),
             Self::WrongDataset => write!(f, "This identifier does not belong in this dataset"),
             Self::Utf8Conversion(e) => write!(f, "{}", e),
+            Self::NulError(e) => write!(f, "String value contains null bytes {}", e),
         }
     }
 }
