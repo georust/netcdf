@@ -686,10 +686,12 @@ impl<'a> Attribute<'a> {
                     )
                 }),
                 AttrValue::Strs(ref x) => {
-                    let mut cstrings: Vec<CString> = Vec::with_capacity(x.len());
-                    for string in x {
-                        cstrings.push(CString::new(string.as_str())?)
-                    }
+                    let cstrings: Vec<CString> = x
+                        .iter()
+                        .map(String::as_str)
+                        .map(CString::new)
+                        .collect::<Result<Vec<CString>, _>>()?;
+
                     let cstring_pointers: Vec<*const c_char> =
                         cstrings.iter().map(|cs| cs.as_ptr()).collect();
 
