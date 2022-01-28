@@ -434,8 +434,7 @@ impl<'a> Attribute<'a> {
                             }
                         })
                         .collect();
-
-                    nc_free_string(attlen, buf.as_mut_ptr());
+                    super::with_lock(|| nc_free_string(attlen, buf.as_mut_ptr()));
                 }
                 Ok(AttrValue::Strs(result))
             }
