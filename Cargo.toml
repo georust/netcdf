@@ -1,6 +1,6 @@
 [package]
 name = "netcdf"
-version = "0.6.1"
+version = "0.7.0"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -12,6 +12,7 @@ documentation = "https://docs.rs/crate/netcdf"
 keywords = ["netcdf", "hdf", "hdf5", "libnetcdf", "netcdf4"]
 edition = "2018"
 readme = "README.md"
+categories = ["science", "filesystem"]
 exclude = ["examples/**", "tests/**"]
 
 [features]
@@ -22,7 +23,7 @@ static = ["netcdf-sys/static"]
 [dependencies]
 lazy_static = "1.4.0"
 ndarray = { version = "0.15", optional = true }
-netcdf-sys = { path = "netcdf-sys", version = "0.3.3" }
+netcdf-sys = { path = "netcdf-sys", version = "0.4.0" }
 bitflags = "1.2.1"
 
 [dev-dependencies]
