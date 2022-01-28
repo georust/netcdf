@@ -58,14 +58,13 @@ impl<'g> Variable<'g> {
     pub(crate) fn find_from_name(ncid: nc_type, name: &str) -> error::Result<Option<Variable<'g>>> {
         let cname = super::utils::short_name_to_bytes(name)?;
         let mut varid = 0;
-        let e = unsafe {
-            super::with_lock(|| nc_inq_varid(ncid, cname.as_ptr() as *const _, &mut varid))
-        };
+        let e =
+            unsafe { super::with_lock(|| nc_inq_varid(ncid, cname.as_ptr().cast(), &mut varid)) };
         if e == NC_ENOTVAR {
             return Ok(None);
-        } else {
-            error::checked(e)?;
         }
+        error::checked(e)?;
+
         let mut xtype = 0;
         let mut ndims = 0;
         unsafe {
@@ -104,14 +103,11 @@ impl<'g> Variable<'g> {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_inq_varname(self.ncid, self.varid, name.as_mut_ptr() as *mut _)
+                nc_inq_varname(self.ncid, self.varid, name.as_mut_ptr().cast())
             }))
             .unwrap();
         }
-        let zeropos = name
-            .iter()
-            .position(|&x| x == 0)
-            .unwrap_or_else(|| name.len());
+        let zeropos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         name.resize(zeropos, 0);
 
         String::from_utf8(name).expect("Variable name contained invalid sequence")
@@ -300,7 +296,7 @@ impl<'g> Variable<'g> {
         let num_unlims = self
             .dimensions
             .iter()
-            .fold(0, |acc, x| acc + x.is_unlimited() as usize);
+            .fold(0, |acc, x| acc + usize::from(x.is_unlimited()));
         if num_unlims > 1 {
             return Err(error::Error::Ambiguous);
         }
@@ -812,7 +808,7 @@ impl<'g> Variable<'g> {
                     self.ncid,
                     self.varid,
                     &mut nofill,
-                    &mut location as *mut _ as *mut _,
+                    std::ptr::addr_of_mut!(location).cast(),
                 )
             }))?;
         }
@@ -954,7 +950,7 @@ impl<'g> Variable<'g> {
                 self.varid,
                 start.as_ptr(),
                 count.as_ptr(),
-                buf.as_mut_ptr() as *mut _,
+                buf.as_mut_ptr().cast(),
             )
         }))
     }
@@ -984,7 +980,7 @@ impl<'g> Variable<'g> {
                 self.varid,
                 index.as_ptr(),
                 count.as_ptr(),
-                &mut vlen as *mut _ as *mut _,
+                std::ptr::addr_of_mut!(vlen).cast(),
             )
         }))?;
 
@@ -1036,7 +1032,7 @@ impl<'g> VariableMut<'g> {
         unsafe {
             error::checked(super::with_lock(|| {
                 nc_put_var1_string(self.ncid, self.varid, indices.as_ptr(), &mut ptr)
-            }))?
+            }))?;
         }
 
         Ok(())
@@ -1162,7 +1158,7 @@ impl<'g> VariableMut<'g> {
                     self.ncid,
                     self.varid,
                     NC_FILL,
-                    &fill_value as *const T as *const _,
+                    std::ptr::addr_of!(fill_value).cast(),
                 )
             }))?;
         }
@@ -1241,7 +1237,7 @@ impl<'g> VariableMut<'g> {
                 self.varid,
                 start.as_ptr(),
                 count.as_ptr(),
-                buf.as_ptr() as *const _,
+                buf.as_ptr().cast(),
             )
         }))
     }
@@ -1260,7 +1256,7 @@ impl<'g> VariableMut<'g> {
 
         let vlen = nc_vlen_t {
             len: vec.len(),
-            p: vec.as_ptr() as *const _ as *mut _,
+            p: vec.as_ptr() as *mut _,
         };
 
         let count = index.iter().map(|_| 1).collect::<Vec<usize>>();
@@ -1271,7 +1267,7 @@ impl<'g> VariableMut<'g> {
                 self.varid,
                 index.as_ptr(),
                 count.as_ptr(),
-                &vlen as *const _ as *const _,
+                std::ptr::addr_of!(vlen).cast(),
             )
         }))
     }
@@ -1302,7 +1298,7 @@ impl<'g> VariableMut<'g> {
             error::checked(super::with_lock(|| {
                 nc_def_var(
                     ncid,
-                    cname.as_ptr() as *const _,
+                    cname.as_ptr().cast(),
                     xtype,
                     dimlen,
                     dimensions.as_ptr(),
@@ -1403,7 +1399,7 @@ pub(crate) fn add_variable_from_identifiers<'g>(
         error::checked(super::with_lock(|| {
             nc_def_var(
                 ncid,
-                cname.as_ptr() as *const _,
+                cname.as_ptr().cast(),
                 xtype,
                 dimlen,
                 dims.as_ptr(),

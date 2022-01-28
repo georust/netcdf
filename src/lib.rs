@@ -10,7 +10,7 @@
 //! forecast models.
 //!
 //! To explore the documentation, see the `Functions` section, in particular
-//! `open()`, `create(), and `append()`.
+//! `open()`, `create()`, and `append()`.
 //!
 //! For more information see:
 //! * [The official introduction to `netCDF`](https://www.unidata.ucar.edu/software/netcdf/docs/netcdf_introduction.html)
@@ -179,10 +179,7 @@ pub(crate) mod utils {
         if name.len() > NC_MAX_NAME as _ {
             Err(NC_EMAXNAME.into())
         } else {
-            let len = name
-                .bytes()
-                .position(|x| x == 0)
-                .unwrap_or_else(|| name.len());
+            let len = name.bytes().position(|x| x == 0).unwrap_or(name.len());
             let mut bytes = [0_u8; NC_MAX_NAME as usize + 1];
             bytes[..len].copy_from_slice(name.as_bytes());
             Ok(bytes)

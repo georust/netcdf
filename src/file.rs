@@ -27,12 +27,7 @@ impl Drop for RawFile {
 #[cfg(unix)]
 fn get_ffi_from_path(path: &path::Path) -> Vec<u8> {
     use std::os::unix::ffi::OsStrExt;
-    let mut bytes = path
-        .as_os_str()
-        .as_bytes()
-        .iter()
-        .copied()
-        .collect::<Vec<u8>>();
+    let mut bytes = path.as_os_str().as_bytes().to_vec();
     bytes.push(0);
     bytes
 }
@@ -144,11 +139,7 @@ impl File {
             let mut name = vec![0_u8; pathlen as usize + 1_usize];
             unsafe {
                 error::checked(super::with_lock(|| {
-                    nc_inq_path(
-                        self.0.ncid,
-                        std::ptr::null_mut(),
-                        name.as_mut_ptr() as *mut _,
-                    )
+                    nc_inq_path(self.0.ncid, std::ptr::null_mut(), name.as_mut_ptr().cast())
                 }))?;
             }
             name.truncate(pathlen);
