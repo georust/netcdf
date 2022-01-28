@@ -413,7 +413,7 @@ impl<'a> Attribute<'a> {
             }
             NC_STRING => {
                 let mut buf: Vec<*mut c_char> = vec![std::ptr::null_mut(); attlen];
-                let mut result: Vec<String> = Vec::with_capacity(attlen);
+                let result;
                 unsafe {
                     error::checked(super::with_lock(|| {
                         nc_get_att_string(
@@ -424,13 +424,17 @@ impl<'a> Attribute<'a> {
                         )
                     }))?;
 
-                    for str_ptr in &buf {
-                        if str_ptr.is_null() {
-                            break;
-                        }
-                        let c_str = CStr::from_ptr(*str_ptr);
-                        result.push(c_str.to_string_lossy().to_string());
-                    }
+                    result = buf
+                        .iter()
+                        .map(|cstr_pointer| {
+                            if cstr_pointer.is_null() {
+                                String::new()
+                            } else {
+                                CStr::from_ptr(*cstr_pointer).to_string_lossy().to_string()
+                            }
+                        })
+                        .collect();
+
                     nc_free_string(attlen, buf.as_mut_ptr());
                 }
                 Ok(AttrValue::Strs(result))
