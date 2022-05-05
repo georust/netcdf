@@ -902,11 +902,11 @@ impl<'g> Variable<'g> {
                 .zip(strides)
                 .map(|((d, &start), &stride)| match stride {
                     0 => 1,
-                    stride if stride < 0 => start / stride.abs() as usize,
+                    stride if stride < 0 => start / stride.unsigned_abs(),
                     stride => {
                         let dlen = d.len();
-                        let round_up = stride.abs() as usize - 1;
-                        (dlen - start + round_up) / stride.abs() as usize
+                        let round_up = stride.unsigned_abs() - 1;
+                        (dlen - start + round_up) / stride.unsigned_abs()
                     }
                 })
                 .collect::<Vec<_>>();
