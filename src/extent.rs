@@ -246,7 +246,7 @@ impl Extent {
 /// A selector for putting and getting data along a dataset
 ///
 /// This type can be constructed in many ways
-/// ```rust
+/// ```rust,no_run
 /// use netcdf::extent::{Extent, Extents};
 /// // Get all values
 /// let _: Extents = (..).into();
