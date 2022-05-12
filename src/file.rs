@@ -5,7 +5,7 @@ use super::attribute::{AttrValue, Attribute};
 use super::dimension::{self, Dimension};
 use super::error;
 use super::group::{Group, GroupMut};
-use super::variable::{Numeric, Variable, VariableMut};
+use super::variable::{NcPutGet, Variable, VariableMut};
 use netcdf_sys::*;
 use std::marker::PhantomData;
 use std::path;
@@ -322,7 +322,7 @@ impl MutableFile {
         dims: &[&str],
     ) -> error::Result<VariableMut<'f>>
     where
-        T: Numeric,
+        T: NcPutGet,
     {
         VariableMut::add_from_str(self.ncid(), T::NCTYPE, name, dims)
     }
@@ -346,14 +346,14 @@ impl MutableFile {
         super::types::OpaqueType::add(self.ncid(), name, size)
     }
     /// Add a variable length datatype
-    pub fn add_vlen_type<T: Numeric>(
+    pub fn add_vlen_type<T: NcPutGet>(
         &mut self,
         name: &str,
     ) -> error::Result<super::types::VlenType> {
         super::types::VlenType::add::<T>(self.ncid(), name)
     }
     /// Add an enum datatype
-    pub fn add_enum_type<T: Numeric>(
+    pub fn add_enum_type<T: NcPutGet>(
         &mut self,
         name: &str,
         mappings: &[(&str, T)],
@@ -385,7 +385,7 @@ impl MutableFile {
         dims: &[dimension::Identifier],
     ) -> error::Result<VariableMut<'f>>
     where
-        T: Numeric,
+        T: NcPutGet,
     {
         super::variable::add_variable_from_identifiers(self.ncid(), name, dims, T::NCTYPE)
     }

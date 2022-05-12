@@ -44,7 +44,7 @@ impl BasicType {
     }
     /// `nc_type` of the type
     pub(crate) fn id(self) -> nc_type {
-        use super::Numeric;
+        use super::NcPutGet;
         match self {
             Self::Byte => i8::NCTYPE,
             Self::Char => NC_CHAR,
@@ -187,7 +187,7 @@ impl VlenType {
 
     pub(crate) fn add<T>(location: nc_type, name: &str) -> error::Result<Self>
     where
-        T: super::Numeric,
+        T: super::NcPutGet,
     {
         let name = super::utils::short_name_to_bytes(name)?;
         let mut id = 0;
@@ -236,7 +236,7 @@ pub struct EnumType {
 }
 
 impl EnumType {
-    pub(crate) fn add<T: super::Numeric>(
+    pub(crate) fn add<T: super::NcPutGet>(
         ncid: nc_type,
         name: &str,
         mappings: &[(&str, T)],
@@ -290,7 +290,7 @@ impl EnumType {
     ///
     /// # Safety
     /// Does not check type of enum
-    unsafe fn member_at<T: super::Numeric>(&self, idx: usize) -> error::Result<(String, T)> {
+    unsafe fn member_at<T: super::NcPutGet>(&self, idx: usize) -> error::Result<(String, T)> {
         let mut name = [0_u8; NC_MAX_NAME as usize + 1];
         let mut t = std::mem::MaybeUninit::<T>::uninit();
         let idx = idx.try_into()?;
@@ -310,7 +310,7 @@ impl EnumType {
     }
 
     /// Get all members of the enum
-    pub fn members<T: super::Numeric>(
+    pub fn members<T: super::NcPutGet>(
         &self,
     ) -> error::Result<impl Iterator<Item = (String, T)> + '_> {
         let mut typ = 0;
@@ -547,13 +547,13 @@ impl CompoundBuilder {
     }
 
     /// Add a basic numeric type
-    pub fn add<T: super::Numeric>(&mut self, name: &str) -> error::Result<&mut Self> {
+    pub fn add<T: super::NcPutGet>(&mut self, name: &str) -> error::Result<&mut Self> {
         let var = VariableType::from_id(self.ncid, T::NCTYPE)?;
         self.add_type(name, &var)
     }
 
     /// Add an array of a basic type
-    pub fn add_array<T: super::Numeric>(
+    pub fn add_array<T: super::NcPutGet>(
         &mut self,
         name: &str,
         dims: &[usize],

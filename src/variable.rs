@@ -224,6 +224,10 @@ impl<'g> VariableMut<'g> {
     }
 }
 
+mod sealed {
+    pub trait Sealed {}
+}
+
 #[allow(clippy::doc_markdown)]
 /// This trait allow an implicit cast when fetching
 /// a netCDF variable. These methods are not be called
@@ -232,7 +236,9 @@ impl<'g> VariableMut<'g> {
 /// # Safety
 /// This trait maps directly to netCDF semantics and needs
 /// to upheld invariants therein.
-pub unsafe trait Numeric
+/// This trait is sealed and can not be implemented for
+/// types outside this crate
+pub trait NcPutGet: sealed::Sealed
 where
     Self: Sized,
 {
@@ -316,12 +322,46 @@ where
         stride: &[isize],
         values: *const Self,
     ) -> error::Result<()>;
+
+    /// get a SLICE of values into the variable, with the source
+    /// strided by `stride`, mapped by `map`
+    ///
+    /// # Safety
+    ///
+    /// `values` must contain space for all the data,
+    /// `indices`, `slice_len`, and `stride` must be of
+    /// at least dimension length size.
+    unsafe fn get_varm(
+        variable: &Variable,
+        start: &[usize],
+        count: &[usize],
+        stride: &[isize],
+        map: &[isize],
+        values: *mut Self,
+    ) -> error::Result<()>;
+
+    /// put a SLICE of values into the variable, with the destination
+    /// strided by `stride`
+    ///
+    /// # Safety
+    ///
+    /// `values` must contain space for all the data,
+    /// `indices`, `slice_len`, and `stride` must be of
+    /// at least dimension length size.
+    unsafe fn put_varm(
+        variable: &mut VariableMut,
+        start: &[usize],
+        count: &[usize],
+        stride: &[isize],
+        map: &[isize],
+        values: *const Self,
+    ) -> error::Result<()>;
 }
 
 #[allow(clippy::doc_markdown)]
-/// This macro implements the trait Numeric for the type `sized_type`.
+/// This macro implements the trait NcPutGet for the type `sized_type`.
 ///
-/// The use of this macro reduce code duplication for the implementation of Numeric
+/// The use of this macro reduce code duplication for the implementation of NcPutGet
 /// for the common numeric types (i32, f32 ...): they only differs by the name of the
 /// C function used to fetch values from the NetCDF variable (eg: `nc_get_var_ushort`, ...).
 macro_rules! impl_numeric {
@@ -335,9 +375,12 @@ macro_rules! impl_numeric {
         $nc_put_vara_type: ident,
         $nc_get_vars_type: ident,
         $nc_put_vars_type: ident,
+        $nc_get_varm_type: ident,
+        $nc_put_varm_type: ident,
     ) => {
+        impl sealed::Sealed for $sized_type {}
         #[allow(clippy::use_self)] // False positives
-        unsafe impl Numeric for $sized_type {
+        impl NcPutGet for $sized_type {
             const NCTYPE: nc_type = $nc_type;
 
             // fetch ONE value from variable using `$nc_get_var1`
@@ -442,6 +485,48 @@ macro_rules! impl_numeric {
                     )
                 }))
             }
+
+            unsafe fn get_varm(
+                variable: &Variable,
+                start: &[usize],
+                count: &[usize],
+                stride: &[isize],
+                map: &[isize],
+                values: *mut Self,
+            ) -> error::Result<()> {
+                error::checked(super::with_lock(|| {
+                    $nc_get_varm_type(
+                        variable.ncid,
+                        variable.varid,
+                        start.as_ptr(),
+                        count.as_ptr(),
+                        stride.as_ptr(),
+                        map.as_ptr(),
+                        values,
+                    )
+                }))
+            }
+
+            unsafe fn put_varm(
+                variable: &mut VariableMut,
+                start: &[usize],
+                count: &[usize],
+                stride: &[isize],
+                map: &[isize],
+                values: *const Self,
+            ) -> error::Result<()> {
+                error::checked(super::with_lock(|| {
+                    $nc_put_varm_type(
+                        variable.ncid,
+                        variable.varid,
+                        start.as_ptr(),
+                        count.as_ptr(),
+                        stride.as_ptr(),
+                        map.as_ptr(),
+                        values,
+                    )
+                }))
+            }
         }
     };
 }
@@ -455,6 +540,8 @@ impl_numeric!(
     nc_put_vara_uchar,
     nc_get_vars_uchar,
     nc_put_vars_uchar,
+    nc_get_varm_uchar,
+    nc_put_varm_uchar,
 );
 
 impl_numeric!(
@@ -467,6 +554,8 @@ impl_numeric!(
     nc_put_vara_schar,
     nc_get_vars_schar,
     nc_put_vars_schar,
+    nc_get_varm_schar,
+    nc_put_varm_schar,
 );
 
 impl_numeric!(
@@ -479,6 +568,8 @@ impl_numeric!(
     nc_put_vara_short,
     nc_get_vars_short,
     nc_put_vars_short,
+    nc_get_varm_short,
+    nc_put_varm_short,
 );
 
 impl_numeric!(
@@ -491,6 +582,8 @@ impl_numeric!(
     nc_put_vara_ushort,
     nc_get_vars_ushort,
     nc_put_vars_ushort,
+    nc_get_varm_ushort,
+    nc_put_varm_ushort,
 );
 
 impl_numeric!(
@@ -503,6 +596,8 @@ impl_numeric!(
     nc_put_vara_int,
     nc_get_vars_int,
     nc_put_vars_int,
+    nc_get_varm_int,
+    nc_put_varm_int,
 );
 
 impl_numeric!(
@@ -515,6 +610,8 @@ impl_numeric!(
     nc_put_vara_uint,
     nc_get_vars_uint,
     nc_put_vars_uint,
+    nc_get_varm_uint,
+    nc_put_varm_uint,
 );
 
 impl_numeric!(
@@ -527,6 +624,8 @@ impl_numeric!(
     nc_put_vara_longlong,
     nc_get_vars_longlong,
     nc_put_vars_longlong,
+    nc_get_varm_longlong,
+    nc_put_varm_longlong,
 );
 
 impl_numeric!(
@@ -539,6 +638,8 @@ impl_numeric!(
     nc_put_vara_ulonglong,
     nc_get_vars_ulonglong,
     nc_put_vars_ulonglong,
+    nc_get_varm_ulonglong,
+    nc_put_varm_ulonglong,
 );
 
 impl_numeric!(
@@ -551,6 +652,8 @@ impl_numeric!(
     nc_put_vara_float,
     nc_get_vars_float,
     nc_put_vars_float,
+    nc_get_varm_float,
+    nc_put_varm_float,
 );
 
 impl_numeric!(
@@ -563,6 +666,8 @@ impl_numeric!(
     nc_put_vara_double,
     nc_get_vars_double,
     nc_put_vars_double,
+    nc_get_varm_double,
+    nc_put_varm_double,
 );
 
 /// Holds the contents of a netcdf string. Use deref to get a `CStr`
@@ -600,7 +705,7 @@ impl<'g> VariableMut<'g> {
 }
 
 impl<'g> Variable<'g> {
-    fn value_mono<T: Numeric>(&self, extent: &Extents) -> error::Result<T> {
+    fn value_mono<T: NcPutGet>(&self, extent: &Extents) -> error::Result<T> {
         let dims = self.dimensions();
         let (start, count, _stride) = extent.get_start_count_stride(dims)?;
 
@@ -617,7 +722,7 @@ impl<'g> Variable<'g> {
 
     ///  Fetches one specific value at specific indices
     ///  indices must has the same length as self.dimensions.
-    pub fn value<T: Numeric, E>(&self, indices: E) -> error::Result<T>
+    pub fn value<T: NcPutGet, E>(&self, indices: E) -> error::Result<T>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -659,7 +764,7 @@ impl<'g> Variable<'g> {
         self.string_value_mono(&extent)
     }
 
-    fn values_mono<T: Numeric>(&self, extents: &Extents) -> error::Result<Vec<T>> {
+    fn values_mono<T: NcPutGet>(&self, extents: &Extents) -> error::Result<Vec<T>> {
         let dims = self.dimensions();
         let (start, count, stride) = extents.get_start_count_stride(dims)?;
 
@@ -674,7 +779,7 @@ impl<'g> Variable<'g> {
     }
 
     /// Get multiple values from a variable
-    pub fn values<T: Numeric, E>(&self, extents: E) -> error::Result<Vec<T>>
+    pub fn values<T: NcPutGet, E>(&self, extents: E) -> error::Result<Vec<T>>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -685,7 +790,7 @@ impl<'g> Variable<'g> {
 
     #[cfg(feature = "ndarray")]
     /// Fetches variable
-    fn values_arr_mono<T: Numeric>(&self, extents: &Extents) -> error::Result<ArrayD<T>> {
+    fn values_arr_mono<T: NcPutGet>(&self, extents: &Extents) -> error::Result<ArrayD<T>> {
         let dims = self.dimensions();
         let (start, count, stride) = extents.get_start_count_stride(dims)?;
 
@@ -701,7 +806,7 @@ impl<'g> Variable<'g> {
 
     #[cfg(feature = "ndarray")]
     /// Fetches variable
-    pub fn values_arr<T: Numeric, E>(&self, extents: E) -> error::Result<ArrayD<T>>
+    pub fn values_arr<T: NcPutGet, E>(&self, extents: E) -> error::Result<ArrayD<T>>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -711,7 +816,7 @@ impl<'g> Variable<'g> {
     }
 
     /// Get the fill value of a variable
-    pub fn fill_value<T: Numeric>(&self) -> error::Result<Option<T>> {
+    pub fn fill_value<T: NcPutGet>(&self) -> error::Result<Option<T>> {
         if T::NCTYPE != self.vartype {
             return Err(error::Error::TypeMismatch);
         }
@@ -734,7 +839,11 @@ impl<'g> Variable<'g> {
         Ok(Some(unsafe { location.assume_init() }))
     }
 
-    fn values_to_mono<T: Numeric>(&self, buffer: &mut [T], extents: &Extents) -> error::Result<()> {
+    fn values_to_mono<T: NcPutGet>(
+        &self,
+        buffer: &mut [T],
+        extents: &Extents,
+    ) -> error::Result<()> {
         let dims = self.dimensions();
         let (start, count, stride) = extents.get_start_count_stride(dims)?;
 
@@ -749,7 +858,7 @@ impl<'g> Variable<'g> {
     }
     /// Fetches variable into slice
     /// buffer must be able to hold all the requested elements
-    pub fn values_to<T: Numeric, E>(&self, buffer: &mut [T], extents: E) -> error::Result<()>
+    pub fn values_to<T: NcPutGet, E>(&self, buffer: &mut [T], extents: E) -> error::Result<()>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -808,7 +917,7 @@ impl<'g> Variable<'g> {
         self.raw_values_mono(buf, &extents)
     }
 
-    fn vlen_mono<T: Numeric>(&self, extent: &Extents) -> error::Result<Vec<T>> {
+    fn vlen_mono<T: NcPutGet>(&self, extent: &Extents) -> error::Result<Vec<T>> {
         let dims = self.dimensions();
         let (start, count, _stride) = extent.get_start_count_stride(dims)?;
 
@@ -852,7 +961,7 @@ impl<'g> Variable<'g> {
         Ok(v)
     }
     /// Get a vlen element
-    pub fn vlen<T: Numeric, E>(&self, indices: E) -> error::Result<Vec<T>>
+    pub fn vlen<T: NcPutGet, E>(&self, indices: E) -> error::Result<Vec<T>>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -863,7 +972,7 @@ impl<'g> Variable<'g> {
 }
 
 impl<'g> VariableMut<'g> {
-    fn put_value_mono<T: Numeric>(&mut self, value: T, extents: &Extents) -> error::Result<()> {
+    fn put_value_mono<T: NcPutGet>(&mut self, value: T, extents: &Extents) -> error::Result<()> {
         let dims = self.dimensions();
         let (start, count, _stride) = extents.get_start_count_stride(dims)?;
 
@@ -878,7 +987,7 @@ impl<'g> VariableMut<'g> {
         unsafe { T::put_var1(self, &start, value) }
     }
     /// Put a single value at `indices`
-    pub fn put_value<T: Numeric, E>(&mut self, value: T, extents: E) -> error::Result<()>
+    pub fn put_value<T: NcPutGet, E>(&mut self, value: T, extents: E) -> error::Result<()>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -921,7 +1030,7 @@ impl<'g> VariableMut<'g> {
         self.put_string_mono(value, &extents)
     }
 
-    fn put_values_mono<T: Numeric>(
+    fn put_values_mono<T: NcPutGet>(
         &mut self,
         values: &[T],
         extents: &Extents,
@@ -948,7 +1057,7 @@ impl<'g> VariableMut<'g> {
         Ok(())
     }
     /// Put a slice of values at `indices`
-    pub fn put_values<T: Numeric, E>(&mut self, values: &[T], extents: E) -> error::Result<()>
+    pub fn put_values<T: NcPutGet, E>(&mut self, values: &[T], extents: E) -> error::Result<()>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -965,7 +1074,7 @@ impl<'g> VariableMut<'g> {
     #[allow(clippy::needless_pass_by_value)] // All values will be small
     pub fn set_fill_value<T>(&mut self, fill_value: T) -> error::Result<()>
     where
-        T: Numeric,
+        T: NcPutGet,
     {
         if T::NCTYPE != self.vartype {
             return Err(error::Error::TypeMismatch);
@@ -1074,7 +1183,7 @@ impl<'g> VariableMut<'g> {
         self.put_raw_values_mono(buf, &extents)
     }
 
-    fn put_vlen_mono<T: Numeric>(&mut self, vec: &[T], extent: &Extents) -> error::Result<()> {
+    fn put_vlen_mono<T: NcPutGet>(&mut self, vec: &[T], extent: &Extents) -> error::Result<()> {
         let dims = self.dimensions();
         let (start, count, stride) = extent.get_start_count_stride(dims)?;
 
@@ -1111,7 +1220,7 @@ impl<'g> VariableMut<'g> {
         }))
     }
     /// Get a vlen element
-    pub fn put_vlen<T: Numeric, E>(&mut self, vec: &[T], indices: E) -> error::Result<()>
+    pub fn put_vlen<T: NcPutGet, E>(&mut self, vec: &[T], indices: E) -> error::Result<()>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,

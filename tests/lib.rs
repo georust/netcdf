@@ -1002,7 +1002,7 @@ fn unlimited_dimension_single_putting() {
 
 fn check_equal<T>(var: &netcdf::Variable, check: &[T])
 where
-    T: netcdf::variable::Numeric
+    T: netcdf::variable::NcPutGet
         + std::clone::Clone
         + std::default::Default
         + std::fmt::Debug

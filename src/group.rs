@@ -5,7 +5,7 @@ use super::attribute::AttrValue;
 use super::attribute::Attribute;
 use super::dimension::Dimension;
 use super::error;
-use super::variable::{Numeric, Variable, VariableMut};
+use super::variable::{NcPutGet, Variable, VariableMut};
 use netcdf_sys::*;
 use std::convert::TryInto;
 use std::marker::PhantomData;
@@ -165,7 +165,7 @@ impl<'f> GroupMut<'f> {
     }
 
     /// Add a variable length datatype
-    pub fn add_vlen_type<T: Numeric>(
+    pub fn add_vlen_type<T: NcPutGet>(
         &'f mut self,
         name: &str,
     ) -> error::Result<super::types::VlenType> {
@@ -173,7 +173,7 @@ impl<'f> GroupMut<'f> {
     }
 
     /// Add an enum datatype
-    pub fn add_enum_type<T: Numeric>(
+    pub fn add_enum_type<T: NcPutGet>(
         &'f mut self,
         name: &str,
         mappings: &[(&str, T)],
@@ -243,7 +243,7 @@ impl<'f> GroupMut<'f> {
         dims: &[&str],
     ) -> error::Result<VariableMut<'g>>
     where
-        T: Numeric,
+        T: NcPutGet,
         'f: 'g,
     {
         VariableMut::add_from_str(self.id(), T::NCTYPE, name, dims)
@@ -264,7 +264,7 @@ impl<'f> GroupMut<'f> {
         dims: &[super::dimension::Identifier],
     ) -> error::Result<VariableMut<'g>>
     where
-        T: Numeric,
+        T: NcPutGet,
     {
         super::variable::add_variable_from_identifiers(self.id(), name, dims, T::NCTYPE)
     }
