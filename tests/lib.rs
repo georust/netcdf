@@ -905,10 +905,6 @@ fn set_compression_all_variables_in_a_group() {
     for mut var in file.variables_mut() {
         var.compression(9).expect("Could not set compression level");
     }
-
-    let mut var = file.variable_mut("var0").unwrap();
-    var.compression(netcdf_sys::NC_MAX_DEFLATE_LEVEL + 1)
-        .unwrap_err();
 }
 
 #[test]
