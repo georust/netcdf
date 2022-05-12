@@ -218,7 +218,7 @@ fn read_compound_simple_nc4() {
     }
 
     let mut raws = vec![0_u8; 12 * 6 * 2 * 4];
-    var.raw_values(&mut raws, &[0, 0], &[6, 12]).unwrap();
+    var.raw_values(&mut raws, (..6, ..12)).unwrap();
 
     use std::convert::TryInto;
     let intlen = 4;
@@ -254,7 +254,7 @@ fn put_get_enum() {
             .unwrap();
 
         unsafe {
-            var.put_raw_values(&bytes, &[0, 0], &[5, 2]).unwrap();
+            var.put_raw_values(&bytes, (..5, ..2)).unwrap();
         }
     }
 
@@ -262,7 +262,7 @@ fn put_get_enum() {
     let var = file.variable("var").unwrap();
 
     let mut bytes_copy = vec![0_u8; 5 * 2];
-    var.raw_values(&mut bytes_copy, &[0, 0], &[5, 2]).unwrap();
+    var.raw_values(&mut bytes_copy, (..5, ..2)).unwrap();
     assert_eq!(bytes, bytes_copy);
 }
 
@@ -292,7 +292,7 @@ fn put_get_vlen() {
 
     let buf = (0..9).collect::<Vec<i32>>();
     for i in 0..9 {
-        let v = var.vlen::<i32>(&[i]).unwrap();
+        let v = var.vlen::<i32, _>(&[i]).unwrap();
         assert_eq!(v, &buf[i..]);
     }
 }
@@ -313,10 +313,10 @@ fn char() {
 
     let vals = ['2' as char as u8, '3' as char as u8];
     unsafe {
-        var.put_raw_values(&vals, &[0], &[vals.len()]).unwrap();
+        var.put_raw_values(&vals, [..vals.len()]).unwrap();
     }
 
     let mut retrieved_vals = [0, 0];
-    var.raw_values(&mut retrieved_vals, &[0], &[2]).unwrap();
+    var.raw_values(&mut retrieved_vals, 0..2).unwrap();
     assert_eq!(vals, retrieved_vals);
 }

@@ -63,17 +63,17 @@ impl BasicType {
     /// `rusty` name of the type
     pub fn name(self) -> &'static str {
         match self {
-            BasicType::Byte => "i8",
-            BasicType::Char => "char",
-            BasicType::Ubyte => "u8",
-            BasicType::Short => "i16",
-            BasicType::Ushort => "u16",
-            BasicType::Int => "i32",
-            BasicType::Uint => "u32",
-            BasicType::Int64 => "i64",
-            BasicType::Uint64 => "u64",
-            BasicType::Float => "f32",
-            BasicType::Double => "f64",
+            Self::Byte => "i8",
+            Self::Char => "char",
+            Self::Ubyte => "u8",
+            Self::Short => "i16",
+            Self::Ushort => "u16",
+            Self::Int => "i32",
+            Self::Uint => "u32",
+            Self::Int64 => "i64",
+            Self::Uint64 => "u64",
+            Self::Float => "f32",
+            Self::Double => "f64",
         }
     }
 }
@@ -240,7 +240,7 @@ impl EnumType {
         ncid: nc_type,
         name: &str,
         mappings: &[(&str, T)],
-    ) -> error::Result<EnumType> {
+    ) -> error::Result<Self> {
         let name = super::utils::short_name_to_bytes(name)?;
         let mut id = 0;
         error::checked(super::with_lock(|| unsafe {

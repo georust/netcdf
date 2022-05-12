@@ -1,18 +1,21 @@
 //! Variables in the netcdf file
-
 #![allow(clippy::similar_names)]
-use super::attribute::AttrValue;
-use super::attribute::Attribute;
-use super::dimension::Dimension;
-use super::error;
-use super::types::VariableType;
-#[cfg(feature = "ndarray")]
-use ndarray::ArrayD;
-use netcdf_sys::*;
 use std::convert::TryInto;
 use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::marker::Sized;
+use std::mem::MaybeUninit;
+use std::ptr::addr_of;
+
+use super::attribute::AttrValue;
+use super::attribute::Attribute;
+use super::dimension::Dimension;
+use super::error;
+use super::extent::Extents;
+use super::types::VariableType;
+#[cfg(feature = "ndarray")]
+use ndarray::ArrayD;
+use netcdf_sys::*;
 
 #[allow(clippy::doc_markdown)]
 /// This struct defines a `netCDF` variable.
@@ -135,7 +138,10 @@ impl<'g> Variable<'g> {
     }
     /// Get current length of the variable
     pub fn len(&self) -> usize {
-        self.dimensions.iter().map(Dimension::len).product()
+        self.dimensions
+            .iter()
+            .map(Dimension::len)
+            .fold(1_usize, usize::saturating_mul)
     }
     /// Get endianness of the variable.
     ///
@@ -170,7 +176,13 @@ impl<'g> VariableMut<'g> {
     pub fn compression(&mut self, deflate_level: nc_type) -> error::Result<()> {
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_def_var_deflate(self.ncid, self.varid, false as _, true as _, deflate_level)
+                nc_def_var_deflate(
+                    self.ncid,
+                    self.varid,
+                    <_>::from(false),
+                    <_>::from(true),
+                    deflate_level,
+                )
             }))?;
         }
 
@@ -197,7 +209,8 @@ impl<'g> VariableMut<'g> {
         }
         let len = chunksize
             .iter()
-            .fold(1_usize, |acc, &x| acc.saturating_mul(x));
+            .copied()
+            .fold(1_usize, usize::saturating_mul);
         if len == usize::max_value() {
             return Err(error::Error::Overflow);
         }
@@ -208,140 +221,6 @@ impl<'g> VariableMut<'g> {
         }
 
         Ok(())
-    }
-}
-
-impl<'g> Variable<'g> {
-    /// Checks for array mismatch
-    fn check_indices(&self, indices: &[usize], putting: bool) -> error::Result<()> {
-        if indices.len() != self.dimensions.len() {
-            return Err(error::Error::IndexLen);
-        }
-
-        for (d, i) in self.dimensions.iter().zip(indices) {
-            if d.is_unlimited() && putting {
-                continue;
-            }
-            if *i > d.len() {
-                return Err(error::Error::IndexMismatch);
-            }
-        }
-
-        Ok(())
-    }
-    /// Create a default [0, 0, ..., 0] offset
-    fn default_indices(&self, putting: bool) -> error::Result<Vec<usize>> {
-        self.dimensions
-            .iter()
-            .map(|d| {
-                if d.len() > 0 || putting {
-                    Ok(0)
-                } else {
-                    Err(error::Error::IndexMismatch)
-                }
-            })
-            .collect()
-    }
-
-    /// Assumes indices is valid for this variable
-    fn check_sizelen(
-        &self,
-        totallen: usize,
-        indices: &[usize],
-        sizelen: &[usize],
-        putting: bool,
-    ) -> error::Result<()> {
-        if sizelen.len() != self.dimensions.len() {
-            return Err(error::Error::SliceLen);
-        }
-
-        for ((i, s), d) in indices.iter().zip(sizelen).zip(&self.dimensions) {
-            if *s == 0 {
-                return Err(error::Error::ZeroSlice);
-            }
-            if i.checked_add(*s).is_none() {
-                return Err(error::Error::Overflow);
-            }
-            if i + s > d.len() {
-                if !putting {
-                    return Err(error::Error::SliceMismatch);
-                }
-                if !d.is_unlimited() {
-                    return Err(error::Error::SliceMismatch);
-                }
-            }
-        }
-
-        let thislen = sizelen
-            .iter()
-            .fold(1_usize, |acc, &x| acc.saturating_mul(x));
-        if thislen == usize::max_value() {
-            return Err(error::Error::Overflow);
-        }
-
-        if totallen != thislen {
-            return Err(error::Error::BufferLen(totallen, thislen));
-        }
-
-        Ok(())
-    }
-
-    /// Assumes indices is valid for this variable
-    fn default_sizelen(
-        &self,
-        totallen: usize,
-        indices: &[usize],
-        putting: bool,
-    ) -> error::Result<Vec<usize>> {
-        let num_unlims = self
-            .dimensions
-            .iter()
-            .fold(0, |acc, x| acc + usize::from(x.is_unlimited()));
-        if num_unlims > 1 {
-            return Err(error::Error::Ambiguous);
-        }
-
-        let mut sizelen = Vec::with_capacity(self.dimensions.len());
-
-        let mut unlim_pos = None;
-        for (pos, (&i, d)) in indices.iter().zip(&self.dimensions).enumerate() {
-            if i >= d.len() {
-                if !d.is_unlimited() {
-                    return Err(error::Error::SliceMismatch);
-                }
-                if !putting {
-                    return Err(error::Error::SliceMismatch);
-                }
-                unlim_pos = Some(pos);
-                sizelen.push(1);
-            } else if putting && d.is_unlimited() {
-                unlim_pos = Some(pos);
-                sizelen.push(1);
-            } else {
-                sizelen.push(d.len() - i);
-            }
-        }
-
-        if let Some(pos) = unlim_pos {
-            let l = sizelen
-                .iter()
-                .fold(1_usize, |acc, &x| acc.saturating_mul(x));
-            if l == usize::max_value() {
-                return Err(error::Error::Overflow);
-            }
-            sizelen[pos] = totallen / l;
-        }
-
-        let wantedlen = sizelen
-            .iter()
-            .fold(1_usize, |acc, &x| acc.saturating_mul(x));
-        if wantedlen == usize::max_value() {
-            return Err(error::Error::Overflow);
-        }
-        if totallen != wantedlen {
-            return Err(error::Error::BufferLen(totallen, wantedlen));
-        }
-        Ok(sizelen)
     }
 }
 
@@ -365,10 +244,19 @@ where
     /// # Safety
     ///
     /// Requires `indices` to be of a valid length
-    unsafe fn single_value_from_variable(
-        variable: &Variable,
-        indices: &[usize],
-    ) -> error::Result<Self>;
+    unsafe fn get_var1(variable: &Variable, start: &[usize]) -> error::Result<Self>;
+
+    #[allow(clippy::doc_markdown)]
+    /// Put a single value into a netCDF variable
+    ///
+    /// # Safety
+    ///
+    /// Requires `indices` to be of a valid length
+    unsafe fn put_var1(
+        variable: &mut VariableMut,
+        start: &[usize],
+        value: Self,
+    ) -> error::Result<()>;
 
     /// Get multiple values at once, without checking the validity of
     /// `indices` or `slice_len`
@@ -377,23 +265,11 @@ where
     ///
     /// Requires `values` to be of at least size `slice_len.product()`,
     /// `indices` and `slice_len` to be of a valid length
-    unsafe fn variable_to_ptr(
+    unsafe fn get_vara(
         variable: &Variable,
-        indices: &[usize],
-        slice_len: &[usize],
+        start: &[usize],
+        count: &[usize],
         values: *mut Self,
-    ) -> error::Result<()>;
-
-    #[allow(clippy::doc_markdown)]
-    /// Put a single value into a netCDF variable
-    ///
-    /// # Safety
-    ///
-    /// Requires `indices` to be of a valid length
-    unsafe fn put_value_at(
-        variable: &mut VariableMut,
-        indices: &[usize],
-        value: Self,
     ) -> error::Result<()>;
 
     #[allow(clippy::doc_markdown)]
@@ -402,42 +278,42 @@ where
     /// # Safety
     ///
     /// Requires `indices` and `slice_len` to be of a valid length
-    unsafe fn put_values_at(
+    unsafe fn put_vara(
         variable: &mut VariableMut,
-        indices: &[usize],
-        slice_len: &[usize],
+        start: &[usize],
+        count: &[usize],
         values: &[Self],
     ) -> error::Result<()>;
 
     /// get a SLICE of values into the variable, with the source
-    /// strided by `strides`
+    /// strided by `stride`
     ///
     /// # Safety
     ///
     /// `values` must contain space for all the data,
-    /// `indices`, `slice_len`, and `strides` must be of
+    /// `indices`, `slice_len`, and `stride` must be of
     /// at least dimension length size.
-    unsafe fn get_values_strided(
+    unsafe fn get_vars(
         variable: &Variable,
-        indices: &[usize],
-        slice_len: &[usize],
-        strides: &[isize],
+        start: &[usize],
+        count: &[usize],
+        stride: &[isize],
         values: *mut Self,
     ) -> error::Result<()>;
 
     /// put a SLICE of values into the variable, with the destination
-    /// strided by `strides`
+    /// strided by `stride`
     ///
     /// # Safety
     ///
     /// `values` must contain space for all the data,
-    /// `indices`, `slice_len`, and `strides` must be of
+    /// `indices`, `slice_len`, and `stride` must be of
     /// at least dimension length size.
-    unsafe fn put_values_strided(
+    unsafe fn put_vars(
         variable: &mut VariableMut,
-        indices: &[usize],
-        slice_len: &[usize],
-        strides: &[isize],
+        start: &[usize],
+        count: &[usize],
+        stride: &[isize],
         values: *const Self,
     ) -> error::Result<()>;
 }
@@ -465,70 +341,74 @@ macro_rules! impl_numeric {
             const NCTYPE: nc_type = $nc_type;
 
             // fetch ONE value from variable using `$nc_get_var1`
-            unsafe fn single_value_from_variable(
-                variable: &Variable,
-                indices: &[usize],
-            ) -> error::Result<Self> {
-                // initialize `buff` to 0
-                let mut buff: Self = 0 as _;
-                // Get a pointer to an array
-                let indices_ptr = indices.as_ptr();
+            unsafe fn get_var1(variable: &Variable, start: &[usize]) -> error::Result<Self> {
+                let mut buff: MaybeUninit<Self> = MaybeUninit::uninit();
                 error::checked(super::with_lock(|| {
-                    $nc_get_var1_type(variable.ncid, variable.varid, indices_ptr, &mut buff)
+                    $nc_get_var1_type(
+                        variable.ncid,
+                        variable.varid,
+                        start.as_ptr(),
+                        buff.as_mut_ptr(),
+                    )
                 }))?;
-                Ok(buff)
+                Ok(buff.assume_init())
             }
 
-            unsafe fn variable_to_ptr(
+            // put a SINGLE value into a netCDF variable at the given index
+            unsafe fn put_var1(
+                variable: &mut VariableMut,
+                start: &[usize],
+                value: Self,
+            ) -> error::Result<()> {
+                error::checked(super::with_lock(|| {
+                    $nc_put_var1_type(
+                        variable.ncid,
+                        variable.varid,
+                        start.as_ptr(),
+                        addr_of!(value),
+                    )
+                }))
+            }
+
+            unsafe fn get_vara(
                 variable: &Variable,
-                indices: &[usize],
-                slice_len: &[usize],
+                start: &[usize],
+                count: &[usize],
                 values: *mut Self,
             ) -> error::Result<()> {
                 error::checked(super::with_lock(|| {
                     $nc_get_vara_type(
                         variable.ncid,
                         variable.varid,
-                        indices.as_ptr(),
-                        slice_len.as_ptr(),
+                        start.as_ptr(),
+                        count.as_ptr(),
                         values,
                     )
                 }))
             }
 
-            // put a SINGLE value into a netCDF variable at the given index
-            unsafe fn put_value_at(
-                variable: &mut VariableMut,
-                indices: &[usize],
-                value: Self,
-            ) -> error::Result<()> {
-                error::checked(super::with_lock(|| {
-                    $nc_put_var1_type(variable.ncid, variable.varid, indices.as_ptr(), &value)
-                }))
-            }
-
             // put a SLICE of values into a netCDF variable at the given index
-            unsafe fn put_values_at(
+            unsafe fn put_vara(
                 variable: &mut VariableMut,
-                indices: &[usize],
-                slice_len: &[usize],
+                start: &[usize],
+                count: &[usize],
                 values: &[Self],
             ) -> error::Result<()> {
                 error::checked(super::with_lock(|| {
                     $nc_put_vara_type(
                         variable.ncid,
                         variable.varid,
-                        indices.as_ptr(),
-                        slice_len.as_ptr(),
+                        start.as_ptr(),
+                        count.as_ptr(),
                         values.as_ptr(),
                     )
                 }))
             }
 
-            unsafe fn get_values_strided(
+            unsafe fn get_vars(
                 variable: &Variable,
-                indices: &[usize],
-                slice_len: &[usize],
+                start: &[usize],
+                count: &[usize],
                 strides: &[isize],
                 values: *mut Self,
             ) -> error::Result<()> {
@@ -536,28 +416,28 @@ macro_rules! impl_numeric {
                     $nc_get_vars_type(
                         variable.ncid,
                         variable.varid,
-                        indices.as_ptr(),
-                        slice_len.as_ptr(),
+                        start.as_ptr(),
+                        count.as_ptr(),
                         strides.as_ptr(),
                         values,
                     )
                 }))
             }
 
-            unsafe fn put_values_strided(
+            unsafe fn put_vars(
                 variable: &mut VariableMut,
-                indices: &[usize],
-                slice_len: &[usize],
-                strides: &[isize],
+                start: &[usize],
+                count: &[usize],
+                stride: &[isize],
                 values: *const Self,
             ) -> error::Result<()> {
                 error::checked(super::with_lock(|| {
                     $nc_put_vars_type(
                         variable.ncid,
                         variable.varid,
-                        indices.as_ptr(),
-                        slice_len.as_ptr(),
-                        strides.as_ptr(),
+                        start.as_ptr(),
+                        count.as_ptr(),
+                        stride.as_ptr(),
                         values,
                     )
                 }))
@@ -720,79 +600,114 @@ impl<'g> VariableMut<'g> {
 }
 
 impl<'g> Variable<'g> {
-    ///  Fetches one specific value at specific indices
-    ///  indices must has the same length as self.dimensions.
-    pub fn value<T: Numeric>(&self, indices: Option<&[usize]>) -> error::Result<T> {
-        let indices_: Vec<usize>;
-        let indices = if let Some(x) = indices {
-            self.check_indices(x, false)?;
-            x
-        } else {
-            indices_ = self.default_indices(false)?;
-            &indices_
-        };
+    fn value_mono<T: Numeric>(&self, extent: &Extents) -> error::Result<T> {
+        let dims = self.dimensions();
+        let (start, count, _stride) = extent.get_start_count_stride(dims)?;
 
-        unsafe { T::single_value_from_variable(self, indices) }
+        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        if number_of_items != 1 {
+            return Err(error::Error::BufferLen {
+                wanted: 1,
+                actual: number_of_items,
+            });
+        }
+
+        unsafe { T::get_var1(self, &start) }
     }
 
-    /// Reads a string variable. This involves two copies per read, and should
-    /// be avoided in performance critical code
-    pub fn string_value(&self, indices: Option<&[usize]>) -> error::Result<String> {
-        let indices_: Vec<usize>;
-        let indices = if let Some(x) = indices {
-            self.check_indices(x, false)?;
-            x
-        } else {
-            indices_ = self.default_indices(false)?;
-            &indices_
-        };
+    ///  Fetches one specific value at specific indices
+    ///  indices must has the same length as self.dimensions.
+    pub fn value<T: Numeric, E>(&self, indices: E) -> error::Result<T>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extent = indices.try_into().map_err(Into::into)?;
+        self.value_mono(&extent)
+    }
+
+    fn string_value_mono(&self, extent: &Extents) -> error::Result<String> {
+        let dims = self.dimensions();
+        let (start, count, _stride) = extent.get_start_count_stride(dims)?;
+
+        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        if number_of_items != 1 {
+            return Err(error::Error::BufferLen {
+                wanted: 1,
+                actual: number_of_items,
+            });
+        }
 
         let mut s: *mut std::os::raw::c_char = std::ptr::null_mut();
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_get_var1_string(self.ncid, self.varid, indices.as_ptr(), &mut s)
+                nc_get_var1_string(self.ncid, self.varid, start.as_ptr(), &mut s)
             }))?;
         }
         let string = unsafe { NcString::from_ptr(s) };
         Ok(string.to_string_lossy().into_owned())
     }
 
+    /// Reads a string variable. This involves two copies per read, and should
+    /// be avoided in performance critical code
+    pub fn string_value<E>(&self, indices: E) -> error::Result<String>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extent = indices.try_into().map_err(Into::into)?;
+        self.string_value_mono(&extent)
+    }
+
+    fn values_mono<T: Numeric>(&self, extents: &Extents) -> error::Result<Vec<T>> {
+        let dims = self.dimensions();
+        let (start, count, stride) = extents.get_start_count_stride(dims)?;
+
+        let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        let mut values = Vec::with_capacity(number_of_elements);
+
+        unsafe {
+            T::get_vars(self, &start, &count, &stride, values.as_mut_ptr())?;
+            values.set_len(number_of_elements);
+        };
+        Ok(values)
+    }
+
+    /// Get multiple values from a variable
+    pub fn values<T: Numeric, E>(&self, extents: E) -> error::Result<Vec<T>>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents: Extents = extents.try_into().map_err(Into::into)?;
+        self.values_mono(&extents)
+    }
+
     #[cfg(feature = "ndarray")]
     /// Fetches variable
-    pub fn values<T: Numeric>(
-        &self,
-        indices: Option<&[usize]>,
-        slice_len: Option<&[usize]>,
-    ) -> error::Result<ArrayD<T>> {
-        let indices_: Vec<usize>;
-        let indices = if let Some(x) = indices {
-            self.check_indices(x, false)?;
-            x
-        } else {
-            indices_ = self.default_indices(false)?;
-            &indices_
-        };
-        let slice_len_: Vec<usize>;
-        let full_length;
-        let slice_len = if let Some(x) = slice_len {
-            full_length = x.iter().fold(1_usize, |acc, x| acc.saturating_mul(*x));
-            if full_length == usize::max_value() {
-                return Err(error::Error::Overflow);
-            }
-            self.check_sizelen(full_length, indices, x, false)?;
-            x
-        } else {
-            full_length = self.dimensions.iter().map(Dimension::len).product();
-            slice_len_ = self.default_sizelen(full_length, indices, false)?;
-            &slice_len_
+    fn values_arr_mono<T: Numeric>(&self, extents: &Extents) -> error::Result<ArrayD<T>> {
+        let dims = self.dimensions();
+        let (start, count, stride) = extents.get_start_count_stride(dims)?;
+
+        let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        let mut values = Vec::with_capacity(number_of_elements);
+        unsafe {
+            T::get_vars(self, &start, &count, &stride, values.as_mut_ptr())?;
+            values.set_len(number_of_elements);
         };
 
-        let mut values = Vec::with_capacity(full_length);
-        unsafe {
-            T::variable_to_ptr(self, indices, slice_len, values.as_mut_ptr())?;
-            values.set_len(full_length);
-        }
-        Ok(ArrayD::from_shape_vec(slice_len, values).unwrap())
+        Ok(ArrayD::from_shape_vec(count, values).unwrap())
+    }
+
+    #[cfg(feature = "ndarray")]
+    /// Fetches variable
+    pub fn values_arr<T: Numeric, E>(&self, extents: E) -> error::Result<ArrayD<T>>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents: Extents = extents.try_into().map_err(Into::into)?;
+        self.values_arr_mono(&extents)
     }
 
     /// Get the fill value of a variable
@@ -818,107 +733,63 @@ impl<'g> Variable<'g> {
 
         Ok(Some(unsafe { location.assume_init() }))
     }
+
+    fn values_to_mono<T: Numeric>(&self, buffer: &mut [T], extents: &Extents) -> error::Result<()> {
+        let dims = self.dimensions();
+        let (start, count, stride) = extents.get_start_count_stride(dims)?;
+
+        let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        if number_of_elements != buffer.len() {
+            return Err(error::Error::BufferLen {
+                wanted: number_of_elements,
+                actual: buffer.len(),
+            });
+        }
+        unsafe { T::get_vars(self, &start, &count, &stride, buffer.as_mut_ptr()) }
+    }
     /// Fetches variable into slice
     /// buffer must be able to hold all the requested elements
-    pub fn values_to<T: Numeric>(
-        &self,
-        buffer: &mut [T],
-        indices: Option<&[usize]>,
-        slice_len: Option<&[usize]>,
-    ) -> error::Result<()> {
-        let indices_: Vec<usize>;
-        let indices = if let Some(x) = indices {
-            self.check_indices(x, false)?;
-            x
-        } else {
-            indices_ = self.default_indices(false)?;
-            &indices_
-        };
-        let slice_len_: Vec<usize>;
-        let slice_len = if let Some(x) = slice_len {
-            self.check_sizelen(buffer.len(), indices, x, false)?;
-            x
-        } else {
-            slice_len_ = self.default_sizelen(buffer.len(), indices, false)?;
-            &slice_len_
-        };
-
-        unsafe { T::variable_to_ptr(self, indices, slice_len, buffer.as_mut_ptr()) }
+    pub fn values_to<T: Numeric, E>(&self, buffer: &mut [T], extents: E) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents: Extents = extents.try_into().map_err(Into::into)?;
+        self.values_to_mono(buffer, &extents)
     }
 
-    /// Fetches variable into slice
-    /// buffer must be able to hold all the requested elements
-    pub fn values_strided_to<T: Numeric>(
-        &self,
-        buffer: &mut [T],
-        indices: Option<&[usize]>,
-        slice_len: Option<&[usize]>,
-        strides: &[isize],
-    ) -> error::Result<usize> {
-        if strides.len() != self.dimensions.len() {
-            return Err("stride_mismatch".into());
-        }
-        let indices_: Vec<usize>;
-        let indices = if let Some(x) = indices {
-            self.check_indices(x, false)?;
-            x
-        } else {
-            indices_ = self.default_indices(false)?;
-            &indices_
-        };
+    fn raw_values_mono(&self, buf: &mut [u8], extents: &Extents) -> error::Result<()> {
+        let dims = self.dimensions();
+        let (start, count, stride) = extents.get_start_count_stride(dims)?;
 
-        let slice_len_: Vec<usize>;
-        let slice_len = if let Some(slice_len) = slice_len {
-            if slice_len.len() != self.dimensions.len() {
-                return Err("slice mismatch".into());
+        let typ = self.vartype();
+        match typ {
+            super::types::VariableType::String | super::types::VariableType::Vlen(_) => {
+                return Err(error::Error::TypeMismatch)
             }
-            #[allow(clippy::cast_possible_wrap)]
-            for (((d, &start), &count), &stride) in self
-                .dimensions
-                .iter()
-                .zip(indices)
-                .zip(slice_len)
-                .zip(strides)
-            {
-                if stride == 0 && count != 1 {
-                    return Err(error::Error::Stride);
-                }
-                if count == 0 {
-                    return Err(error::Error::ZeroSlice);
-                }
-                if start as isize + (count as isize - 1) * stride > d.len() as isize {
-                    return Err(error::Error::IndexMismatch);
-                }
-                if start as isize + count as isize * stride < 0 {
-                    return Err(error::Error::IndexMismatch);
-                }
-            }
-            slice_len
-        } else {
-            slice_len_ = self
-                .dimensions
-                .iter()
-                .zip(indices)
-                .zip(strides)
-                .map(|((d, &start), &stride)| match stride {
-                    0 => 1,
-                    stride if stride < 0 => start / stride.unsigned_abs(),
-                    stride => {
-                        let dlen = d.len();
-                        let round_up = stride.unsigned_abs() - 1;
-                        (dlen - start + round_up) / stride.unsigned_abs()
-                    }
-                })
-                .collect::<Vec<_>>();
-            &slice_len_
-        };
-        if buffer.len() < slice_len.iter().product() {
-            return Err("buffer too small".into());
+            _ => (),
         }
-        unsafe { T::get_values_strided(self, indices, slice_len, strides, buffer.as_mut_ptr())? };
-        Ok(slice_len.iter().product())
+
+        let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        let bytes_requested = number_of_elements.saturating_mul(typ.size());
+        if buf.len() != bytes_requested {
+            return Err(error::Error::BufferLen {
+                wanted: buf.len(),
+                actual: bytes_requested,
+            });
+        }
+
+        error::checked(super::with_lock(|| unsafe {
+            nc_get_vars(
+                self.ncid,
+                self.varid,
+                start.as_ptr(),
+                count.as_ptr(),
+                stride.as_ptr(),
+                buf.as_mut_ptr().cast(),
+            )
+        }))
     }
-
     /// Get values of any type as bytes, with no further interpretation
     /// of the values.
     ///
@@ -928,35 +799,26 @@ impl<'g> Variable<'g> {
     /// strings will be allocated in `buf`, and this library will
     /// not keep track of the allocations.
     /// This can lead to memory leaks.
-    pub fn raw_values(
-        &self,
-        buf: &mut [u8],
-        start: &[usize],
-        count: &[usize],
-    ) -> error::Result<()> {
-        let typ = self.vartype();
-        match typ {
-            super::types::VariableType::String | super::types::VariableType::Vlen(_) => {
-                return Err(error::Error::TypeMismatch)
-            }
-            _ => (),
-        }
-        self.check_indices(start, false)?;
-        self.check_sizelen(buf.len() / typ.size(), start, count, false)?;
-
-        error::checked(super::with_lock(|| unsafe {
-            nc_get_vara(
-                self.ncid,
-                self.varid,
-                start.as_ptr(),
-                count.as_ptr(),
-                buf.as_mut_ptr().cast(),
-            )
-        }))
+    pub fn raw_values<E>(&self, buf: &mut [u8], extents: E) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents: Extents = extents.try_into().map_err(Into::into)?;
+        self.raw_values_mono(buf, &extents)
     }
 
-    /// Get a vlen element
-    pub fn vlen<T: Numeric>(&self, index: &[usize]) -> error::Result<Vec<T>> {
+    fn vlen_mono<T: Numeric>(&self, extent: &Extents) -> error::Result<Vec<T>> {
+        let dims = self.dimensions();
+        let (start, count, _stride) = extent.get_start_count_stride(dims)?;
+
+        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        if number_of_items != 1 {
+            return Err(error::Error::BufferLen {
+                wanted: 1,
+                actual: number_of_items,
+            });
+        }
         if let super::types::VariableType::Vlen(v) = self.vartype() {
             if v.typ().id() != T::NCTYPE {
                 return Err(error::Error::TypeMismatch);
@@ -965,24 +827,19 @@ impl<'g> Variable<'g> {
             return Err(error::Error::TypeMismatch);
         };
 
-        self.check_indices(index, false)?;
-
-        let mut vlen = nc_vlen_t {
-            len: 0,
-            p: std::ptr::null_mut(),
-        };
-
-        let count = index.iter().map(|_| 1).collect::<Vec<usize>>();
+        let mut vlen: MaybeUninit<nc_vlen_t> = MaybeUninit::uninit();
 
         error::checked(super::with_lock(|| unsafe {
             nc_get_vara(
                 self.ncid,
                 self.varid,
-                index.as_ptr(),
+                start.as_ptr(),
                 count.as_ptr(),
-                std::ptr::addr_of_mut!(vlen).cast(),
+                vlen.as_mut_ptr().cast(),
             )
         }))?;
+
+        let mut vlen = unsafe { vlen.assume_init() };
 
         let mut v = Vec::<T>::with_capacity(vlen.len);
 
@@ -994,149 +851,110 @@ impl<'g> Variable<'g> {
 
         Ok(v)
     }
+    /// Get a vlen element
+    pub fn vlen<T: Numeric, E>(&self, indices: E) -> error::Result<Vec<T>>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extent = indices.try_into().map_err(Into::into)?;
+        self.vlen_mono(&extent)
+    }
 }
 
 impl<'g> VariableMut<'g> {
+    fn put_value_mono<T: Numeric>(&mut self, value: T, extents: &Extents) -> error::Result<()> {
+        let dims = self.dimensions();
+        let (start, count, _stride) = extents.get_start_count_stride(dims)?;
+
+        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        if number_of_items != 1 {
+            return Err(error::Error::BufferLen {
+                wanted: 1,
+                actual: number_of_items,
+            });
+        }
+
+        unsafe { T::put_var1(self, &start, value) }
+    }
     /// Put a single value at `indices`
-    pub fn put_value<T: Numeric>(
-        &mut self,
-        value: T,
-        indices: Option<&[usize]>,
-    ) -> error::Result<()> {
-        let indices_: Vec<usize>;
-        let indices = if let Some(x) = indices {
-            self.check_indices(x, true)?;
-            x
-        } else {
-            indices_ = self.default_indices(true)?;
-            &indices_
-        };
-        unsafe { T::put_value_at(self, indices, value) }
+    pub fn put_value<T: Numeric, E>(&mut self, value: T, extents: E) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents: Extents = extents.try_into().map_err(Into::into)?;
+        self.put_value_mono(value, &extents)
     }
 
-    /// Internally converts to a `CString`, avoid using this function when performance
-    /// is important
-    pub fn put_string(&mut self, value: &str, indices: Option<&[usize]>) -> error::Result<()> {
-        let indices_: Vec<usize>;
-        let indices = if let Some(x) = indices {
-            self.check_indices(x, true)?;
-            x
-        } else {
-            indices_ = self.default_indices(true)?;
-            &indices_
-        };
+    fn put_string_mono(&mut self, value: &str, extent: &Extents) -> error::Result<()> {
+        let dims = self.dimensions();
+        let (start, count, _stride) = extent.get_start_count_stride(dims)?;
+
+        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        if number_of_items != 1 {
+            return Err(error::Error::BufferLen {
+                wanted: 1,
+                actual: number_of_items,
+            });
+        }
 
         let value = std::ffi::CString::new(value).expect("String contained interior 0");
         let mut ptr = value.as_ptr();
 
         unsafe {
             error::checked(super::with_lock(|| {
-                nc_put_var1_string(self.ncid, self.varid, indices.as_ptr(), &mut ptr)
+                nc_put_var1_string(self.ncid, self.varid, start.as_ptr(), &mut ptr)
             }))?;
         }
 
         Ok(())
     }
-
-    /// Put a slice of values at `indices`
-    pub fn put_values<T: Numeric>(
-        &mut self,
-        values: &[T],
-        indices: Option<&[usize]>,
-        slice_len: Option<&[usize]>,
-    ) -> error::Result<()> {
-        let indices_: Vec<usize>;
-        let indices = if let Some(x) = indices {
-            self.check_indices(x, true)?;
-            x
-        } else {
-            indices_ = self.default_indices(true)?;
-            &indices_
-        };
-        let slice_len_: Vec<usize>;
-        let slice_len = if let Some(x) = slice_len {
-            self.check_sizelen(values.len(), indices, x, true)?;
-            x
-        } else {
-            slice_len_ = self.default_sizelen(values.len(), indices, true)?;
-            &slice_len_
-        };
-        unsafe { T::put_values_at(self, indices, slice_len, values) }
+    /// Internally converts to a `CString`, avoid using this function when performance
+    /// is important
+    pub fn put_string<E>(&mut self, value: &str, extent: E) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents: Extents = extent.try_into().map_err(Into::into)?;
+        self.put_string_mono(value, &extents)
     }
 
-    /// Put a slice of values at `indices`, with destination strided
-    pub fn put_values_strided<T: Numeric>(
+    fn put_values_mono<T: Numeric>(
         &mut self,
         values: &[T],
-        indices: Option<&[usize]>,
-        slice_len: Option<&[usize]>,
-        strides: &[isize],
-    ) -> error::Result<usize> {
-        let indices_: Vec<usize>;
-        let indices = if let Some(x) = indices {
-            self.check_indices(x, true)?;
-            x
-        } else {
-            indices_ = self.default_indices(true)?;
-            &indices_
-        };
-        if strides.len() != self.dimensions.len() {
-            return Err(error::Error::IndexMismatch);
+        extents: &Extents,
+    ) -> error::Result<()> {
+        let dims = self.dimensions();
+        let (start, mut count, stride) = extents.get_start_count_stride(dims)?;
+
+        let number_of_elements_to_put = values.len();
+        let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        if number_of_elements != number_of_elements_to_put {
+            if dims.len() == 1 {
+                count[0] = values.len();
+            } else {
+                return Err(error::Error::BufferLen {
+                    wanted: number_of_elements,
+                    actual: number_of_elements_to_put,
+                });
+            }
         }
 
-        let slice_len_: Vec<usize>;
-        let slice_len = if let Some(slice_len) = slice_len {
-            if slice_len.len() != self.dimensions.len() {
-                return Err(error::Error::SliceMismatch);
-            }
-            for (((d, &start), &count), &stride) in self
-                .dimensions
-                .iter()
-                .zip(indices)
-                .zip(slice_len)
-                .zip(strides)
-            {
-                if count == 0 {
-                    return Err(error::Error::ZeroSlice);
-                }
-                #[allow(clippy::cast_possible_wrap)]
-                let end = start as isize + (count as isize - 1) * stride;
-                if end < 0 {
-                    return Err(error::Error::IndexMismatch);
-                }
-                if !d.is_unlimited() && end > d.len().try_into()? {
-                    return Err(error::Error::IndexMismatch);
-                }
-            }
-            slice_len
-        } else {
-            slice_len_ = self
-                .dimensions
-                .iter()
-                .zip(indices)
-                .zip(strides)
-                .map(|((d, &start), &stride)| {
-                    match stride {
-                        0 => 1,
-                        stride if stride > 0 => {
-                            let stride: usize = stride.try_into().unwrap();
-                            let dlen = d.len();
-                            (dlen - start + stride - 1) / stride
-                        }
-                        _stride => {
-                            // Negative stride
-                            1
-                        }
-                    }
-                })
-                .collect();
-            &slice_len_
+        unsafe {
+            T::put_vars(self, &start, &count, &stride, values.as_ptr())?;
         };
-        if values.len() < slice_len.iter().product() {
-            return Err("not enough values".into());
-        }
-        unsafe { T::put_values_strided(self, indices, slice_len, strides, values.as_ptr())? };
-        Ok(slice_len.iter().product())
+        Ok(())
+    }
+    /// Put a slice of values at `indices`
+    pub fn put_values<T: Numeric, E>(&mut self, values: &[T], extents: E) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents: Extents = extents.try_into().map_err(Into::into)?;
+        self.put_values_mono(values, &extents)
     }
 
     /// Set a Fill Value
@@ -1205,6 +1023,39 @@ impl<'g> VariableMut<'g> {
         Ok(())
     }
 
+    unsafe fn put_raw_values_mono(&mut self, buf: &[u8], extents: &Extents) -> error::Result<()> {
+        let dims = self.dimensions();
+        let (start, count, stride) = extents.get_start_count_stride(dims)?;
+
+        let typ = self.vartype();
+        match typ {
+            super::types::VariableType::String | super::types::VariableType::Vlen(_) => {
+                return Err(error::Error::TypeMismatch)
+            }
+            _ => (),
+        }
+
+        let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        let bytes_requested = number_of_elements.saturating_mul(typ.size());
+        if buf.len() != bytes_requested {
+            return Err(error::Error::BufferLen {
+                wanted: buf.len(),
+                actual: bytes_requested,
+            });
+        }
+
+        #[allow(unused_unsafe)]
+        error::checked(super::with_lock(|| unsafe {
+            nc_put_vars(
+                self.ncid,
+                self.varid,
+                start.as_ptr(),
+                count.as_ptr(),
+                stride.as_ptr(),
+                buf.as_ptr().cast(),
+            )
+        }))
+    }
     /// Get values of any type as bytes
     ///
     /// # Safety
@@ -1214,36 +1065,27 @@ impl<'g> VariableMut<'g> {
     /// memory from these locations. Compound types which does not
     /// have these elements will be safe to access, and can treat
     /// this function as safe
-    pub unsafe fn put_raw_values(
-        &mut self,
-        buf: &[u8],
-        start: &[usize],
-        count: &[usize],
-    ) -> error::Result<()> {
-        let typ = self.vartype();
-        match typ {
-            super::types::VariableType::String | super::types::VariableType::Vlen(_) => {
-                return Err(error::Error::TypeMismatch)
-            }
-            _ => (),
-        }
-        self.check_indices(start, true)?;
-        self.check_sizelen(buf.len() / typ.size(), start, count, true)?;
-
-        #[allow(unused_unsafe)]
-        error::checked(super::with_lock(|| unsafe {
-            nc_put_vara(
-                self.ncid,
-                self.varid,
-                start.as_ptr(),
-                count.as_ptr(),
-                buf.as_ptr().cast(),
-            )
-        }))
+    pub unsafe fn put_raw_values<E>(&mut self, buf: &[u8], extents: E) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents: Extents = extents.try_into().map_err(Into::into)?;
+        self.put_raw_values_mono(buf, &extents)
     }
 
-    /// Get a vlen element
-    pub fn put_vlen<T: Numeric>(&mut self, vec: &[T], index: &[usize]) -> error::Result<()> {
+    fn put_vlen_mono<T: Numeric>(&mut self, vec: &[T], extent: &Extents) -> error::Result<()> {
+        let dims = self.dimensions();
+        let (start, count, stride) = extent.get_start_count_stride(dims)?;
+
+        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        if number_of_items != 1 {
+            return Err(error::Error::BufferLen {
+                wanted: 1,
+                actual: number_of_items,
+            });
+        }
+
         if let super::types::VariableType::Vlen(v) = self.vartype() {
             if v.typ().id() != T::NCTYPE {
                 return Err(error::Error::TypeMismatch);
@@ -1252,24 +1094,30 @@ impl<'g> VariableMut<'g> {
             return Err(error::Error::TypeMismatch);
         };
 
-        self.check_indices(index, true)?;
-
         let vlen = nc_vlen_t {
             len: vec.len(),
             p: vec.as_ptr() as *mut _,
         };
 
-        let count = index.iter().map(|_| 1).collect::<Vec<usize>>();
-
         error::checked(super::with_lock(|| unsafe {
-            nc_put_vara(
+            nc_put_vars(
                 self.ncid,
                 self.varid,
-                index.as_ptr(),
+                start.as_ptr(),
                 count.as_ptr(),
+                stride.as_ptr(),
                 std::ptr::addr_of!(vlen).cast(),
             )
         }))
+    }
+    /// Get a vlen element
+    pub fn put_vlen<T: Numeric, E>(&mut self, vec: &[T], indices: E) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extent = indices.try_into().map_err(Into::into)?;
+        self.put_vlen_mono(vec, &extent)
     }
 }
 

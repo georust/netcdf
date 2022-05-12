@@ -264,8 +264,8 @@ impl MutableFile {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut file = netcdf::append("file.nc")?;
     /// let mut vars = file.variables_mut().collect::<Vec<_>>();
-    /// vars[0].put_value(1_u8, Some(&[2, 5]))?;
-    /// vars[1].put_value(1_u8, Some(&[5, 2]))?;
+    /// vars[0].put_value(1_u8, [2, 5])?;
+    /// vars[1].put_value(1_u8, [5, 2])?;
     /// # Ok(()) }
     /// ```
     pub fn variables_mut(&mut self) -> impl Iterator<Item = VariableMut> {

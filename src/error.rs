@@ -19,7 +19,19 @@ pub enum Error {
     /// Length of the slice indices is inconsistent
     SliceLen,
     /// Supplied the wrong length of the buffer
-    BufferLen(usize, usize),
+    BufferLen {
+        /// Wanted size of the buffer
+        wanted: usize,
+        /// Actual size of the buffer
+        actual: usize,
+    },
+    /// Supplied the wrong length of dimension
+    DimensionMismatch {
+        /// Wanted size of the dimension
+        wanted: usize,
+        /// Actual size of the dimension
+        actual: usize,
+    },
     /// Some index is greater than expected
     IndexMismatch,
     /// Requested a mismatched total slice
@@ -107,6 +119,12 @@ impl From<std::ffi::NulError> for Error {
     }
 }
 
+impl From<std::convert::Infallible> for Error {
+    fn from(_: std::convert::Infallible) -> Self {
+        unreachable!("Infallible error can never be constructed")
+    }
+}
+
 use std::fmt;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -116,12 +134,15 @@ impl fmt::Display for Error {
             Self::SliceLen => write!(f, "slices does not match in length with the variable"),
             Self::IndexMismatch => write!(f, "requested index is bigger than the dimension length"),
             Self::SliceMismatch => write!(f, "requested slice is bigger than the dimension length"),
+            Self::DimensionMismatch { wanted, actual } => write!(
+                f,
+                "requested dimension ({actual}) is bigger than the dimension length ({wanted})"
+            ),
             Self::ZeroSlice => write!(f, "must request a slice length larger than zero"),
             Self::Stride => write!(f, "invalid strides"),
-            Self::BufferLen(has, need) => write!(
+            Self::BufferLen { wanted, actual } => write!(
                 f,
-                "buffer size mismatch, has size {}, but needs size {}",
-                has, need
+                "buffer size mismatch, has size {actual}, but needs size {wanted}",
             ),
             Self::TypeMismatch => write!(f, "netcdf types does not correspond to what is defined"),
             Self::TypeUnknown(t) => write!(f, "netcdf type {} is not known", t),
