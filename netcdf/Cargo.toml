@@ -1,0 +1,33 @@
+[package]
+name = "netcdf"
+version = "0.7.0"
+authors = [
+    "Michael Hiley <mhiley@gmail.com>",
+    "Magnus Ulimoen <magnusu@met.no>"
+]
+license = "MIT OR Apache-2.0"
+description = "High-level NetCDF bindings for Rust"
+repository = "https://github.com/georust/netcdf"
+keywords = ["netcdf", "hdf", "hdf5", "libnetcdf", "netcdf4"]
+edition = "2021"
+readme = "../README.md"
+categories = ["science", "filesystem"]
+exclude = ["examples/**", "tests/**"]
+
+[features]
+default = ["ndarray"]
+memory = ["netcdf-sys/memio"]
+static = ["netcdf-sys/static"]
+
+[dependencies]
+lazy_static = "1.4.0"
+ndarray = { version = "0.15", optional = true }
+netcdf-sys = { path = "../netcdf-sys", version = "0.4.0" }
+bitflags = "1.2.1"
+
+[dev-dependencies]
+tempfile = "3.1.0"
+structopt = "0.3.3"
+
+[package.metadata.docs.rs]
+features = ["static"]

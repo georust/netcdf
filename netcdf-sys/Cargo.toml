@@ -8,7 +8,6 @@ authors = [
 license = "MIT"
 description = "FFI bindings to NetCDF"
 repository = "https://github.com/georust/netcdf"
-documentation = "https://docs.rs/netcdf"
 keywords = ["netcdf", "hdf", "hdf5", "cdm", "ffi"]
 edition = "2021"
 links = "netcdf"
@@ -18,6 +17,7 @@ categories = ["ffi", "filesystem", "science"]
 exclude = [
     "testdata/**",
 ]
+rust-version = "1.60"
 
 [dependencies]
 libz-sys = { version = "1.0.25" }
