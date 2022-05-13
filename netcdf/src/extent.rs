@@ -18,7 +18,7 @@ pub enum Extent {
         /// Start of slice
         start: usize,
         /// Stride of slice
-        stride: usize,
+        stride: isize,
     },
     /// A slice with an end
     SliceEnd {
@@ -27,7 +27,7 @@ pub enum Extent {
         /// End of slice
         end: usize,
         /// Stride of slice
-        stride: usize,
+        stride: isize,
     },
     /// A slice with a count
     SliceCount {
@@ -36,7 +36,7 @@ pub enum Extent {
         /// Number of elements in slice
         count: usize,
         /// Stride of slice
-        stride: usize,
+        stride: isize,
     },
     /// A slice which is just an index
     Index(usize),
@@ -86,7 +86,7 @@ impl From<StepBy<RangeFrom<usize>>> for Extent {
             .next()
             .expect("Iterator must contain at least two items");
 
-        let stride = second - first;
+        let stride = isize::try_from(second - first).unwrap_or(isize::MAX);
         Self::Slice {
             start: first,
             stride,
@@ -115,7 +115,7 @@ impl From<StepBy<Range<usize>>> for Extent {
                 stride: 1,
             },
             (Some(first), Some(second)) => {
-                let stride = second - first;
+                let stride = isize::try_from(second - first).unwrap_or(isize::MAX);
                 let last = range.last().unwrap_or(second);
 
                 Self::SliceEnd {
@@ -176,7 +176,7 @@ impl From<StepBy<RangeInclusive<usize>>> for Extent {
                 stride: 1,
             },
             (Some(first), Some(second)) => {
-                let stride = second - first;
+                let stride = isize::try_from(second - first).unwrap_or(isize::MAX);
                 let last = range.last().unwrap_or(second);
 
                 Self::SliceEnd {
@@ -206,7 +206,7 @@ impl From<RangeFull> for Extent {
 impl_for_ref!(RangeFull: Extent);
 
 impl Extent {
-    const fn stride(&self) -> Option<usize> {
+    const fn stride(&self) -> Option<isize> {
         match *self {
             Self::Slice { start: _, stride }
             | Self::SliceEnd {
@@ -223,7 +223,7 @@ impl Extent {
         }
     }
     /// Set stride of the slice
-    pub fn set_stride(&mut self, stride: usize) {
+    pub fn set_stride(&mut self, stride: isize) {
         let s = stride;
         match self {
             Self::Slice { start: _, stride }
@@ -485,28 +485,23 @@ impl Extents {
                     .zip(&*extents)
                     .map(|(d, &e)| match e {
                         Extent::Index(start) => (start, 1),
-                        Extent::Slice { start, stride } => {
-                            let count = (start..d.len()).step_by(stride).count();
-                            (start, count)
-                        }
+                        Extent::Slice { start, stride } => usize::try_from(stride).map_or_else(
+                            |_| (start, 0),
+                            |stride| (start, (start..d.len()).step_by(stride).count()),
+                        ),
                         Extent::SliceCount {
                             start,
                             count,
                             stride: _,
                         } => (start, count),
-                        Extent::SliceEnd { start, end, stride } => {
-                            let count = (start..end).step_by(stride).count();
-                            (start, count)
-                        }
+                        Extent::SliceEnd { start, end, stride } => usize::try_from(stride)
+                            .map_or_else(
+                                |_| (start, 0),
+                                |stride| (start, (start..end).step_by(stride).count()),
+                            ),
                     })
                     .unzip();
-                let stride = extents
-                    .iter()
-                    .map(|e| {
-                        e.stride()
-                            .map_or(1, |s| isize::try_from(s).expect("Stride index too large"))
-                    })
-                    .collect();
+                let stride = extents.iter().map(|e| e.stride().unwrap_or(1)).collect();
                 (start, count, stride)
             }
         };
@@ -532,8 +527,7 @@ mod ndarray_impl {
                 .map(|&s| match s {
                     SliceInfoElem::Slice { start, end, step } => {
                         let start = usize::try_from(start).map_err(|_| "Invalid start")?;
-
-                        let stride = usize::try_from(step).map_err(|_| "Invalid stride")?;
+                        let stride = step;
 
                         if let Some(end) = end {
                             let end = usize::try_from(end).map_err(|_| "Invalid end")?;
@@ -592,10 +586,10 @@ impl TryFrom<(Vec<usize>, Vec<usize>)> for Extents {
     }
 }
 
-impl TryFrom<(&[usize], &[usize], &[usize])> for Extents {
+impl TryFrom<(&[usize], &[usize], &[isize])> for Extents {
     type Error = error::Error;
     fn try_from(
-        (start, count, stride): (&[usize], &[usize], &[usize]),
+        (start, count, stride): (&[usize], &[usize], &[isize]),
     ) -> Result<Self, Self::Error> {
         if start.len() != count.len() || start.len() != stride.len() {
             Err("Indices or count or stride does not have the same length".into())
@@ -616,10 +610,10 @@ impl TryFrom<(&[usize], &[usize], &[usize])> for Extents {
     }
 }
 
-impl TryFrom<(Vec<usize>, Vec<usize>, Vec<usize>)> for Extents {
+impl TryFrom<(Vec<usize>, Vec<usize>, Vec<isize>)> for Extents {
     type Error = error::Error;
     fn try_from(
-        (start, count, stride): (Vec<usize>, Vec<usize>, Vec<usize>),
+        (start, count, stride): (Vec<usize>, Vec<usize>, Vec<isize>),
     ) -> Result<Self, Self::Error> {
         Self::try_from((start.as_slice(), count.as_slice(), stride.as_slice()))
     }
@@ -651,16 +645,16 @@ macro_rules! impl_extents_for_arrays {
             }
         }
 
-        impl TryFrom<([usize; $N], [usize; $N], [usize; $N])> for Extents {
+        impl TryFrom<([usize; $N], [usize; $N], [isize; $N])> for Extents {
             type Error = Infallible;
-            fn try_from((start, count, stride): ([usize; $N], [usize; $N], [usize; $N])) -> Result<Self, Self::Error> {
+            fn try_from((start, count, stride): ([usize; $N], [usize; $N], [isize; $N])) -> Result<Self, Self::Error> {
                     Self::try_from((&start, &count, &stride))
             }
         }
 
-        impl TryFrom<(&[usize; $N], &[usize; $N], &[usize; $N])> for Extents {
+        impl TryFrom<(&[usize; $N], &[usize; $N], &[isize; $N])> for Extents {
             type Error = Infallible;
-            fn try_from((start, count, stride): (&[usize; $N], &[usize; $N], &[usize; $N])) -> Result<Self, Self::Error> {
+            fn try_from((start, count, stride): (&[usize; $N], &[usize; $N], &[isize; $N])) -> Result<Self, Self::Error> {
                     Ok(Self::Extent(
                         start
                             .iter()
