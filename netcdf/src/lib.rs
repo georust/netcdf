@@ -28,22 +28,25 @@
 //! // Get the variable in this file with the name "data"
 //! let var = &file.variable("data").expect("Could not find variable 'data'");
 //!
-//! // Read a single datapoint from the variable as a numeric type
-//! let data_i32 = var.value::<i32>(None)?;
-//! let data_f32 : f32 = var.value(None)?;
+//! // Read a single datapoint from a 1D variable as a numeric type
+//! let data_i32 = var.value::<i32, _>(4)?;
+//! let data_f32 : f32 = var.value(5)?;
 //!
-//! // If your variable is multi-dimensional you might want to get a certain index
-//! let data_i32 = var.value::<i32>(Some(&[40, 0, 0]))?;
+//! // If your variable is multi-dimensional you need to use a
+//! // type that supports `Selection`, such as a tuple or array
+//! let data_i32 = var.value::<i32, _>([40, 0, 0])?;
+//! let data_i32 = var.value::<i32, _>((40, 0, 0))?;
 //!
-//! // You can use `values()` to get all the data from the variable.
-//! // Passing `None` as both arguments will give you the entire slice
+//! // You can use `values_arr()` to get all the data from the variable.
+//! // Passing `..` will give you the entire slice
 //! # #[cfg(feature = "ndarray")]
-//! let data = var.values::<i32>(None, None)?;
+//! let data = var.values_arr::<i32, _>(..)?;
 //!
 //! // A subset can also be selected, the following will extract the slice at
 //! // `(40, 0, 0)` and get a dataset of size `100, 100` from this
 //! # #[cfg(feature = "ndarray")]
-//! let data = var.values::<i32>(Some(&[40, 0 ,0]), Some(&[1, 100, 100]))?;
+//! let data = var.values_arr::<i32, _>(([40, 0 ,0], [1, 100, 100]))?;
+//! let data = var.values_arr::<i32, _>((40, ..100, ..100))?;
 //! # Ok(()) }
 //! ```
 //!
@@ -65,17 +68,16 @@
 //!             &["time", "ncrabs"],
 //! )?;
 //! // Metadata can be added to the variable
-//! var.add_attribute("units", "Kelvin");
-//! var.add_attribute("add_offset", 273.15_f32);
+//! var.add_attribute("units", "Kelvin")?;
+//! var.add_attribute("add_offset", 273.15_f32)?;
 //!
 //! // Data can then be created and added to the variable
 //! let data : Vec<i32> = vec![42; 10];
-//! var.put_values(&data, Some(&[0, 0]), None);
-//! // (This puts data at offset (0, 0) until all the data has been consumed)
+//! var.put_values(&data, (0, ..))?;
 //!
 //! // Values can be added along the unlimited dimension, which
 //! // resizes along the `time` axis
-//! var.put_values(&data, Some(&[1, 0]), None);
+//! var.put_values(&data, (11, ..))?;
 //! # Ok(()) }
 //! ```
 
@@ -91,6 +93,7 @@ use std::sync::Mutex;
 pub mod attribute;
 pub mod dimension;
 pub mod error;
+pub mod extent;
 pub mod file;
 pub mod group;
 pub mod types;

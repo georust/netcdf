@@ -1,3 +1,4 @@
+---
 name: CI
 
 on:
@@ -33,7 +34,7 @@ jobs:
     - name: Check formatting
       run: cargo fmt -- --check
     - name: Documentation
-      run: cargo doc
+      run: cargo doc --workspace
     - name: Clippy
       run: cargo clippy --workspace -- -D warnings
 
@@ -69,10 +70,10 @@ jobs:
         override: true
 
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --workspace --exclude netcdf-src
 
     - name: Test
-      run: cargo test --verbose
+      run: cargo test --verbose --workspace --exclude netcdf-src
 
   conda:
     name: conda
@@ -90,7 +91,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-        with: {submodules: true}
+        with: {submodules: false}
       - name: Install Rust (${{matrix.rust}})
         uses: actions-rs/toolchain@v1
         with: {toolchain: '${{matrix.rust}}', profile: minimal, override: true}
@@ -98,12 +99,12 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with: {auto-update-conda: false, activate-environment: testenv}
       - name: Install netCDF
-        run: conda install -y -c ${{matrix.channel}} libnetcdf=4.7.4
+        run: conda install -y -c ${{matrix.channel}} libnetcdf=4.8.1
       - name: Build and test
         run: |
           export HDF5_DIR="$CONDA_PREFIX"
           [ "${{runner.os}}" != "Windows" ] && export RUSTFLAGS="-C link-args=-Wl,-rpath,$CONDA_PREFIX/lib"
-          cargo test -vv
+          cargo test -vv --workspace --exclude netcdf-src
 
   static_builds:
     name: static builds
@@ -130,7 +131,7 @@ jobs:
         if: matrix.os == 'macos'
         run: sudo xcode-select -s "/Applications/Xcode_11.7.app"
       - name: Build and test
-        run: cargo test -vv --features static
+        run: cargo test -vv --features static --workspace
 
   addr_san:
     name: Address sanitizer
@@ -143,4 +144,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with: {toolchain: nightly, profile: minimal, override: true}
       - name: Run test with sanitizer
-        run: env RUSTFLAGS="-Z sanitizer=address" cargo test --features netcdf-sys/static --target x86_64-unknown-linux-gnu --workspace
+        env:
+          RUSTFLAGS: "-Z sanitizer=address"
+          RUSTDOCFLAGS: "-Z sanitizer=address"
+        run: cargo test --features netcdf-sys/static --target x86_64-unknown-linux-gnu --workspace

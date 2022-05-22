@@ -44,7 +44,7 @@ impl BasicType {
     }
     /// `nc_type` of the type
     pub(crate) fn id(self) -> nc_type {
-        use super::Numeric;
+        use super::NcPutGet;
         match self {
             Self::Byte => i8::NCTYPE,
             Self::Char => NC_CHAR,
@@ -63,17 +63,17 @@ impl BasicType {
     /// `rusty` name of the type
     pub fn name(self) -> &'static str {
         match self {
-            BasicType::Byte => "i8",
-            BasicType::Char => "char",
-            BasicType::Ubyte => "u8",
-            BasicType::Short => "i16",
-            BasicType::Ushort => "u16",
-            BasicType::Int => "i32",
-            BasicType::Uint => "u32",
-            BasicType::Int64 => "i64",
-            BasicType::Uint64 => "u64",
-            BasicType::Float => "f32",
-            BasicType::Double => "f64",
+            Self::Byte => "i8",
+            Self::Char => "char",
+            Self::Ubyte => "u8",
+            Self::Short => "i16",
+            Self::Ushort => "u16",
+            Self::Int => "i32",
+            Self::Uint => "u32",
+            Self::Int64 => "i64",
+            Self::Uint64 => "u64",
+            Self::Float => "f32",
+            Self::Double => "f64",
         }
     }
 }
@@ -187,7 +187,7 @@ impl VlenType {
 
     pub(crate) fn add<T>(location: nc_type, name: &str) -> error::Result<Self>
     where
-        T: super::Numeric,
+        T: super::NcPutGet,
     {
         let name = super::utils::short_name_to_bytes(name)?;
         let mut id = 0;
@@ -236,11 +236,11 @@ pub struct EnumType {
 }
 
 impl EnumType {
-    pub(crate) fn add<T: super::Numeric>(
+    pub(crate) fn add<T: super::NcPutGet>(
         ncid: nc_type,
         name: &str,
         mappings: &[(&str, T)],
-    ) -> error::Result<EnumType> {
+    ) -> error::Result<Self> {
         let name = super::utils::short_name_to_bytes(name)?;
         let mut id = 0;
         error::checked(super::with_lock(|| unsafe {
@@ -290,7 +290,7 @@ impl EnumType {
     ///
     /// # Safety
     /// Does not check type of enum
-    unsafe fn member_at<T: super::Numeric>(&self, idx: usize) -> error::Result<(String, T)> {
+    unsafe fn member_at<T: super::NcPutGet>(&self, idx: usize) -> error::Result<(String, T)> {
         let mut name = [0_u8; NC_MAX_NAME as usize + 1];
         let mut t = std::mem::MaybeUninit::<T>::uninit();
         let idx = idx.try_into()?;
@@ -310,7 +310,7 @@ impl EnumType {
     }
 
     /// Get all members of the enum
-    pub fn members<T: super::Numeric>(
+    pub fn members<T: super::NcPutGet>(
         &self,
     ) -> error::Result<impl Iterator<Item = (String, T)> + '_> {
         let mut typ = 0;
@@ -547,13 +547,13 @@ impl CompoundBuilder {
     }
 
     /// Add a basic numeric type
-    pub fn add<T: super::Numeric>(&mut self, name: &str) -> error::Result<&mut Self> {
+    pub fn add<T: super::NcPutGet>(&mut self, name: &str) -> error::Result<&mut Self> {
         let var = VariableType::from_id(self.ncid, T::NCTYPE)?;
         self.add_type(name, &var)
     }
 
     /// Add an array of a basic type
-    pub fn add_array<T: super::Numeric>(
+    pub fn add_array<T: super::NcPutGet>(
         &mut self,
         name: &str,
         dims: &[usize],

@@ -129,13 +129,18 @@ pub(crate) fn dimensions_from_location<'g>(
     let mut ndims = 0;
     unsafe {
         error::checked(super::with_lock(|| {
-            nc_inq_dimids(ncid, &mut ndims, std::ptr::null_mut(), false as _)
+            nc_inq_dimids(ncid, &mut ndims, std::ptr::null_mut(), <_>::from(false))
         }))?;
     }
     let mut dimids = vec![0; ndims.try_into()?];
     unsafe {
         error::checked(super::with_lock(|| {
-            nc_inq_dimids(ncid, std::ptr::null_mut(), dimids.as_mut_ptr(), false as _)
+            nc_inq_dimids(
+                ncid,
+                std::ptr::null_mut(),
+                dimids.as_mut_ptr(),
+                <_>::from(false),
+            )
         }))?;
     }
     let unlimdims = {

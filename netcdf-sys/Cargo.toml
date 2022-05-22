@@ -8,9 +8,8 @@ authors = [
 license = "MIT"
 description = "FFI bindings to NetCDF"
 repository = "https://github.com/georust/netcdf"
-documentation = "https://docs.rs/netcdf"
 keywords = ["netcdf", "hdf", "hdf5", "cdm", "ffi"]
-edition = "2018"
+edition = "2021"
 links = "netcdf"
 build = "build.rs"
 readme = "README.md"
@@ -18,6 +17,7 @@ categories = ["ffi", "filesystem", "science"]
 exclude = [
     "testdata/**",
 ]
+rust-version = "1.60"
 
 [dependencies]
 libz-sys = { version = "1.0.25" }
@@ -31,9 +31,8 @@ lazy_static = "1.4.0"
 [features]
 default = []
 memio = []
-static = ["libz-sys/static", "hdf5-sys/static", "hdf5-sys/hl", "hdf5-sys/deprecated", "hdf5-sys/zlib", "netcdf-src"]
-# TODO: Link static curl (but only when using "dap") "curl-sys/static-curl", "curl-sys/static-ssl"
-dap = ["curl-sys"]
+static = ["libz-sys/static", "hdf5-sys/static", "hdf5-sys/hl", "hdf5-sys/deprecated", "hdf5-sys/zlib", "netcdf-src", "curl-sys?/static-curl", "curl-sys?/static-ssl"]
+dap = ["dep:curl-sys"]
 
 [package.metadata.docs.rs]
 features = ["static"]
