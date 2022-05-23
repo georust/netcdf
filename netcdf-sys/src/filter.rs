@@ -1,7 +1,6 @@
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 
 extern "C" {
-
     pub fn nc_inq_var_filter_ids(
         ncid: c_int,
         varid: c_int,

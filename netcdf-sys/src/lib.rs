@@ -15,7 +15,9 @@ mod functions;
 pub use consts::*;
 pub use functions::*;
 
+#[cfg(feature = "4.8.0")]
 mod dispatch;
+#[cfg(feature = "4.8.0")]
 pub use dispatch::*;
 
 #[cfg(feature = "has-mmap")]
@@ -23,7 +25,9 @@ mod mmap;
 #[cfg(feature = "has-mmap")]
 pub use mmap::*;
 
+#[cfg(feature = "4.8.0")]
 mod filter;
+#[cfg(feature = "4.8.0")]
 pub use filter::*;
 
 #[cfg(test)]

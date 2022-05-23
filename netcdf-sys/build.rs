@@ -217,7 +217,7 @@ impl NcInfo {
             println!("cargo:has-dap=1");
         } else {
             assert!(
-                !feature!("DAP").is_ok(),
+                feature!("DAP").is_err(),
                 "DAP requested but not found in this installation of netCDF"
             );
         }
@@ -226,7 +226,7 @@ impl NcInfo {
             println!("cargo:has-mmap=1");
         } else {
             assert!(
-                !feature!("MEMIO").is_ok(),
+                feature!("MEMIO").is_err(),
                 "MEMIO requested but not found in this installation of netCDF"
             );
         }
