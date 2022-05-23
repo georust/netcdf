@@ -3,7 +3,8 @@ use std::os::raw::{
     c_ushort, c_void,
 };
 
-#[cfg(feature = "4.6.2")]
+// #[cfg(feature = "4.6.2")]
+#[cfg(feature = "4.8.0")]
 use super::NC_Dispatch;
 
 pub type nc_type = c_int;
@@ -18,13 +19,15 @@ extern "C" {
     pub fn nc_inq_libvers() -> *const c_char;
     pub fn nc_strerror(ncerr: c_int) -> *const c_char;
 
-    #[cfg(feature = "4.6.2")]
+    // #[cfg(feature = "4.6.2")]
+    #[cfg(feature = "4.8.0")]
     pub fn nc_def_user_format(
         mode_flag: c_int,
         dispatch_table: *mut NC_Dispatch,
         magic_number: *mut c_char,
     ) -> c_int;
-    #[cfg(feature = "4.6.2")]
+    //#[cfg(feature = "4.6.2")]
+    #[cfg(feature = "4.8.0")]
     pub fn nc_inq_user_format(
         mode_flag: c_int,
         dispatch_table: *mut *mut NC_Dispatch,
