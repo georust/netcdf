@@ -1,5 +1,5 @@
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
+#![allow(non_upper_case_globals, non_camel_case_types, non_snake_case)]
+#![allow(clippy::type_complexity)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 extern crate hdf5_sys;
@@ -17,6 +17,14 @@ pub use functions::*;
 
 mod dispatch;
 pub use dispatch::*;
+
+#[cfg(feature = "has-mmap")]
+mod mmap;
+#[cfg(feature = "has-mmap")]
+pub use mmap::*;
+
+mod filter;
+pub use filter::*;
 
 #[cfg(test)]
 mod tests {

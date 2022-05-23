@@ -155,7 +155,7 @@ where
     RawFile::open_with(name.as_ref(), options)
 }
 
-#[cfg(feature = "memory")]
+#[cfg(feature = "has-mmap")]
 /// Open a `netCDF` file from a buffer
 pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<MemFile<'a>> {
     RawFile::open_from_memory(name, mem)

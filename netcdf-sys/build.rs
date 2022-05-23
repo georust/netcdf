@@ -215,10 +215,20 @@ impl NcInfo {
         if self.metaheader.has_dap2 || self.metaheader.has_dap4 {
             println!("cargo:rustc-cfg=feature=\"has-dap\"");
             println!("cargo:has-dap=1");
+        } else {
+            assert!(
+                !feature!("DAP").is_ok(),
+                "DAP requested but not found in this installation of netCDF"
+            );
         }
         if self.metaheader.has_mmap {
             println!("cargo:rustc-cfg=feature=\"has-mmap\"");
             println!("cargo:has-mmap=1");
+        } else {
+            assert!(
+                !feature!("MEMIO").is_ok(),
+                "MEMIO requested but not found in this installation of netCDF"
+            );
         }
     }
 }
@@ -232,10 +242,6 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     let info;
-
-    // TODO: find netcdf_mem.h, enable mem if found
-    // TODO: check if DAP is enabled, fail if not
-
     if feature!("STATIC").is_ok() {
         let netcdf_lib = std::env::var("DEP_NETCDFSRC_LIB").unwrap();
         let netcdf_path = std::env::var("DEP_NETCDFSRC_SEARCH").unwrap();

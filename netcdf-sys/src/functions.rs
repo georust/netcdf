@@ -1728,21 +1728,3 @@ mod netcdf_2 {
     }
 }
 pub use netcdf_2::*;
-
-#[cfg(feature = "has-mmap")]
-mod has_mmap {
-    use super::*;
-
-    extern "C" {
-        #[cfg(feature = "has-mmap")]
-        pub fn nc_open_mem(
-            path: *const c_char,
-            mode: c_int,
-            size: usize,
-            memory: *mut c_void,
-            ncidp: *mut c_int,
-        ) -> c_int;
-    }
-}
-#[cfg(feature = "has-mmap")]
-pub use has_mmap::*;
