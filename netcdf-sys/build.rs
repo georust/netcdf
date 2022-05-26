@@ -9,7 +9,7 @@ macro_rules! feature {
 }
 
 #[derive(Debug)]
-struct NcInfoMetaHeader {
+struct NcMetaHeader {
     version: Version,
 
     has_nc2: bool,
@@ -41,7 +41,7 @@ struct NcInfoMetaHeader {
     has_benchmarks: bool,
 }
 
-impl NcInfoMetaHeader {
+impl NcMetaHeader {
     fn gather_from_includeheader(path: &std::path::Path) -> Self {
         macro_rules! match_prefix {
             ($line: expr, $prefix: expr, $item: expr) => {
@@ -59,7 +59,7 @@ impl NcInfoMetaHeader {
         }
         let meta = std::fs::read_to_string(path).expect("Could not read header file");
 
-        let mut info = NcInfoMetaHeader {
+        let mut info = Self {
             version: Version::new(0, 0, 0),
             has_nc2: false,
             has_nc4: false,
@@ -127,15 +127,37 @@ impl NcInfoMetaHeader {
         }
         info
     }
+
+    fn emit_feature_flags(&self) {
+        if self.has_dap2 || self.has_dap4 {
+            println!("cargo:rustc-cfg=feature=\"has-dap\"");
+            println!("cargo:has-dap=1");
+        } else {
+            assert!(
+                feature!("DAP").is_err(),
+                "DAP requested but not found in this installation of netCDF"
+            );
+        }
+        if self.has_mmap {
+            println!("cargo:rustc-cfg=feature=\"has-mmap\"");
+            println!("cargo:has-mmap=1");
+        } else {
+            assert!(
+                feature!("MEMIO").is_err(),
+                "MEMIO requested but not found in this installation of netCDF"
+            );
+        }
+    }
 }
 
 #[derive(Debug)]
 struct NcInfo {
-    version: Version,
-    metaheader: NcInfoMetaHeader,
+    version: Option<Version>,
+
     _prefix: String,
     includedir: String,
     libdir: String,
+    libname: String,
 }
 
 fn from_utf8_to_trimmed_string(bytes: &[u8]) -> String {
@@ -143,8 +165,10 @@ fn from_utf8_to_trimmed_string(bytes: &[u8]) -> String {
 }
 
 impl NcInfo {
-    fn gather_from_ncconfig(search_path: Option<&str>) -> Self {
-        // if ENV NETCDF_DIR or NetCDF_DIR use some other dir
+    fn guess() -> Self {
+        todo!()
+    }
+    fn gather_from_ncconfig(search_path: Option<&str>) -> Option<Self> {
         let path = if let Some(search_path) = search_path {
             std::borrow::Cow::Owned(format!("{}/bin/nc-config", search_path))
         } else {
@@ -152,6 +176,7 @@ impl NcInfo {
         };
         println!("{path:?}");
         let cmd = || Command::new(path.as_ref());
+        cmd().arg("--help").status().ok()?;
 
         let extract = |arg: &str| -> Result<Option<String>, Box<dyn std::error::Error>> {
             let output = &cmd().arg(arg).output()?;
@@ -169,67 +194,23 @@ impl NcInfo {
         };
         let version = Version::parse(&version).unwrap();
 
-        /*
-        let to_bool = |v: &str| match v {
-            "yes" => true,
-            "no" => true,
-            x => panic!("Unknown value '{}'", x),
-        };
-        let has_dap = to_bool(&extract("--has-dap").unwrap().unwrap());
-        let has_dap2 = to_bool(&extract("--has-dap2").unwrap().unwrap());
-        let has_dap4 = to_bool(&extract("--has-dap4").unwrap().unwrap());
-        let has_nc2 = to_bool(&extract("--has-nc2").unwrap().unwrap());
-        let has_nc4 = to_bool(&extract("--has-nc4").unwrap().unwrap());
-        let has_hdf5 = to_bool(&extract("--has-hdf5").unwrap().unwrap());
-        let has_logging = to_bool(&extract("--has-logging").unwrap().unwrap());
-        let has_pnetcdf = to_bool(&extract("--has-pnetcdf").unwrap().unwrap());
-        let has_szlib = to_bool(&extract("--has-szlib").unwrap().unwrap());
-        let has_cdf5 = to_bool(&extract("--has-cdf5").unwrap().unwrap());
-        let has_parallel = to_bool(&extract("--has-parallel").unwrap().unwrap());
-        */
-
         let prefix = extract("--prefix").unwrap().unwrap();
         let includedir = extract("--includedir").unwrap().unwrap();
         let libdir = extract("--libdir").unwrap().unwrap();
         let libs = extract("--libs").unwrap().unwrap();
         assert!(libs.contains("-lnetcdf"));
+        let libname = "netcdf".to_owned();
 
         let _inc = std::fs::read_to_string(std::path::Path::new(&includedir).join("netcdf.h"))
             .expect("Could not find netcdf.h");
-        let metaheader = NcInfoMetaHeader::gather_from_includeheader(
-            &std::path::Path::new(&includedir).join("netcdf_meta.h"),
-        );
 
-        assert_eq!(version, metaheader.version, "Version mismatch");
-
-        Self {
-            version,
-            metaheader,
+        Some(Self {
+            version: Some(version),
             _prefix: prefix,
             includedir,
             libdir,
-        }
-    }
-
-    fn emit_feature_flags(&self) {
-        if self.metaheader.has_dap2 || self.metaheader.has_dap4 {
-            println!("cargo:rustc-cfg=feature=\"has-dap\"");
-            println!("cargo:has-dap=1");
-        } else {
-            assert!(
-                feature!("DAP").is_err(),
-                "DAP requested but not found in this installation of netCDF"
-            );
-        }
-        if self.metaheader.has_mmap {
-            println!("cargo:rustc-cfg=feature=\"has-mmap\"");
-            println!("cargo:has-mmap=1");
-        } else {
-            assert!(
-                feature!("MEMIO").is_err(),
-                "MEMIO requested but not found in this installation of netCDF"
-            );
-        }
+            libname,
+        })
     }
 }
 
@@ -246,26 +227,34 @@ fn main() {
         let netcdf_lib = std::env::var("DEP_NETCDFSRC_LIB").unwrap();
         let netcdf_path = std::env::var("DEP_NETCDFSRC_SEARCH").unwrap();
 
-        println!("cargo:rustc-link-lib=static={}", netcdf_lib);
         println!("cargo:rustc-link-search=native={}", netcdf_path);
+        println!("cargo:rustc-link-lib=static={}", netcdf_lib);
 
-        info = NcInfo::gather_from_ncconfig(Some(&format!("{netcdf_path}/..")));
+        info = NcInfo::gather_from_ncconfig(Some(&format!("{netcdf_path}/..")))
+            .unwrap_or_else(|| NcInfo::guess());
     } else {
         println!("cargo:rerun-if-env-changed=NETCDF_DIR");
 
         let nc_dir = std::env::var("NETCDF_DIR")
             .or_else(|_| std::env::var("NetCDF_DIR"))
             .ok();
-        info = NcInfo::gather_from_ncconfig(nc_dir.as_deref());
+        info = NcInfo::gather_from_ncconfig(nc_dir.as_deref()).unwrap_or_else(|| NcInfo::guess());
 
         println!("cargo:rustc-link-search={}/lib", &info.libdir);
-        println!("cargo:rustc-link-lib=netcdf");
+        println!("cargo:rustc-link-lib={}", &info.libname);
+    }
+
+    let metaheader = NcMetaHeader::gather_from_includeheader(
+        &std::path::Path::new(&info.includedir).join("netcdf_meta.h"),
+    );
+    if let Some(version) = info.version {
+        assert_eq!(version, metaheader.version, "Version mismatch");
     }
 
     // panic!("{:?}", info);
     // Emit nc flags
     println!("cargo:includedir={}", info.includedir);
-    println!("cargo:nc_version={}", info.version);
+    println!("cargo:nc_version={}", metaheader.version);
     let versions = [
         Version::new(4, 4, 0),
         Version::new(4, 4, 1),
@@ -283,13 +272,13 @@ fn main() {
         Version::new(4, 8, 1),
     ];
 
-    if !versions.contains(&info.version) {
+    if !versions.contains(&metaheader.version) {
         if versions
             .iter()
-            .any(|x| (x.major == info.version.major) && (x.minor == info.version.minor))
+            .any(|x| (x.major == metaheader.version.major) && (x.minor == metaheader.version.minor))
         {
             println!("We don't know this release, but it is just a patch difference")
-        } else if versions.iter().any(|x| x.major == info.version.major) {
+        } else if versions.iter().any(|x| x.major == metaheader.version.major) {
             eprintln!("This minor version of netCDF is not known, but the major version is known and the release is unlikely to contain breaking API changes");
         } else {
             eprintln!("This major version is not known, please file an issue if breaking API changes have been made to netCDF-c");
@@ -297,12 +286,12 @@ fn main() {
     }
 
     for version in versions {
-        if info.version >= version {
+        if metaheader.version >= version {
             println!(
                 "cargo:rustc-cfg=feature=\"{}.{}.{}\"",
                 version.major, version.minor, version.patch
             );
         }
     }
-    info.emit_feature_flags();
+    metaheader.emit_feature_flags();
 }
