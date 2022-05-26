@@ -1,3 +1,4 @@
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use semver::Version;
@@ -90,12 +91,10 @@ impl NcMetaHeader {
         };
         for line in meta.lines() {
             if let Some(ncversion) = match_prefix(line, "NC_VERSION") {
-                println!("{}", ncversion);
                 info.version = Version::parse(ncversion.trim_matches('"')).unwrap();
             }
             if let Some(dversion) = match_prefix(line, "NC_DISPATCH_VERSION") {
                 let (dversion, _) = dversion.split_once(' ').unwrap();
-                println!("{}", dversion);
                 info.dispatch_version = Some(dversion.parse().unwrap());
             }
             match_prefix!(line, "NC_HAS_NC2", info.has_nc2);
@@ -154,9 +153,8 @@ impl NcMetaHeader {
 struct NcInfo {
     version: Option<Version>,
 
-    _prefix: String,
-    includedir: String,
-    libdir: String,
+    includedir: PathBuf,
+    libdir: PathBuf,
     libname: String,
 }
 
@@ -168,14 +166,22 @@ impl NcInfo {
     fn guess() -> Self {
         todo!()
     }
-    fn gather_from_ncconfig(search_path: Option<&str>) -> Option<Self> {
+    fn from_path(path: &Path) -> Self {
+        Self {
+            version: None,
+            includedir: path.join("include"),
+            libdir: path.join("lib"),
+            libname: "netcdf".to_owned(),
+        }
+    }
+    fn gather_from_ncconfig(search_path: Option<&Path>) -> Option<Self> {
         let path = if let Some(search_path) = search_path {
-            std::borrow::Cow::Owned(format!("{}/bin/nc-config", search_path))
+            let search_path = search_path.join("bin").join("nc-config");
+            search_path.as_os_str().to_owned()
         } else {
-            std::borrow::Cow::Borrowed("nc-config")
+            std::ffi::OsString::from("nc-config")
         };
-        println!("{path:?}");
-        let cmd = || Command::new(path.as_ref());
+        let cmd = || Command::new(&path);
         cmd().arg("--help").status().ok()?;
 
         let extract = |arg: &str| -> Result<Option<String>, Box<dyn std::error::Error>> {
@@ -194,9 +200,8 @@ impl NcInfo {
         };
         let version = Version::parse(&version).unwrap();
 
-        let prefix = extract("--prefix").unwrap().unwrap();
-        let includedir = extract("--includedir").unwrap().unwrap();
-        let libdir = extract("--libdir").unwrap().unwrap();
+        let includedir = PathBuf::from(extract("--includedir").unwrap().unwrap());
+        let libdir = PathBuf::from(extract("--libdir").unwrap().unwrap());
         let libs = extract("--libs").unwrap().unwrap();
         assert!(libs.contains("-lnetcdf"));
         let libname = "netcdf".to_owned();
@@ -206,7 +211,6 @@ impl NcInfo {
 
         Some(Self {
             version: Some(version),
-            _prefix: prefix,
             includedir,
             libdir,
             libname,
@@ -225,22 +229,30 @@ fn main() {
     let info;
     if feature!("STATIC").is_ok() {
         let netcdf_lib = std::env::var("DEP_NETCDFSRC_LIB").unwrap();
-        let netcdf_path = std::env::var("DEP_NETCDFSRC_SEARCH").unwrap();
+        let netcdf_path = PathBuf::from(std::env::var_os("DEP_NETCDFSRC_SEARCH").unwrap());
 
-        println!("cargo:rustc-link-search=native={}", netcdf_path);
+        info = NcInfo::gather_from_ncconfig(Some(&netcdf_path.join("..")))
+            .unwrap_or_else(|| NcInfo::from_path(&netcdf_path.join("..")));
+
+        println!("cargo:rustc-link-search=native={}", netcdf_path.display());
         println!("cargo:rustc-link-lib=static={}", netcdf_lib);
-
-        info = NcInfo::gather_from_ncconfig(Some(&format!("{netcdf_path}/..")))
-            .unwrap_or_else(|| NcInfo::guess());
     } else {
         println!("cargo:rerun-if-env-changed=NETCDF_DIR");
 
-        let nc_dir = std::env::var("NETCDF_DIR")
-            .or_else(|_| std::env::var("NetCDF_DIR"))
-            .ok();
-        info = NcInfo::gather_from_ncconfig(nc_dir.as_deref()).unwrap_or_else(|| NcInfo::guess());
+        let nc_dir = std::env::var_os("NETCDF_DIR")
+            .or_else(|| std::env::var_os("NetCDF_DIR"))
+            .map(PathBuf::from);
 
-        println!("cargo:rustc-link-search={}/lib", &info.libdir);
+        #[cfg(windows)]
+        let nc_dir = nc_dir.map(|d| d.join("Library"));
+
+        info = if let Some(nc_dir) = nc_dir.as_ref() {
+            NcInfo::gather_from_ncconfig(Some(nc_dir)).unwrap_or_else(|| NcInfo::from_path(nc_dir))
+        } else {
+            NcInfo::gather_from_ncconfig(None).unwrap_or_else(NcInfo::guess)
+        };
+
+        println!("cargo:rustc-link-search={}/lib", info.libdir.display());
         println!("cargo:rustc-link-lib={}", &info.libname);
     }
 
@@ -253,7 +265,7 @@ fn main() {
 
     // panic!("{:?}", info);
     // Emit nc flags
-    println!("cargo:includedir={}", info.includedir);
+    println!("cargo:includedir={}", info.includedir.display());
     println!("cargo:nc_version={}", metaheader.version);
     let versions = [
         Version::new(4, 4, 0),

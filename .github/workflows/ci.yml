@@ -103,6 +103,7 @@ jobs:
       - name: Build and test
         run: |
           export HDF5_DIR="$CONDA_PREFIX"
+          export NETCDF_DIR="$CONDA_PREFIX"
           [ "${{runner.os}}" != "Windows" ] && export RUSTFLAGS="-C link-args=-Wl,-rpath,$CONDA_PREFIX/lib"
           cargo test -vv --workspace --exclude netcdf-src
 
