@@ -85,6 +85,7 @@
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::wildcard_imports)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 use lazy_static::lazy_static;
 use netcdf_sys::nc_type;

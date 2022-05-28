@@ -31,3 +31,4 @@ structopt = "0.3.3"
 
 [package.metadata.docs.rs]
 features = ["static"]
+rustdoc-args = ["--cfg", "docsrs"]
