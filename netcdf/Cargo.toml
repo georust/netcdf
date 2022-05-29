@@ -13,10 +13,10 @@ edition = "2021"
 readme = "../README.md"
 categories = ["science", "filesystem"]
 exclude = ["examples/**", "tests/**"]
+build = "build.rs"
 
 [features]
 default = ["ndarray"]
-memory = ["netcdf-sys/memio"]
 static = ["netcdf-sys/static"]
 
 [dependencies]
@@ -31,3 +31,4 @@ structopt = "0.3.3"
 
 [package.metadata.docs.rs]
 features = ["static"]
+rustdoc-args = ["--cfg", "docsrs"]

@@ -93,7 +93,7 @@ impl RawFile {
         Ok(MutableFile(File(Self { ncid })))
     }
 
-    #[cfg(feature = "memory")]
+    #[cfg(feature = "has-mmap")]
     pub(crate) fn open_from_memory<'buffer>(
         name: Option<&str>,
         mem: &'buffer [u8],
@@ -391,7 +391,7 @@ impl MutableFile {
     }
 }
 
-#[cfg(feature = "memory")]
+#[cfg(feature = "has-mmap")]
 /// The memory mapped file is kept in this structure to keep the
 /// lifetime of the buffer longer than the file.
 ///
@@ -407,7 +407,7 @@ impl MutableFile {
 #[allow(clippy::module_name_repetitions)]
 pub struct MemFile<'buffer>(File, std::marker::PhantomData<&'buffer [u8]>);
 
-#[cfg(feature = "memory")]
+#[cfg(feature = "has-mmap")]
 impl<'a> std::ops::Deref for MemFile<'a> {
     type Target = File;
     fn deref(&self) -> &Self::Target {

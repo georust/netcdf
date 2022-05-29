@@ -908,7 +908,7 @@ fn set_compression_all_variables_in_a_group() {
 }
 
 #[test]
-#[cfg(feature = "memory")]
+#[cfg(feature = "has-mmap")]
 fn read_from_memory() {
     use std::io::Read;
     let origfile = test_location().join("simple_xy.nc");

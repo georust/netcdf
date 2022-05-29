@@ -1,5 +1,6 @@
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
+#![allow(non_upper_case_globals, non_camel_case_types, non_snake_case)]
+#![allow(clippy::type_complexity)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 extern crate hdf5_sys;
 
@@ -9,10 +10,25 @@ extern crate curl_sys;
 #[cfg(feature = "static")]
 extern crate netcdf_src;
 
-mod netcdf_bindings;
-mod netcdf_const;
-pub use netcdf_bindings::*;
-pub use netcdf_const::*;
+mod consts;
+mod functions;
+pub use consts::*;
+pub use functions::*;
+
+#[cfg(feature = "4.8.0")]
+mod dispatch;
+#[cfg(feature = "4.8.0")]
+pub use dispatch::*;
+
+#[cfg(feature = "has-mmap")]
+mod mmap;
+#[cfg(feature = "has-mmap")]
+pub use mmap::*;
+
+#[cfg(feature = "4.8.0")]
+mod filter;
+#[cfg(feature = "4.8.0")]
+pub use filter::*;
 
 #[cfg(test)]
 mod tests {
