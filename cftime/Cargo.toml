@@ -1,10 +1,15 @@
 [package]
-edition = "2021"
 name = "cftime"
 version = "0.1.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = [
+    "Antoine Gibek <antoine.gibek@ipsl.fr>",
+]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/georust/netcdf"
+keywords = ["netcdf", "time", "calendar"]
+description = "Time handling functionality for CF conventions"
+categories = ["science"]
 
 [dependencies]
 nom = "7.1.1"
-time = "0.3.11"

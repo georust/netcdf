@@ -3,5 +3,6 @@ members = [
     "netcdf",
     "netcdf-sys",
     "netcdf-src",
+    "cftime",
 ]
 default-members = ["netcdf", "netcdf-sys"]
