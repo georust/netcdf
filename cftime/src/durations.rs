@@ -1,32 +1,31 @@
 use crate::calendars::Calendars;
+use crate::constants;
 use chrono;
 use std::{
     fmt,
     ops::{Add, Div, Mul, Neg, Sub},
 };
 
-const SECS_PER_DAY: i64 = 86400;
-
 /// Base duration between time points. Higly inspired by https://docs.rs/time/0.1.37/src/time/duration.rs.html
 #[allow(missing_docs)]
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
 pub struct CFDuration {
-    duration: chrono::Duration,
-    calendar: Calendars,
+    pub duration: chrono::Duration,
+    pub calendar: Calendars,
 }
 
 impl CFDuration {
     /// Makes a new `Duration` with given number of years.
     /// Depends on the calendars definitions found in https://github.com/nco/nco/blob/master/data/udunits.dat
     /// Panics when the duration is out of bounds.
-    fn years(years: i64, calendar: Calendars) -> CFDuration {
+    pub fn years(years: i64, calendar: Calendars) -> CFDuration {
         let secs_per_year = match calendar {
-            Calendars::Gregorian => 365.2425 * SECS_PER_DAY as f64,
+            Calendars::Gregorian => 365.2425 * constants::SECS_PER_DAY as f64,
             Calendars::ProlepticGregorian | Calendars::Standard => 3.15569259747e7,
-            Calendars::NoLeap | Calendars::Day365 => 365.0 * SECS_PER_DAY as f64,
-            Calendars::AllLeap | Calendars::Day366 => 366.0 * SECS_PER_DAY as f64,
-            Calendars::Julian => 365.25 * SECS_PER_DAY as f64,
-            Calendars::Day360 => 360.0 * SECS_PER_DAY as f64,
+            Calendars::NoLeap | Calendars::Day365 => 365.0 * constants::SECS_PER_DAY as f64,
+            Calendars::AllLeap | Calendars::Day366 => 366.0 * constants::SECS_PER_DAY as f64,
+            Calendars::Julian => 365.25 * constants::SECS_PER_DAY as f64,
+            Calendars::Day360 => 360.0 * constants::SECS_PER_DAY as f64,
         };
         let secs = (secs_per_year as i64)
             .checked_mul(years)
@@ -37,7 +36,8 @@ impl CFDuration {
     /// Makes a new `Duration` with given number of months.
     /// Depends on the calendars definitions found in https://github.com/nco/nco/blob/master/data/udunits.dat
     /// Panics when the duration is out of bounds.
-    fn months(months: i64, calendar: Calendars) -> CFDuration {
+    /// Formaly a month is not exactly a month as it is defined as year/12.
+    pub fn months(months: i64, calendar: Calendars) -> CFDuration {
         let secs_per_month = match calendar {
             Calendars::Gregorian => CFDuration::years(1, calendar).num_seconds() as f64 / 12.0,
             Calendars::ProlepticGregorian | Calendars::Standard => {
@@ -184,6 +184,12 @@ impl CFDuration {
         self.duration.num_nanoseconds()
     }
 
+    pub fn get_calendar(&self) -> Calendars {
+        self.calendar
+    }
+    pub fn get_duration(&self) -> chrono::Duration {
+        self.duration
+    }
     /// The minimum possible `Duration`: `i64::MIN` milliseconds.
     #[inline]
     pub fn min_value(calendar: Calendars) -> CFDuration {

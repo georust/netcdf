@@ -8,3 +8,5 @@ version = "0.1.0"
 [dependencies]
 nom = "7.1.1"
 time = "0.3.11"
+num-integer = "0.1.45"
+chrono = "0.4.19"
