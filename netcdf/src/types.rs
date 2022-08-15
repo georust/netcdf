@@ -6,7 +6,7 @@ use netcdf_sys::*;
 use std::convert::TryInto;
 
 /// Basic numeric types
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum BasicType {
     /// Signed 1 byte integer
     Byte,

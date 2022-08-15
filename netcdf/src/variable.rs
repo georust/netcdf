@@ -46,7 +46,7 @@ impl<'g> std::ops::Deref for VariableMut<'g> {
 }
 
 /// Enum for variables endianness
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Endianness {
     /// Native endianness, depends on machine architecture (x86_64 is Little)
     Native,
