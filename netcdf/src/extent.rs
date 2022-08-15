@@ -482,7 +482,7 @@ impl Extents {
                 }
                 let (start, count) = dims
                     .iter()
-                    .zip(&*extents)
+                    .zip(extents)
                     .map(|(d, &e)| match e {
                         Extent::Index(start) => (start, 1),
                         Extent::Slice { start, stride } => usize::try_from(stride).map_or_else(
