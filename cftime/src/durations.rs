@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::calendars::Calendars;
 use crate::constants;
 use chrono;

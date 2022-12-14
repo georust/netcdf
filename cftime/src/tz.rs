@@ -1,15 +1,15 @@
-use crate::calendars::Calendars;
-use crate::constants;
-use crate::durations::CFDuration;
-use crate::time::Time;
-use crate::traits::IsLeap;
-use crate::{impl_date_display, impl_dt_display, impl_getter};
 use std::fmt;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Tz {
     pub hour: i8,
     pub minute: u8,
+}
+
+impl Default for Tz {
+    fn default() -> Self {
+        Self { hour: 0, minute: 0 }
+    }
 }
 
 impl fmt::Display for Tz {
@@ -19,7 +19,6 @@ impl fmt::Display for Tz {
         // stream: `f`. Returns `fmt::Result` which indicates whether the
         // operation succeeded or failed. Note that `write!` uses syntax which
         // is very similar to `println!`.
-        let time_str = format!("+{:02}:{:02}", self.hour, self.minute);
-        write!(f, "{}", time_str)
+        write!(f, "+{:02}:{:02}", self.hour, self.minute)
     }
 }

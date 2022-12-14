@@ -1,7 +1,8 @@
+#![allow(unused)]
 use crate::constants;
 use num_integer::div_mod_floor;
 use std::fmt;
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Time {
     pub hour: u32,
     pub minute: u32,
@@ -10,19 +11,26 @@ pub struct Time {
 }
 
 impl fmt::Display for Time {
-    // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Write strictly the first element into the supplied output
-        // stream: `f`. Returns `fmt::Result` which indicates whether the
-        // operation succeeded or failed. Note that `write!` uses syntax which
-        // is very similar to `println!`.
-        let time_str = format!(
+        write!(
+            f,
             "{:02}:{:02}:{:02}.{:06}",
             self.hour, self.minute, self.second, self.nanosecond
-        );
-        write!(f, "{}", time_str)
+        )
     }
 }
+
+impl Default for Time {
+    fn default() -> Self {
+        Self {
+            hour: 0,
+            minute: 0,
+            second: 0,
+            nanosecond: 0,
+        }
+    }
+}
+
 impl Time {
     pub fn new(hour: u32, minute: u32, second: u32, nanosecond: u64) -> Self {
         if hour >= 24 {

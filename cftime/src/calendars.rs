@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]

@@ -1,13 +1,9 @@
+#![allow(unused)]
 use crate::calendars::Calendars;
+use crate::datetimes::factory::{CFDateFactory, CFDateTimeFactory, CFDates, CFDatetimes};
 use crate::durations::CFDuration;
 use crate::time::Time;
 use crate::tz::Tz;
-
-use crate::datetime_360day::{Date360Day, DateTime360Day};
-use crate::datetime_all_leap::{DateAllLeap, DateTimeAllLeap};
-use crate::datetime_julian::{DateJulian, DateTimeJulian};
-use crate::datetime_no_leap::{DateNoLeap, DateTimeNoLeap};
-use crate::datetime_prolecpticgregorian::{DateProlepticGregorian, DateTimeProlepticGregorian};
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -125,12 +121,9 @@ fn duration<'a>(input: &'a str, calendar: &'a Calendars) -> IResult<&'a str, CFD
 /// for nom::separated_pair
 
 fn date<'a>(input: &'a str, calendar: &'a Calendars) -> IResult<&'a str, CFDates> {
-    let cf_date_factory = CFDateFactory {
-        calendar: *calendar,
-    };
     let ymd = map(
         tuple((i32, tag("-"), u32, tag("-"), u32)),
-        |(year, _, month, _, day)| cf_date_factory.build(year, month, day).unwrap(),
+        |(year, _, month, _, day)| CFDateFactory::build(year, month, day, *calendar).unwrap(),
     );
 
     let x = alt((ymd,))(input);
@@ -178,7 +171,6 @@ fn timezone(input: &str) -> IResult<&str, Tz> {
 }
 
 fn datetime<'a>(input: &'a str, calendar: &'a Calendars) -> IResult<&'a str, CFDatetimes> {
-    let cf_datetime_factory = CFDateTimeFactory {};
     fn space1_or_t(input: &str) -> IResult<&str, ()> {
         alt((value((), space1), value((), tag("T"))))(input)
     }
@@ -188,14 +180,14 @@ fn datetime<'a>(input: &'a str, calendar: &'a Calendars) -> IResult<&'a str, CFD
             space1,
             timezone,
         ),
-        |((date, time), tz)| cf_datetime_factory.build(date, time, tz).unwrap(),
+        |((date, time), tz)| CFDateTimeFactory::build(date, time, tz).unwrap(),
     );
 
     let no_tz = map(
         separated_pair(|x| date(x, calendar), space1_or_t, time),
         |(date, time)| {
             let tz = Tz { hour: 0, minute: 0 };
-            cf_datetime_factory.build(date, time, tz).unwrap()
+            CFDateTimeFactory::build(date, time, tz).unwrap()
         },
     );
 
@@ -208,7 +200,7 @@ fn datetime<'a>(input: &'a str, calendar: &'a Calendars) -> IResult<&'a str, CFD
                 second: 0,
                 nanosecond: 0,
             };
-            cf_datetime_factory.build(date, time, tz).unwrap()
+            CFDateTimeFactory::build(date, time, tz).unwrap()
         },
     );
 
@@ -218,7 +210,7 @@ fn datetime<'a>(input: &'a str, calendar: &'a Calendars) -> IResult<&'a str, CFD
             peek(one_of("+-Z")),
             timezone,
         ),
-        |((date, time), tz)| cf_datetime_factory.build(date, time, tz).unwrap(),
+        |((date, time), tz)| CFDateTimeFactory::build(date, time, tz).unwrap(),
     );
 
     let only_date = map(
@@ -231,76 +223,12 @@ fn datetime<'a>(input: &'a str, calendar: &'a Calendars) -> IResult<&'a str, CFD
                 nanosecond: 0,
             };
             let tz = Tz { hour: 0, minute: 0 };
-            cf_datetime_factory.build(date, time, tz).unwrap()
+            CFDateTimeFactory::build(date, time, tz).unwrap()
         },
     );
 
     let x = alt((tz, date_time_no_space_tz, no_tz, date_with_tz, only_date))(input);
     x
-}
-
-#[derive(Debug)]
-pub enum CFDates {
-    DateProlepticGregorian(DateProlepticGregorian),
-    DateAllLeap(DateAllLeap),
-    DateNoLeap(DateNoLeap),
-    Date360Day(Date360Day),
-    DateJulian(DateJulian),
-}
-
-struct CFDateFactory {
-    calendar: Calendars,
-}
-
-impl CFDateFactory {
-    fn build(&self, year: i32, month: u32, day: u32) -> Option<CFDates> {
-        match self.calendar {
-            Calendars::ProlepticGregorian => Some(CFDates::DateProlepticGregorian(
-                DateProlepticGregorian::new(year, month, day),
-            )),
-            Calendars::Day360 => Some(CFDates::Date360Day(Date360Day::new(year, month, day))),
-            Calendars::Day365 | Calendars::NoLeap => {
-                Some(CFDates::DateNoLeap(DateNoLeap::new(year, month, day)))
-            }
-            Calendars::AllLeap | Calendars::Day366 => {
-                Some(CFDates::DateAllLeap(DateAllLeap::new(year, month, day)))
-            }
-            Calendars::Julian => None,
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum CFDatetimes {
-    DateTimeProlepticGregorian(DateTimeProlepticGregorian),
-    DateTimeAllLeap(DateTimeAllLeap),
-    DateTimeNoLeap(DateTimeNoLeap),
-    DateTime360Day(DateTime360Day),
-    DateTimeJulian(DateTimeJulian),
-}
-struct CFDateTimeFactory {}
-
-impl CFDateTimeFactory {
-    fn build(&self, date: CFDates, time: Time, tz: Tz) -> Option<CFDatetimes> {
-        match date {
-            CFDates::DateProlepticGregorian(date) => Some(CFDatetimes::DateTimeProlepticGregorian(
-                DateTimeProlepticGregorian::new(date, time, tz),
-            )),
-
-            CFDates::Date360Day(date) => Some(CFDatetimes::DateTime360Day(DateTime360Day::new(
-                date, time, tz,
-            ))),
-            CFDates::DateNoLeap(date) => Some(CFDatetimes::DateTimeNoLeap(DateTimeNoLeap::new(
-                date, time, tz,
-            ))),
-            CFDates::DateAllLeap(date) => Some(CFDatetimes::DateTimeAllLeap(DateTimeAllLeap::new(
-                date, time, tz,
-            ))),
-            CFDates::DateJulian(date) => None,
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug)]

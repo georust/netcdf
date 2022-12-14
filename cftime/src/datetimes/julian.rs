@@ -1,17 +1,18 @@
+#![allow(unused)]
 use crate::calendars::Calendars;
 use crate::constants;
 use crate::durations::CFDuration;
+use crate::macros::{impl_date_display, impl_dt_display, impl_getter};
 use crate::time::Time;
 use crate::traits::IsLeap;
 use crate::tz::Tz;
-use crate::{impl_date_display, impl_dt_display, impl_getter};
 use num_integer::div_mod_floor;
 use std::{
     fmt,
     ops::{Add, Sub},
 };
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone)]
 pub struct DateJulian {
     pub year: i32,
     pub month: u32,
@@ -32,6 +33,15 @@ impl IsLeap for DateJulian {
             f_year = year + 1;
         }
         f_year % 4 == 0
+    }
+}
+impl Default for DateJulian {
+    fn default() -> Self {
+        Self {
+            year: constants::UNIX_DEFAULT_YEAR,
+            month: constants::UNIX_DEFAULT_MONTH,
+            day: constants::UNIX_DEFAULT_DAY,
+        }
     }
 }
 
