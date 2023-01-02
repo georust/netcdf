@@ -51,8 +51,8 @@ impl NcMetaHeader {
                 }
             };
         }
-        fn match_prefix<'a, 'b>(line: &'a str, prefix: &'b str) -> Option<&'a str> {
-            line.strip_prefix(&format!("#define {} ", prefix))
+        fn match_prefix<'a>(line: &'a str, prefix: &str) -> Option<&'a str> {
+            line.strip_prefix(&format!("#define {prefix} "))
                 .map(|item| item.trim())
         }
         fn match_prefix_bool(line: &str, prefix: &str) -> Option<bool> {
@@ -235,7 +235,7 @@ fn main() {
             .unwrap_or_else(|| NcInfo::from_path(&netcdf_path.join("..")));
 
         println!("cargo:rustc-link-search=native={}", netcdf_path.display());
-        println!("cargo:rustc-link-lib=static={}", netcdf_lib);
+        println!("cargo:rustc-link-lib=static={netcdf_lib}");
     } else {
         println!("cargo:rerun-if-env-changed=NETCDF_DIR");
 

@@ -136,7 +136,7 @@ impl File {
                     nc_inq_path(self.0.ncid, &mut pathlen, std::ptr::null_mut())
                 }))?;
             }
-            let mut name = vec![0_u8; pathlen as usize + 1_usize];
+            let mut name = vec![0_u8; pathlen + 1];
             unsafe {
                 error::checked(super::with_lock(|| {
                     nc_inq_path(self.0.ncid, std::ptr::null_mut(), name.as_mut_ptr().cast())

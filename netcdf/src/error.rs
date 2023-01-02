@@ -129,7 +129,7 @@ use std::fmt;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Str(x) => write!(f, "{}", x),
+            Self::Str(x) => x.fmt(f),
             Self::IndexLen => write!(f, "indices does not match in length with the variable"),
             Self::SliceLen => write!(f, "slices does not match in length with the variable"),
             Self::IndexMismatch => write!(f, "requested index is bigger than the dimension length"),
@@ -145,9 +145,9 @@ impl fmt::Display for Error {
                 "buffer size mismatch, has size {actual}, but needs size {wanted}",
             ),
             Self::TypeMismatch => write!(f, "netcdf types does not correspond to what is defined"),
-            Self::TypeUnknown(t) => write!(f, "netcdf type {} is not known", t),
+            Self::TypeUnknown(t) => write!(f, "netcdf type {t} is not known"),
             Self::AlreadyExists => write!(f, "variable/group/dimension already exists"),
-            Self::NotFound(x) => write!(f, "Could not find {}", x),
+            Self::NotFound(x) => write!(f, "could not find {x}"),
             Self::Netcdf(x) => {
                 let msg;
                 unsafe {
@@ -158,12 +158,12 @@ impl fmt::Display for Error {
 
                 write!(f, "netcdf error({}): {}", x, msg.to_string_lossy())
             }
-            Self::Ambiguous => write!(f, "Could not find an appropriate length of the slices"),
+            Self::Ambiguous => write!(f, "could not find an appropriate length of the slices"),
             Self::Overflow => write!(f, "slice would exceed maximum size of possible buffers"),
             Self::Conversion(e) => e.fmt(f),
-            Self::WrongDataset => write!(f, "This identifier does not belong in this dataset"),
-            Self::Utf8Conversion(e) => write!(f, "{}", e),
-            Self::NulError(e) => write!(f, "String value contains null bytes {}", e),
+            Self::WrongDataset => write!(f, "this identifier does not belong in this dataset"),
+            Self::Utf8Conversion(e) => e.fmt(f),
+            Self::NulError(e) => write!(f, "string value contains null bytes {e}"),
         }
     }
 }

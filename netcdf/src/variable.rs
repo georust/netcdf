@@ -1242,7 +1242,7 @@ impl<'g> VariableMut<'g> {
             .map(
                 |dimname| match super::dimension::from_name_toid(ncid, dimname) {
                     Ok(Some(id)) => Ok(id),
-                    Ok(None) => Err(error::Error::NotFound(format!("dimensions {}", dimname))),
+                    Ok(None) => Err(error::Error::NotFound(format!("dimensions {dimname}"))),
                     Err(e) => Err(e),
                 },
             )
@@ -1267,7 +1267,7 @@ impl<'g> VariableMut<'g> {
         let dimensions = dims
             .iter()
             .map(|dimname| match super::dimension::from_name(ncid, dimname) {
-                Ok(None) => Err(error::Error::NotFound(format!("dimensions {}", dimname))),
+                Ok(None) => Err(error::Error::NotFound(format!("dimensions {dimname}"))),
                 Ok(Some(dim)) => Ok(dim),
                 Err(e) => Err(e),
             })
