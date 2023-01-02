@@ -147,7 +147,7 @@ impl fmt::Display for Error {
             Self::TypeMismatch => write!(f, "netcdf types does not correspond to what is defined"),
             Self::TypeUnknown(t) => write!(f, "netcdf type {t} is not known"),
             Self::AlreadyExists => write!(f, "variable/group/dimension already exists"),
-            Self::NotFound(x) => write!(f, "Could not find {x}"),
+            Self::NotFound(x) => write!(f, "could not find {x}"),
             Self::Netcdf(x) => {
                 let msg;
                 unsafe {
@@ -158,12 +158,12 @@ impl fmt::Display for Error {
 
                 write!(f, "netcdf error({}): {}", x, msg.to_string_lossy())
             }
-            Self::Ambiguous => write!(f, "Could not find an appropriate length of the slices"),
+            Self::Ambiguous => write!(f, "could not find an appropriate length of the slices"),
             Self::Overflow => write!(f, "slice would exceed maximum size of possible buffers"),
-            Self::Conversion(e) => e.fmt(f),
-            Self::WrongDataset => write!(f, "This identifier does not belong in this dataset"),
+            Self::Conversion(e) => write!(f, "{e}"),
+            Self::WrongDataset => write!(f, "this identifier does not belong in this dataset"),
             Self::Utf8Conversion(e) => write!(f, "{e}"),
-            Self::NulError(e) => write!(f, "String value contains null bytes {e}"),
+            Self::NulError(e) => write!(f, "string value contains null bytes {e}"),
         }
     }
 }
