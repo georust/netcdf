@@ -129,7 +129,7 @@ use std::fmt;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Str(x) => write!(f, "{x}"),
+            Self::Str(x) => x.fmt(f),
             Self::IndexLen => write!(f, "indices does not match in length with the variable"),
             Self::SliceLen => write!(f, "slices does not match in length with the variable"),
             Self::IndexMismatch => write!(f, "requested index is bigger than the dimension length"),
@@ -160,9 +160,9 @@ impl fmt::Display for Error {
             }
             Self::Ambiguous => write!(f, "could not find an appropriate length of the slices"),
             Self::Overflow => write!(f, "slice would exceed maximum size of possible buffers"),
-            Self::Conversion(e) => write!(f, "{e}"),
+            Self::Conversion(e) => e.fmt(f),
             Self::WrongDataset => write!(f, "this identifier does not belong in this dataset"),
-            Self::Utf8Conversion(e) => write!(f, "{e}"),
+            Self::Utf8Conversion(e) => e.fmt(f),
             Self::NulError(e) => write!(f, "string value contains null bytes {e}"),
         }
     }
