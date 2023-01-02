@@ -104,7 +104,7 @@ impl<'a> Attribute<'a> {
                     Ok(AttrValue::Uchar(value))
                 }
                 len => {
-                    let mut values = vec![0_u8; len as usize];
+                    let mut values = vec![0_u8; len];
                     unsafe {
                         error::checked(super::with_lock(|| {
                             nc_get_att_uchar(
