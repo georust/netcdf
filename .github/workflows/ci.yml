@@ -17,7 +17,7 @@ env:
 jobs:
   rustfmt:
     name: rustfmt
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -40,7 +40,7 @@ jobs:
 
   test_apt:
     name: test apt
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         build:
@@ -109,15 +109,16 @@ jobs:
 
   static_builds:
     name: static builds
-    runs-on: ${{matrix.os}}-latest
+    runs-on: ${{matrix.os}}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu, rust: stable}
-          - {os: windows, rust: stable-msvc}
-          - {os: windows, rust: stable-gnu}
-          - {os: macos, rust: stable}
+          - {os: ubuntu-latest, rust: stable}
+          - {os: windows-latest, rust: stable-msvc}
+          - {os: windows-latest, rust: stable-gnu}
+          - {os: macos-11, rust: stable}
+          - {os: macos-latest, rust: stable}
     defaults:
       run:
           shell: bash -l {0}
@@ -129,7 +130,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with: {toolchain: '${{matrix.rust}}', profile: minimal, override: true}
       - name: Change to older toolchain
-        if: matrix.os == 'macos'
+        if: matrix.os == 'macos-11'
         run: sudo xcode-select -s "/Applications/Xcode_11.7.app"
       - name: Build and test
         run: cargo test -vv --features static --workspace
