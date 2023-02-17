@@ -64,7 +64,7 @@ fn find_variable() {
 
     for mut var in group.variables_mut() {
         if var.dimensions().len() > 0 {
-            var.compression(3).unwrap();
+            var.compression(3, false).unwrap();
         }
         if var.name() == "z" {
             var.chunking(&[1]).unwrap();

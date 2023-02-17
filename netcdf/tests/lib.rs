@@ -854,7 +854,7 @@ fn use_compression_chunking() {
     file.add_dimension("x", 10).unwrap();
 
     let var = &mut file.add_variable::<i32>("compressed", &["x"]).unwrap();
-    var.compression(5).unwrap();
+    var.compression(5, false).unwrap();
     var.chunking(&[5]).unwrap();
 
     let v = vec![0i32; 10];
@@ -863,7 +863,7 @@ fn use_compression_chunking() {
     let var = &mut file
         .add_variable::<i32>("compressed2", &["x", "x"])
         .unwrap();
-    var.compression(9).unwrap();
+    var.compression(9, true).unwrap();
     var.chunking(&[5, 5]).unwrap();
     var.put_values(&[1i32, 2, 3, 4, 5, 6, 7, 8, 9, 10], (..10, ..1))
         .unwrap();
@@ -903,7 +903,8 @@ fn set_compression_all_variables_in_a_group() {
         .expect("Could not create variable");
 
     for mut var in file.variables_mut() {
-        var.compression(9).expect("Could not set compression level");
+        var.compression(9, false)
+            .expect("Could not set compression level");
     }
 }
 
