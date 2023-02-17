@@ -170,16 +170,19 @@ impl<'g> VariableMut<'g> {
     /// compression (good for CPU bound tasks), and 9 providing the
     /// highest compression level (good for memory bound tasks)
     ///
+    /// `shuffle` enables a filter to reorder bytes before compressing, which
+    /// can improve compression ratios
+    ///
     /// # Errors
     ///
     /// Not a `netcdf-4` file or `deflate_level` not valid
-    pub fn compression(&mut self, deflate_level: nc_type) -> error::Result<()> {
+    pub fn compression(&mut self, deflate_level: nc_type, shuffle: bool) -> error::Result<()> {
         unsafe {
             error::checked(super::with_lock(|| {
                 nc_def_var_deflate(
                     self.ncid,
                     self.varid,
-                    <_>::from(false),
+                    shuffle.into(),
                     <_>::from(true),
                     deflate_level,
                 )
