@@ -32,6 +32,7 @@ dap = []
 
 [dependencies]
 hdf5-sys = { version = "0.8.0", features = ["hl", "deprecated", "zlib"] }
+libz-sys = { version = "1.0.25" }
 
 [build-dependencies]
 cmake = "0.1.44"
