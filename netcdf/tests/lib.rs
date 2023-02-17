@@ -903,7 +903,8 @@ fn set_compression_all_variables_in_a_group() {
         .expect("Could not create variable");
 
     for mut var in file.variables_mut() {
-        var.compression(9, false).expect("Could not set compression level");
+        var.compression(9, false)
+            .expect("Could not set compression level");
     }
 }
 
