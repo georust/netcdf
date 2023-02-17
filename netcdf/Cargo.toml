@@ -1,6 +1,6 @@
 [package]
 name = "netcdf"
-version = "0.7.0"
+version = "0.8.0"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -22,7 +22,7 @@ static = ["netcdf-sys/static"]
 [dependencies]
 lazy_static = "1.4.0"
 ndarray = { version = "0.15", optional = true }
-netcdf-sys = { path = "../netcdf-sys", version = "0.4.0" }
+netcdf-sys = { path = "../netcdf-sys", version = "0.4.1" }
 bitflags = "1.2.1"
 
 [dev-dependencies]

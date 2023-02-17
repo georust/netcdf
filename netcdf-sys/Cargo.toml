@@ -1,6 +1,6 @@
 [package]
 name = "netcdf-sys"
-version = "0.4.0"
+version = "0.4.1"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -23,7 +23,7 @@ rust-version = "1.60"
 libz-sys = { version = "1.0.25" }
 curl-sys = { version = "0.4.51", optional = true }
 hdf5-sys = { version = "0.8.0" }
-netcdf-src = { path = "../netcdf-src", version = "0.2.0", optional = true }
+netcdf-src = { path = "../netcdf-src", version = "0.3.0", optional = true }
 
 [dev-dependencies]
 lazy_static = "1.4.0"
