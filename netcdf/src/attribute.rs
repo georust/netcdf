@@ -399,7 +399,7 @@ impl<'a> Attribute<'a> {
                             self.ncid,
                             self.varid,
                             self.name.as_ptr().cast(),
-                            buf.as_mut_ptr().cast(),
+                            buf.as_mut_ptr().cast::<u8>().cast::<c_char>(),
                         )
                     }))?;
                 }

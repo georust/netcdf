@@ -1,7 +1,7 @@
 //! Variables in the netcdf file
 #![allow(clippy::similar_names)]
 use std::convert::TryInto;
-use std::ffi::CStr;
+use std::ffi::{c_char, CStr};
 use std::marker::PhantomData;
 use std::marker::Sized;
 use std::mem::MaybeUninit;
@@ -675,12 +675,14 @@ impl_numeric!(
 
 /// Holds the contents of a netcdf string. Use deref to get a `CStr`
 struct NcString {
-    data: *mut std::os::raw::c_char,
+    data: *mut c_char,
 }
 impl NcString {
     /// Create an `NcString`
+    ///
+    /// TODO: Change signature to c_char or remove
     unsafe fn from_ptr(ptr: *mut i8) -> Self {
-        Self { data: ptr }
+        Self { data: ptr.cast() }
     }
 }
 impl Drop for NcString {
@@ -752,7 +754,7 @@ impl<'g> Variable<'g> {
                 nc_get_var1_string(self.ncid, self.varid, start.as_ptr(), &mut s)
             }))?;
         }
-        let string = unsafe { NcString::from_ptr(s) };
+        let string = unsafe { NcString::from_ptr(s.cast()) };
         Ok(string.to_string_lossy().into_owned())
     }
 
