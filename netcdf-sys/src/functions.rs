@@ -1,6 +1,6 @@
 use std::os::raw::{
-    c_char, c_double, c_float, c_int, c_long, c_longlong, c_short, c_uchar, c_uint, c_ulonglong,
-    c_ushort, c_void,
+    c_char, c_double, c_float, c_int, c_long, c_longlong, c_schar, c_short, c_uchar, c_uint,
+    c_ulonglong, c_ushort, c_void,
 };
 
 // #[cfg(feature = "4.6.2")]
@@ -498,13 +498,13 @@ extern "C" {
         name: *const c_char,
         xtype: nc_type,
         len: usize,
-        op: *const c_char,
+        op: *const c_schar,
     ) -> c_int;
     pub fn nc_get_att_schar(
         ncid: c_int,
         varid: c_int,
         name: *const c_char,
-        ip: *mut c_char,
+        ip: *mut c_schar,
     ) -> c_int;
     pub fn nc_put_att_short(
         ncid: c_int,
@@ -693,13 +693,13 @@ extern "C" {
         ncid: c_int,
         varid: c_int,
         indexp: *const usize,
-        op: *const c_char,
+        op: *const c_schar,
     ) -> c_int;
     pub fn nc_get_var1_schar(
         ncid: c_int,
         varid: c_int,
         indexp: *const usize,
-        ip: *mut c_char,
+        ip: *mut c_schar,
     ) -> c_int;
     pub fn nc_put_var1_short(
         ncid: c_int,
@@ -854,14 +854,14 @@ extern "C" {
         varid: c_int,
         startp: *const usize,
         countp: *const usize,
-        op: *const c_char,
+        op: *const c_schar,
     ) -> c_int;
     pub fn nc_get_vara_schar(
         ncid: c_int,
         varid: c_int,
         startp: *const usize,
         countp: *const usize,
-        ip: *mut c_char,
+        ip: *mut c_schar,
     ) -> c_int;
     pub fn nc_put_vara_short(
         ncid: c_int,
@@ -1041,7 +1041,7 @@ extern "C" {
         startp: *const usize,
         countp: *const usize,
         stridep: *const isize,
-        op: *const c_char,
+        op: *const c_schar,
     ) -> c_int;
     pub fn nc_get_vars_schar(
         ncid: c_int,
@@ -1049,7 +1049,7 @@ extern "C" {
         startp: *const usize,
         countp: *const usize,
         stridep: *const isize,
-        ip: *mut c_char,
+        ip: *mut c_schar,
     ) -> c_int;
     pub fn nc_put_vars_short(
         ncid: c_int,
@@ -1254,7 +1254,7 @@ extern "C" {
         countp: *const usize,
         stridep: *const isize,
         imapp: *const isize,
-        op: *const c_char,
+        op: *const c_schar,
     ) -> c_int;
     pub fn nc_get_varm_schar(
         ncid: c_int,
@@ -1263,7 +1263,7 @@ extern "C" {
         countp: *const usize,
         stridep: *const isize,
         imapp: *const isize,
-        ip: *mut c_char,
+        ip: *mut c_schar,
     ) -> c_int;
     pub fn nc_put_varm_short(
         ncid: c_int,
@@ -1449,8 +1449,8 @@ extern "C" {
     pub fn nc_get_var_text(ncid: c_int, varid: c_int, ip: *mut c_char) -> c_int;
     pub fn nc_put_var_uchar(ncid: c_int, varid: c_int, op: *const c_uchar) -> c_int;
     pub fn nc_get_var_uchar(ncid: c_int, varid: c_int, ip: *mut c_uchar) -> c_int;
-    pub fn nc_put_var_schar(ncid: c_int, varid: c_int, op: *const c_char) -> c_int;
-    pub fn nc_get_var_schar(ncid: c_int, varid: c_int, ip: *mut c_char) -> c_int;
+    pub fn nc_put_var_schar(ncid: c_int, varid: c_int, op: *const c_schar) -> c_int;
+    pub fn nc_get_var_schar(ncid: c_int, varid: c_int, ip: *mut c_schar) -> c_int;
     pub fn nc_put_var_short(ncid: c_int, varid: c_int, op: *const c_short) -> c_int;
     pub fn nc_get_var_short(ncid: c_int, varid: c_int, ip: *mut c_short) -> c_int;
     pub fn nc_put_var_int(ncid: c_int, varid: c_int, op: *const c_int) -> c_int;
