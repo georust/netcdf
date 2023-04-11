@@ -40,7 +40,7 @@ The crate is built on several platforms using github actions, and is currently k
 
 ## Documentation
 
-Some examples of usage can be found in the [tests/lib.rs](tests/lib.rs) file. The documentation can also be found using `cargo doc`.
+Some examples of usage can be found in the [tests/lib.rs](netcdf/tests/lib.rs) file. The documentation can also be generated using `cargo doc`.
 
 
 ## Thread safety
