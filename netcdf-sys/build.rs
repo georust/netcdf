@@ -252,7 +252,7 @@ fn main() {
             NcInfo::gather_from_ncconfig(None).unwrap_or_else(NcInfo::guess)
         };
 
-        println!("cargo:rustc-link-search={}/lib", info.libdir.display());
+        println!("cargo:rustc-link-search={}", info.libdir.display());
         println!("cargo:rustc-link-lib={}", &info.libname);
     }
 
