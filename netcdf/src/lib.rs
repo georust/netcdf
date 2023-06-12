@@ -13,7 +13,7 @@
 //! `open()`, `create()`, and `append()`.
 //!
 //! For more information see:
-//! * [The official introduction to `netCDF`](https://docs.unidata.ucar.edu/netcdf-c/current/index.html)
+//! * [The official introduction to `netCDF`](https://docs.unidata.ucar.edu/nug/current/netcdf_introduction.html)
 //! * [The `netCDF-c` repository](https://github.com/Unidata/netcdf-c)
 //!
 //! # Examples
