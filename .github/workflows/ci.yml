@@ -20,16 +20,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with: {submodules: true}
     - name: Install netCDF
       run: sudo apt-get update && sudo apt-get install libnetcdf-dev
     - name: Install rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable
-        override: true
-        profile: minimal
         components: rustfmt, clippy
     - name: Check formatting
       run: cargo fmt -- --check
@@ -56,18 +54,16 @@ jobs:
           rust: nightly
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with: {submodules: false}
 
     - name: Install netcdf
       run: sudo apt-get update && sudo apt-get install libnetcdf-dev
 
     - name: Install rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: ${{ matrix.rust }}
-        profile: minimal
-        override: true
 
     - name: Build
       run: cargo build --verbose --workspace --exclude netcdf-src
@@ -90,11 +86,11 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with: {submodules: false}
       - name: Install Rust (${{matrix.rust}})
-        uses: actions-rs/toolchain@v1
-        with: {toolchain: '${{matrix.rust}}', profile: minimal, override: true}
+        uses: dtolnay/rust-toolchain@stable
+        with: {toolchain: '${{matrix.rust}}'}
       - name: Install conda
         uses: conda-incubator/setup-miniconda@v2
         with: {auto-update-conda: false, activate-environment: testenv}
@@ -124,10 +120,10 @@ jobs:
           shell: bash -l {0}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with: {submodules: true}
       - name: Install Rust (${{matrix.rust}})
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with: {toolchain: '${{matrix.rust}}', profile: minimal, override: true}
       - name: Build and test
         run: cargo test -vv --features static --workspace
@@ -137,10 +133,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with: {submodules: true}
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with: {toolchain: nightly, profile: minimal, override: true}
       - name: Run test with sanitizer
         env:
