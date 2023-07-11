@@ -6,29 +6,27 @@ env:
 jobs:
   tarpaulin:
     name: tarpaulin
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
+
     - name: Install netcdf
       run: sudo apt-get install libnetcdf-dev
+
     - name: Install rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
+      uses: dtolnay/rust-toolchain@stable
+
     - name: Install tarpaulin
-      uses: actions-rs/install@v0.1
+      uses: baptiste0928/cargo-install@v2.1.0
       with:
         crate: cargo-tarpaulin
-        version: latest
-        use-tool-cache: true
+        version: "0.26.0"
 
     - name: Tarpaulin
       run: cargo tarpaulin --verbose --out Xml --ignore-tests
 
     - name: Upload to codecov
-      uses: codecov/codecov-action@v1.0.2
+      uses: codecov/codecov-action@v3.1.4
       with:
           token: ${{ secrets.CODECOV_TOKEN }}
