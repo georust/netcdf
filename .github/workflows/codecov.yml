@@ -18,10 +18,10 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
 
     - name: Install tarpaulin
-      uses: baptiste0928/cargo-install@v2.1.0
+      uses: baptiste0928/cargo-install@30f432979e99f3ea66a8fa2eede53c07063995d8  # v2.1.0
       with:
         crate: cargo-tarpaulin
-        version: "0.26.0"
+        version: "0.26.1"
 
     - name: Tarpaulin
       run: cargo tarpaulin --verbose --out Xml --ignore-tests

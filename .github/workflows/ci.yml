@@ -124,7 +124,7 @@ jobs:
         with: {submodules: true}
       - name: Install Rust (${{matrix.rust}})
         uses: dtolnay/rust-toolchain@stable
-        with: {toolchain: '${{matrix.rust}}', profile: minimal, override: true}
+        with: {toolchain: '${{matrix.rust}}'}
       - name: Build and test
         run: cargo test -vv --features static --workspace
 
@@ -137,7 +137,7 @@ jobs:
         with: {submodules: true}
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with: {toolchain: nightly, profile: minimal, override: true}
+        with: {toolchain: nightly}
       - name: Run test with sanitizer
         env:
           RUSTFLAGS: "-Z sanitizer=address"
