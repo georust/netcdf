@@ -190,3 +190,12 @@ pub(crate) mod utils {
         }
     }
 }
+
+
+#[test]
+fn my_test_to_delete(){
+    let path = "w_test.nc";
+    let file = open(path).unwrap();
+    let forecast_date = file.attribute_from_path("WEATHER/forecast_date").unwrap();
+    println!("{:?}",forecast_date);
+}

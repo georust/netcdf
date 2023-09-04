@@ -42,3 +42,26 @@ fn appending_with() {
     let _file =
         netcdf::append_with(&path, netcdf::Options::NETCDF4 | netcdf::Options::DISKLESS).unwrap();
 }
+
+#[test]
+fn fetch_from_path(){
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("cdf5.nc");
+    {
+        let mut file = netcdf::create(path.clone()).unwrap();
+        let mut group = file.add_group("grp").unwrap();
+        let mut subgroup = group.add_group("subgrp").unwrap();
+        subgroup.add_dimension("dim", 1).unwrap();
+        subgroup.add_variable::<f64>("var", &["dim"]).unwrap();
+        subgroup.add_attribute("attr", "test").unwrap();
+    }
+    let file = netcdf::open(path).unwrap();
+    assert_eq!(
+        file.group_from_path("grp/subgrp").unwrap().unwrap().variable("var").unwrap().name(),
+        file.variable_from_path("grp/subgrp/var").unwrap().name(),
+    );
+    match file.attribute_from_path("grp/subgrp/attr").unwrap().value().unwrap() {
+        netcdf::AttrValue::Str(string) => assert_eq!(string,"test"),
+        _ => panic!()
+    }
+}

@@ -702,6 +702,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::reversed_empty_ranges)]
     fn test_extent() -> error::Result<()> {
         let _ = take_extent(1)?;
         let _ = take_extent(1..)?;

@@ -77,7 +77,7 @@ fn add_opaque() {
     let path = d.path().join("test_opaque.nc");
 
     {
-        let mut file = netcdf::create(&path).unwrap();
+        let mut file = netcdf::create(path).unwrap();
 
         let typ = file.add_opaque_type("opa", 42).unwrap();
         assert_eq!(&typ.name(), "opa");
@@ -99,7 +99,7 @@ fn add_vlen() {
     let path = d.path().join("test_add_vlen.nc");
 
     {
-        let mut file = netcdf::create(&path).unwrap();
+        let mut file = netcdf::create(path).unwrap();
 
         let typ = file.add_vlen_type::<u32>("v").unwrap();
         assert_eq!(&typ.name(), "v");
@@ -166,7 +166,7 @@ fn add_enum() {
 fn add_compound() {
     let d = tempfile::tempdir().unwrap();
     let path = d.path().join("test_add_compound.nc");
-    let mut file = netcdf::create(&path).unwrap();
+    let mut file = netcdf::create(path).unwrap();
 
     let mut builder = file.add_compound_type("c").unwrap();
     builder.add::<u8>("u8").unwrap();
@@ -283,7 +283,7 @@ fn put_get_vlen() {
         let buf = (0..9).collect::<Vec<i32>>();
 
         for i in 0..9 {
-            var.put_vlen(&buf[i..], &[i]).unwrap();
+            var.put_vlen(&buf[i..], [i]).unwrap();
         }
     }
 
@@ -303,7 +303,7 @@ fn char() {
     let d = tempfile::tempdir().unwrap();
     let path = d.path().join("test_char.nc");
 
-    let mut f = netcdf::create(&path).unwrap();
+    let mut f = netcdf::create(path).unwrap();
 
     f.add_dimension("x", 2).unwrap();
 
@@ -311,7 +311,7 @@ fn char() {
         .add_variable_with_type("x", &["x"], &BasicType::Char.into())
         .unwrap();
 
-    let vals = ['2' as char as u8, '3' as char as u8];
+    let vals = [2, 3];
     unsafe {
         var.put_raw_values(&vals, [..vals.len()]).unwrap();
     }

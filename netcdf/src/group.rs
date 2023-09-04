@@ -353,7 +353,6 @@ pub(crate) fn group_from_path<'f>(ncid: nc_type, path: &str) -> error::Result<Op
     let mut e = 0;
     let mut grpid = ncid;
     for name in path.split('/') {
-        println!("{}", name);
         let byte_name = super::utils::short_name_to_bytes(name)?;
         e = unsafe {
             super::with_lock(|| nc_inq_grp_ncid(grpid, byte_name.as_ptr().cast(), &mut grpid))
