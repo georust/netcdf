@@ -100,6 +100,63 @@ impl<'g> Variable<'g> {
             _group: PhantomData,
         }))
     }
+    pub(crate) fn find_from_path(ncid: nc_type, path: &str) -> error::Result<Option<Variable<'g>>> {
+        let mut path = path.split('/').collect::<Vec<_>>();
+        let var_name = path.pop().unwrap_or("");
+        let mut e = 0;
+        let mut grpid = ncid;
+        for name in path.iter() {
+            let byte_name = super::utils::short_name_to_bytes(name)?;
+            e = unsafe {
+                super::with_lock(|| nc_inq_grp_ncid(grpid, byte_name.as_ptr().cast(), &mut grpid))
+            };
+            if e == NC_ENOGRP {
+                return Ok(None);
+            }
+            error::checked(e)?;
+        }
+        error::checked(e)?;
+        let cname = super::utils::short_name_to_bytes(var_name)?;
+        let mut varid = 0;
+        let e =
+            unsafe { super::with_lock(|| nc_inq_varid(grpid, cname.as_ptr().cast(), &mut varid)) };
+        if e == NC_ENOTVAR {
+            return Ok(None);
+        }
+        error::checked(e)?;
+
+        let mut xtype = 0;
+        let mut ndims = 0;
+        unsafe {
+            error::checked(super::with_lock(|| {
+                nc_inq_var(
+                    grpid,
+                    varid,
+                    std::ptr::null_mut(),
+                    &mut xtype,
+                    &mut ndims,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                )
+            }))?;
+        }
+        let mut dimids = vec![0; ndims.try_into()?];
+        unsafe {
+            error::checked(super::with_lock(|| {
+                nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr())
+            }))?;
+        }
+        let dimensions = super::dimension::dimensions_from_variable(ncid, varid)?
+            .collect::<error::Result<Vec<_>>>()?;
+
+        Ok(Some(Variable {
+            dimensions,
+            ncid,
+            varid,
+            vartype: xtype,
+            _group: PhantomData,
+        }))
+    }
 
     /// Get name of variable
     pub fn name(&self) -> String {

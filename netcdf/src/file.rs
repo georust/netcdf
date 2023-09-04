@@ -181,16 +181,23 @@ impl File {
     pub fn variable<'f>(&'f self, name: &str) -> Option<Variable<'f>> {
         Variable::find_from_name(self.ncid(), name).unwrap()
     }
+    /// Get a variable from the group from path
+    pub fn variable_from_path<'f>(&'f self, path: &str) -> Option<Variable<'f>> {
+        Variable::find_from_path(self.ncid(), path).unwrap()
+    }
     /// Iterate over all variables in a group
     pub fn variables(&self) -> impl Iterator<Item = Variable> {
         super::variable::variables_at_ncid(self.ncid())
             .unwrap()
             .map(Result::unwrap)
     }
-
     /// Get a single attribute
     pub fn attribute<'f>(&'f self, name: &str) -> Option<Attribute<'f>> {
         Attribute::find_from_name(self.ncid(), None, name).unwrap()
+    }
+    /// Get a single attribute from path
+    pub fn attribute_from_path<'f>(&'f self, path: &str) -> Option<Attribute<'f>> {
+        Attribute::find_from_path(self.ncid(), path).unwrap()
     }
     /// Get all attributes in the root group
     pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
@@ -218,7 +225,7 @@ impl File {
     pub fn group<'f>(&'f self, name: &str) -> error::Result<Option<Group<'f>>> {
         super::group::group_from_name(self.ncid(), name)
     }
-    /// Get a group from a path 
+    /// Get a group from a path
     /// ("subgroup/subsubgroup/subsubsubgroup...")
     ///
     /// # Errors
@@ -260,10 +267,14 @@ impl MutableFile {
     pub fn root_mut(&mut self) -> Option<GroupMut> {
         self.root().map(|root| GroupMut(root, PhantomData))
     }
-
     /// Get a mutable variable from the group
     pub fn variable_mut<'f>(&'f mut self, name: &str) -> Option<VariableMut<'f>> {
         self.variable(name).map(|var| VariableMut(var, PhantomData))
+    }
+    /// Get a mutable variable from the group from path
+    pub fn variable_mut_from_path<'f>(&'f mut self, path: &str) -> Option<VariableMut<'f>> {
+        self.variable_from_path(path)
+            .map(|var| VariableMut(var, PhantomData))
     }
     /// Iterate over all variables in the root group, with mutable access
     ///
@@ -295,7 +306,10 @@ impl MutableFile {
     /// # Errors
     ///
     /// File does not support groups
-    pub fn group_mut_from_path<'f>(&'f mut self, path: &str) -> error::Result<Option<GroupMut<'f>>> {
+    pub fn group_mut_from_path<'f>(
+        &'f mut self,
+        path: &str,
+    ) -> error::Result<Option<GroupMut<'f>>> {
         self.group_from_path(path)
             .map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
