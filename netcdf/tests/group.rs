@@ -75,28 +75,27 @@ fn find_variable() {
 }
 
 #[test]
-fn fetch_from_path() {
+fn add_and_get_from_path() {
     let d = tempfile::tempdir().unwrap();
     let path = d.path().join("cdf5.nc");
     {
         let mut file = netcdf::create(path.clone()).unwrap();
-        let mut group = file.add_group("grp").unwrap();
-        let mut subgroup = group.add_group("subgrp").unwrap();
-        subgroup.add_dimension("dim", 1).unwrap();
-        subgroup.add_variable::<f64>("var", &["dim"]).unwrap();
-        subgroup.add_attribute("attr", "test").unwrap();
+        file.add_group("a/b").unwrap();
+        file.add_dimension("a/b/dim", 1).unwrap();
+        assert!(file.add_dimension("a/c/dim", 1).is_err());
+        file.add_variable::<f64>("a/b/var", &["dim"]).unwrap();
+        assert!(file.add_variable::<f64>("a/c/var", &["dim"]).is_err());
+        file.add_attribute("a/b/attr", "test").unwrap();
+        assert!(file.add_attribute("a/c/test", "test").is_err());
     }
     let file = netcdf::open(path).unwrap();
     let root = file.root().unwrap();
     assert_eq!(
-        root.group("grp/subgrp")
-            .unwrap()
-            .variable("var")
-            .unwrap()
-            .name(),
-        root.variable("grp/subgrp/var").unwrap().name(),
+        root.group("a/b").unwrap().variable("var").unwrap().name(),
+        root.variable("a/b/var").unwrap().name(),
     );
-    match file.attribute("grp/subgrp/attr").unwrap().value().unwrap() {
+    assert!(root.group("missing/subgrp").is_none());
+    match file.attribute("a/b/attr").unwrap().value().unwrap() {
         netcdf::AttrValue::Str(string) => assert_eq!(string, "test"),
         _ => panic!(),
     }

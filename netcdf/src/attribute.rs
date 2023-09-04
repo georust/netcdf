@@ -711,20 +711,16 @@ impl<'a> Attribute<'a> {
             _marker: PhantomData,
         })
     }
-    pub(crate) fn find_from_path(
+    pub(crate) fn find_from_path<'i>(
         mut ncid: nc_type,
         varid: Option<nc_type>,
-        path: &str,
+        mut path: impl Iterator<Item = &'i str> + DoubleEndedIterator,
     ) -> error::Result<Option<Self>> {
-        let mut path = path.split('/').collect::<Vec<_>>();
-        let name = path.pop().unwrap_or("");
-        if !path.is_empty() {
-            let path = path.join("/");
-            ncid = match super::group::group_from_path(ncid, &path)? {
-                Some(group) => group.ncid,
-                None => return Ok(None),
-            }
-        }
+        let name = path.next_back().unwrap_or("");
+        ncid = match super::group::group_from_path(ncid, path)? {
+            Some(ncid) => ncid,
+            None => return Ok(None),
+        };
         let attname = {
             if name.len() > NC_MAX_NAME as usize {
                 return Err(error::Error::Netcdf(NC_EMAXNAME));
