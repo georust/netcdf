@@ -108,6 +108,13 @@ impl<'f> Group<'f> {
         // We are in a group, must support netCDF-4
         group_from_name(self.id(), name).unwrap()
     }
+    /// Get a group from a path
+    pub fn group_from_path<'g>(&'g self, path: &str) -> Option<Group<'g>>
+    where
+        'f:'g,
+    {
+        group_from_path(self.id(), path).unwrap()
+    }
     /// Iterator over all subgroups in this group
     pub fn groups<'g>(&'g self) -> impl Iterator<Item = Group<'g>>
     where
@@ -146,6 +153,13 @@ impl<'f> GroupMut<'f> {
         'f: 'g,
     {
         self.group(name).map(|g| GroupMut(g, PhantomData))
+    }
+    /// Mutable access to subgroup from path
+    pub fn group_mut_from_path<'g>(&'g mut self, path: &str) -> Option<GroupMut<'g>>
+    where
+        'f: 'g,
+    {
+        self.group_from_path(path).map(|g| GroupMut(g, PhantomData))
     }
     /// Iterator over all groups (mutable access)
     pub fn groups_mut<'g>(&'g mut self) -> impl Iterator<Item = GroupMut<'g>>
@@ -310,6 +324,28 @@ pub(crate) fn group_from_name<'f>(ncid: nc_type, name: &str) -> error::Result<Op
     }
     error::checked(e)?;
 
+    Ok(Some(Group {
+        ncid: grpid,
+        _file: PhantomData,
+    }))
+}
+
+
+pub(crate) fn group_from_path<'f>(ncid: nc_type, path: &str) -> error::Result<Option<Group<'f>>> {
+    let mut e = 0;
+    let mut grpid = ncid;
+    for name in path.split('/'){
+        println!("{}",name);
+        let byte_name = super::utils::short_name_to_bytes(name)?;
+        e = unsafe {
+            super::with_lock(|| nc_inq_grp_ncid(grpid, byte_name.as_ptr().cast(), &mut grpid))
+        };
+        if e == NC_ENOGRP {
+            return Ok(None);
+        }
+        error::checked(e)?;
+    };
+    error::checked(e)?;
     Ok(Some(Group {
         ncid: grpid,
         _file: PhantomData,

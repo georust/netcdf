@@ -218,6 +218,15 @@ impl File {
     pub fn group<'f>(&'f self, name: &str) -> error::Result<Option<Group<'f>>> {
         super::group::group_from_name(self.ncid(), name)
     }
+    /// Get a group from a path 
+    /// ("subgroup/subsubgroup/subsubsubgroup...")
+    ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file
+    pub fn group_from_path<'f>(&'f self, path: &str) -> error::Result<Option<Group<'f>>> {
+        super::group::group_from_path(self.ncid(), path)
+    }
     /// Iterator over all subgroups in the root group
     ///
     /// # Errors
@@ -279,6 +288,15 @@ impl MutableFile {
     /// File does not support groups
     pub fn group_mut<'f>(&'f mut self, name: &str) -> error::Result<Option<GroupMut<'f>>> {
         self.group(name)
+            .map(|g| g.map(|g| GroupMut(g, PhantomData)))
+    }
+    /// Mutable access to subgroup from path
+    ///
+    /// # Errors
+    ///
+    /// File does not support groups
+    pub fn group_mut_from_path<'f>(&'f mut self, path: &str) -> error::Result<Option<GroupMut<'f>>> {
+        self.group_from_path(path)
             .map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
     /// Iterator over all groups (mutable access)
