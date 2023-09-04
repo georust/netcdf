@@ -27,7 +27,10 @@ fn use_string_to_open() {
 fn bad_filename() {
     let f = test_location().join("blah_stuff.nc");
     let res_file = netcdf::open(f);
-    assert!(matches!(res_file.unwrap_err(), netcdf::error::Error::Netcdf(2)));
+    assert!(matches!(
+        res_file.unwrap_err(),
+        netcdf::error::Error::Netcdf(2)
+    ));
 }
 
 // Read tests
@@ -643,12 +646,8 @@ fn append() {
     // finally open  the file in read only mode
     // and test the existence of both variable
     let file = netcdf::open(&f).unwrap();
-    assert!(file
-        .variables()
-        .any(|x| x.name() == "some_variable"));
-    assert!(file
-        .variables()
-        .any(|x| x.name() == "some_other_variable"));
+    assert!(file.variables().any(|x| x.name() == "some_variable"));
+    assert!(file.variables().any(|x| x.name() == "some_other_variable"));
 }
 
 #[test]
@@ -861,7 +860,10 @@ fn use_compression_chunking() {
         .unwrap();
 
     let var = &mut file.add_variable::<i32>("chunked3", &["x"]).unwrap();
-    assert!(matches!(var.chunking(&[2, 2]).unwrap_err(), netcdf::error::Error::SliceLen));
+    assert!(matches!(
+        var.chunking(&[2, 2]).unwrap_err(),
+        netcdf::error::Error::SliceLen
+    ));
 
     file.add_dimension("y", 0).unwrap();
     let var = &mut file.add_variable::<u8>("chunked4", &["y", "x"]).unwrap();

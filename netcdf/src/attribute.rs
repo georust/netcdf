@@ -753,12 +753,12 @@ impl<'a> Attribute<'a> {
         let name = path.pop().unwrap_or("");
         if !path.is_empty() {
             let path = path.join("/");
-            ncid =  match super::group::group_from_path(ncid, &path)? {
+            ncid = match super::group::group_from_path(ncid, &path)? {
                 Some(group) => group.ncid,
-                None => return Ok(None)
+                None => return Ok(None),
             }
         }
-        Attribute::find_from_name(ncid,None, name)
+        Attribute::find_from_name(ncid, None, name)
     }
 }
 

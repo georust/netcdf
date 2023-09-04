@@ -100,14 +100,17 @@ impl<'g> Variable<'g> {
             _group: PhantomData,
         }))
     }
-    pub(crate) fn find_from_path(mut ncid: nc_type, path: &str) -> error::Result<Option<Variable<'g>>> {
+    pub(crate) fn find_from_path(
+        mut ncid: nc_type,
+        path: &str,
+    ) -> error::Result<Option<Variable<'g>>> {
         let mut path = path.split('/').collect::<Vec<_>>();
         let name = path.pop().unwrap_or("");
         if !path.is_empty() {
             let path = path.join("/");
-            ncid =  match super::group::group_from_path(ncid, &path)? {
+            ncid = match super::group::group_from_path(ncid, &path)? {
                 Some(group) => group.ncid,
-                None => return Ok(None)
+                None => return Ok(None),
             }
         }
         Variable::find_from_name(ncid, name)
