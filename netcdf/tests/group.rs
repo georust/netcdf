@@ -89,19 +89,14 @@ fn fetch_from_path() {
     let file = netcdf::open(path).unwrap();
     let root = file.root().unwrap();
     assert_eq!(
-        root.group_from_path("grp/subgrp")
+        root.group("grp/subgrp")
             .unwrap()
             .variable("var")
             .unwrap()
             .name(),
-        root.variable_from_path("grp/subgrp/var").unwrap().name(),
+        root.variable("grp/subgrp/var").unwrap().name(),
     );
-    match file
-        .attribute_from_path("grp/subgrp/attr")
-        .unwrap()
-        .value()
-        .unwrap()
-    {
+    match file.attribute("grp/subgrp/attr").unwrap().value().unwrap() {
         netcdf::AttrValue::Str(string) => assert_eq!(string, "test"),
         _ => panic!(),
     }

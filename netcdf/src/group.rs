@@ -59,14 +59,7 @@ impl<'f> Group<'f> {
     where
         'f: 'g,
     {
-        Variable::find_from_name(self.id(), name).unwrap()
-    }
-    /// Get a variable from the group from path
-    pub fn variable_from_path<'g>(&'g self, path: &str) -> Option<Variable<'g>>
-    where
-        'f: 'g,
-    {
-        Variable::find_from_path(self.id(), path).unwrap()
+        Variable::find_from_path(self.id(), name).unwrap()
     }
     /// Iterate over all variables in a group
     pub fn variables<'g>(&'g self) -> impl Iterator<Item = Variable<'g>>
@@ -80,11 +73,7 @@ impl<'f> Group<'f> {
 
     /// Get a single attribute
     pub fn attribute<'a>(&'a self, name: &str) -> Option<Attribute<'a>> {
-        Attribute::find_from_name(self.ncid, None, name).unwrap()
-    }
-    /// Get a single attribute
-    pub fn attribute_from_path<'a>(&'a self, path: &str) -> Option<Attribute<'a>> {
-        Attribute::find_from_path(self.ncid, path).unwrap()
+        Attribute::find_from_path(self.ncid, None, name).unwrap()
     }
     /// Get all attributes in the group
     pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
@@ -117,14 +106,7 @@ impl<'f> Group<'f> {
         'f: 'g,
     {
         // We are in a group, must support netCDF-4
-        group_from_name(self.id(), name).unwrap()
-    }
-    /// Get a group from a path
-    pub fn group_from_path<'g>(&'g self, path: &str) -> Option<Group<'g>>
-    where
-        'f: 'g,
-    {
-        group_from_path(self.id(), path).unwrap()
+        group_from_path(self.id(), name).unwrap()
     }
     /// Iterator over all subgroups in this group
     pub fn groups<'g>(&'g self) -> impl Iterator<Item = Group<'g>>
@@ -150,14 +132,6 @@ impl<'f> GroupMut<'f> {
     {
         self.variable(name).map(|v| VariableMut(v, PhantomData))
     }
-    /// Get a mutable variable from the group from path
-    pub fn variable_mut_from_path<'g>(&'g mut self, path: &str) -> Option<VariableMut<'g>>
-    where
-        'f: 'g,
-    {
-        self.variable_from_path(path)
-            .map(|v| VariableMut(v, PhantomData))
-    }
     /// Iterate over all variables in a group, with mutable access
     pub fn variables_mut<'g>(&'g mut self) -> impl Iterator<Item = VariableMut<'g>>
     where
@@ -172,13 +146,6 @@ impl<'f> GroupMut<'f> {
         'f: 'g,
     {
         self.group(name).map(|g| GroupMut(g, PhantomData))
-    }
-    /// Mutable access to subgroup from path
-    pub fn group_mut_from_path<'g>(&'g mut self, path: &str) -> Option<GroupMut<'g>>
-    where
-        'f: 'g,
-    {
-        self.group_from_path(path).map(|g| GroupMut(g, PhantomData))
     }
     /// Iterator over all groups (mutable access)
     pub fn groups_mut<'g>(&'g mut self) -> impl Iterator<Item = GroupMut<'g>>
@@ -328,23 +295,6 @@ pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<I
     }
     Ok(grps.into_iter().map(|id| Group {
         ncid: id,
-        _file: PhantomData,
-    }))
-}
-
-pub(crate) fn group_from_name<'f>(ncid: nc_type, name: &str) -> error::Result<Option<Group<'f>>> {
-    let byte_name = super::utils::short_name_to_bytes(name)?;
-    let mut grpid = 0;
-    let e = unsafe {
-        super::with_lock(|| nc_inq_grp_ncid(ncid, byte_name.as_ptr().cast(), &mut grpid))
-    };
-    if e == NC_ENOGRP {
-        return Ok(None);
-    }
-    error::checked(e)?;
-
-    Ok(Some(Group {
-        ncid: grpid,
         _file: PhantomData,
     }))
 }
