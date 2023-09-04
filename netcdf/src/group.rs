@@ -61,6 +61,13 @@ impl<'f> Group<'f> {
     {
         Variable::find_from_name(self.id(), name).unwrap()
     }
+    /// Get a variable from the group from path
+    pub fn variable_from_path<'g>(&'g self, path: &str) -> Option<Variable<'g>>
+    where
+        'f: 'g,
+    {
+        Variable::find_from_path(self.id(), path).unwrap()
+    }
     /// Iterate over all variables in a group
     pub fn variables<'g>(&'g self) -> impl Iterator<Item = Variable<'g>>
     where
@@ -74,6 +81,10 @@ impl<'f> Group<'f> {
     /// Get a single attribute
     pub fn attribute<'a>(&'a self, name: &str) -> Option<Attribute<'a>> {
         Attribute::find_from_name(self.ncid, None, name).unwrap()
+    }
+    /// Get a single attribute
+    pub fn attribute_from_path<'a>(&'a self, path: &str) -> Option<Attribute<'a>> {
+        Attribute::find_from_path(self.ncid, path).unwrap()
     }
     /// Get all attributes in the group
     pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
@@ -111,7 +122,7 @@ impl<'f> Group<'f> {
     /// Get a group from a path
     pub fn group_from_path<'g>(&'g self, path: &str) -> Option<Group<'g>>
     where
-        'f:'g,
+        'f: 'g,
     {
         group_from_path(self.id(), path).unwrap()
     }
@@ -138,6 +149,14 @@ impl<'f> GroupMut<'f> {
         'f: 'g,
     {
         self.variable(name).map(|v| VariableMut(v, PhantomData))
+    }
+    /// Get a mutable variable from the group from path
+    pub fn variable_mut_from_path<'g>(&'g mut self, path: &str) -> Option<VariableMut<'g>>
+    where
+        'f: 'g,
+    {
+        self.variable_from_path(path)
+            .map(|v| VariableMut(v, PhantomData))
     }
     /// Iterate over all variables in a group, with mutable access
     pub fn variables_mut<'g>(&'g mut self) -> impl Iterator<Item = VariableMut<'g>>
@@ -330,12 +349,11 @@ pub(crate) fn group_from_name<'f>(ncid: nc_type, name: &str) -> error::Result<Op
     }))
 }
 
-
 pub(crate) fn group_from_path<'f>(ncid: nc_type, path: &str) -> error::Result<Option<Group<'f>>> {
     let mut e = 0;
     let mut grpid = ncid;
-    for name in path.split('/'){
-        println!("{}",name);
+    for name in path.split('/') {
+        println!("{}", name);
         let byte_name = super::utils::short_name_to_bytes(name)?;
         e = unsafe {
             super::with_lock(|| nc_inq_grp_ncid(grpid, byte_name.as_ptr().cast(), &mut grpid))
@@ -344,7 +362,7 @@ pub(crate) fn group_from_path<'f>(ncid: nc_type, path: &str) -> error::Result<Op
             return Ok(None);
         }
         error::checked(e)?;
-    };
+    }
     error::checked(e)?;
     Ok(Some(Group {
         ncid: grpid,

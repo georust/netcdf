@@ -748,6 +748,53 @@ impl<'a> Attribute<'a> {
             _marker: PhantomData,
         }))
     }
+    pub(crate) fn find_from_path(ncid: nc_type, path: &str) -> error::Result<Option<Self>> {
+        let mut path = path.split('/').collect::<Vec<_>>();
+        let attr_name = path.pop().unwrap_or("");
+        let mut e = 0;
+        let mut grpid = ncid;
+        for name in path.iter() {
+            let byte_name = super::utils::short_name_to_bytes(name)?;
+            e = unsafe {
+                super::with_lock(|| nc_inq_grp_ncid(grpid, byte_name.as_ptr().cast(), &mut grpid))
+            };
+            if e == NC_ENOGRP {
+                return Ok(None);
+            }
+            error::checked(e)?;
+        }
+        error::checked(e)?;
+        let attname = {
+            if attr_name.len() > NC_MAX_NAME as usize {
+                return Err(error::Error::Netcdf(NC_EMAXNAME));
+            }
+            let mut attname = [0_u8; NC_MAX_NAME as usize + 1];
+            attname[..attr_name.len()].copy_from_slice(attr_name.as_bytes());
+            attname
+        };
+        let e = unsafe {
+            // Checking whether the variable exists by probing for its id
+            super::with_lock(|| {
+                nc_inq_attid(
+                    grpid,
+                    NC_GLOBAL,
+                    attname.as_ptr().cast(),
+                    std::ptr::null_mut(),
+                )
+            })
+        };
+        if e == NC_ENOTATT {
+            return Ok(None);
+        }
+        error::checked(e)?;
+
+        Ok(Some(Attribute {
+            name: attname,
+            ncid: grpid,
+            varid: NC_GLOBAL,
+            _marker: PhantomData,
+        }))
+    }
 }
 
 // Boring implementations
