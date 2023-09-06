@@ -55,7 +55,7 @@ fn attribute_put() {
 fn open_pres_temp_4d() {
     let f = test_location().join("pres_temp_4D.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::open(f).unwrap();
 
     let pres = &file.variable("pressure").unwrap();
     assert_eq!(pres.dimensions()[0].name(), "time");
@@ -76,7 +76,7 @@ fn open_pres_temp_4d() {
 fn global_attrs() {
     let f = test_location().join("patmosx_v05r03-preliminary_NOAA-19_asc_d20130630_c20140325.nc");
 
-    let file = netcdf::open(&f).unwrap();
+    let file = netcdf::open(f).unwrap();
 
     let ch1_attr = &file
         .attribute("CH1_DARK_COUNT")
@@ -98,13 +98,14 @@ fn global_attrs() {
     }
 }
 #[test]
+#[allow(clippy::unnecessary_cast)]
 fn all_attr_types() {
     let d = tempfile::tempdir().unwrap();
     let u8string = "Testing utf8 with æøå and even 😀";
     let strs = vec!["Hi!".to_string(), "Hello!".to_string()];
     {
         let f = d.path().join("all_attr_types.nc");
-        let mut file = netcdf::create(&f).unwrap();
+        let mut file = netcdf::create(f).unwrap();
 
         file.add_attribute("attr_byte", 3 as i8).unwrap();
         file.add_attribute("attr_ubyte", 3 as u8).unwrap();
@@ -126,7 +127,7 @@ fn all_attr_types() {
 
     {
         let f = d.path().join("all_attr_types.nc");
-        let file = netcdf::open(&f).unwrap();
+        let file = netcdf::open(f).unwrap();
 
         assert_eq!(
             AttrValue::Uchar(3),
