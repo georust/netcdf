@@ -59,7 +59,8 @@ impl<'f> Group<'f> {
     where
         'f: 'g,
     {
-        Variable::find_from_path(self.id(), name.split('/')).unwrap()
+        let (ncid, name) = super::group::try_get_parent_ncid_and_stem(self.id(), name).unwrap()?;
+        Variable::find_from_name(ncid, name).unwrap()
     }
     /// Iterate over all variables in a group
     pub fn variables<'g>(&'g self) -> impl Iterator<Item = Variable<'g>>
@@ -73,7 +74,8 @@ impl<'f> Group<'f> {
 
     /// Get a single attribute
     pub fn attribute<'a>(&'a self, name: &str) -> Option<Attribute<'a>> {
-        Attribute::find_from_path(self.ncid, None, name.split('/')).unwrap()
+        let (ncid, name) = try_get_parent_ncid_and_stem(self.id(), name).unwrap()?;
+        Attribute::find_from_name(ncid, None, name).unwrap()
     }
     /// Get all attributes in the group
     pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
@@ -88,7 +90,8 @@ impl<'f> Group<'f> {
     where
         'f: 'g,
     {
-        super::dimension::dimension_from_name(self.id(), name).unwrap()
+        let (ncid, name) = super::group::try_get_parent_ncid_and_stem(self.id(), name).unwrap()?;
+        super::dimension::dimension_from_name(ncid, name).unwrap()
     }
     /// Iterator over all dimensions
     pub fn dimensions<'g>(&'g self) -> impl Iterator<Item = Dimension<'g>>
@@ -106,8 +109,9 @@ impl<'f> Group<'f> {
         'f: 'g,
     {
         // We are in a group, must support netCDF-4
+        let (ncid, name) = get_parent_ncid_and_stem(self.id(), name).unwrap();
         Some(Group {
-            ncid: group_from_path(self.id(), name.split('/')).unwrap()?,
+            ncid: try_get_ncid(ncid, name).unwrap()?,
             _file: PhantomData,
         })
     }
@@ -164,7 +168,7 @@ impl<'f> GroupMut<'f> {
         name: &str,
         size: usize,
     ) -> error::Result<super::types::OpaqueType> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.id(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         super::types::OpaqueType::add(ncid, name, size)
     }
 
@@ -173,7 +177,7 @@ impl<'f> GroupMut<'f> {
         &'f mut self,
         name: &str,
     ) -> error::Result<super::types::VlenType> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.id(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         super::types::VlenType::add::<T>(ncid, name)
     }
 
@@ -183,7 +187,7 @@ impl<'f> GroupMut<'f> {
         name: &str,
         mappings: &[(&str, T)],
     ) -> error::Result<super::types::EnumType> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.id(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         super::types::EnumType::add::<T>(ncid, name, mappings)
     }
 
@@ -192,7 +196,7 @@ impl<'f> GroupMut<'f> {
         &mut self,
         name: &str,
     ) -> error::Result<super::types::CompoundBuilder> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.id(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         super::types::CompoundType::add(ncid, name)
     }
 
@@ -201,13 +205,13 @@ impl<'f> GroupMut<'f> {
     where
         T: Into<AttrValue>,
     {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.id(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         Attribute::put(ncid, NC_GLOBAL, name, val.into())
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension<'g>(&'g mut self, name: &str, len: usize) -> error::Result<Dimension<'g>> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.id(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         super::dimension::add_dimension_at(ncid, name, len)
     }
 
@@ -223,7 +227,7 @@ impl<'f> GroupMut<'f> {
     {
         Ok(Self(
             Group {
-                ncid: add_group_at_path(self.id(), name.split('/'))?,
+                ncid: add_group_at_path(self.id(), name)?,
                 _file: PhantomData,
             },
             PhantomData,
@@ -243,7 +247,7 @@ impl<'f> GroupMut<'f> {
         T: NcPutGet,
         'f: 'g,
     {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.id(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         VariableMut::add_from_str(ncid, T::NCTYPE, name, dims)
     }
     /// Adds a variable with a basic type of string
@@ -252,7 +256,7 @@ impl<'f> GroupMut<'f> {
         name: &str,
         dims: &[&str],
     ) -> error::Result<VariableMut<'g>> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.id(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         VariableMut::add_from_str(ncid, NC_STRING, name, dims)
     }
     /// Adds a variable from a set of unique identifiers, recursing upwards
@@ -265,7 +269,7 @@ impl<'f> GroupMut<'f> {
     where
         T: NcPutGet,
     {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.id(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         super::variable::add_variable_from_identifiers(ncid, name, dims, T::NCTYPE)
     }
 
@@ -276,7 +280,7 @@ impl<'f> GroupMut<'f> {
         dims: &[&str],
         typ: &super::types::VariableType,
     ) -> error::Result<VariableMut<'f>> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.id(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         VariableMut::add_from_str(ncid, typ.id(), name, dims)
     }
 }
@@ -300,51 +304,58 @@ pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<I
     }))
 }
 
-pub(crate) fn group_from_path<'i>(
-    ncid: nc_type,
-    path: impl Iterator<Item = &'i str>,
-) -> error::Result<Option<nc_type>> {
-    let mut e;
-    let mut grpid = ncid;
+pub(crate) fn add_group_at_path(mut ncid: nc_type, path: &str) -> error::Result<nc_type> {
+    let mut path = path.split('/');
+    let name = path.next_back().unwrap();
     for name in path {
-        let byte_name = super::utils::short_name_to_bytes(name)?;
-        e = unsafe {
-            super::with_lock(|| nc_inq_grp_ncid(grpid, byte_name.as_ptr().cast(), &mut grpid))
-        };
-        if e == NC_ENOGRP {
-            return Ok(None);
+        ncid = match try_get_ncid(ncid, name)? {
+            Some(ncid) => ncid,
+            None => add_group(ncid, name)?,
         }
-        error::checked(e)?;
     }
-    Ok(Some(grpid))
+    add_group(ncid, name)
 }
 
-pub(crate) fn add_group_at_path<'i>(
-    ncid: nc_type,
-    mut path: impl Iterator<Item = &'i str> + DoubleEndedIterator + Clone,
-) -> error::Result<nc_type> {
-    let name = path.next_back().unwrap();
-    let ncid = match group_from_path(ncid, path.clone())? {
-        Some(ncid) => ncid,
-        None => add_group_at_path(ncid, path)?,
-    };
+pub(crate) fn add_group(mut ncid: nc_type, name: &str) -> error::Result<nc_type> {
     let byte_name = super::utils::short_name_to_bytes(name)?;
-    let mut grpid = 0;
     unsafe {
         error::checked(super::with_lock(|| {
-            nc_def_grp(ncid, byte_name.as_ptr().cast(), &mut grpid)
+            nc_def_grp(ncid, byte_name.as_ptr().cast(), &mut ncid)
         }))?;
     }
-    Ok(grpid)
+    Ok(ncid)
 }
 
-pub(crate) fn get_subgroup_ncid_and_stem_from_path(
+pub(crate) fn try_get_ncid(mut ncid: nc_type, name: &str) -> error::Result<Option<nc_type>> {
+    let byte_name = super::utils::short_name_to_bytes(name)?;
+    let e =
+        unsafe { super::with_lock(|| nc_inq_grp_ncid(ncid, byte_name.as_ptr().cast(), &mut ncid)) };
+    if e == NC_ENOGRP {
+        return Ok(None);
+    }
+    error::checked(e)?;
+    Ok(Some(ncid))
+}
+
+pub(crate) fn try_get_parent_ncid_and_stem(
+    mut ncid: nc_type,
+    path: &str,
+) -> error::Result<Option<(nc_type, &str)>> {
+    let mut path = path.split('/');
+    let name = path.next_back().unwrap();
+    for name in path {
+        ncid = match try_get_ncid(ncid, name)? {
+            None => return Ok(None),
+            Some(ncid) => ncid,
+        }
+    }
+    Ok(Some((ncid, name)))
+}
+
+pub(crate) fn get_parent_ncid_and_stem(
     ncid: nc_type,
     path: &str,
 ) -> error::Result<(nc_type, &str)> {
-    let mut path = path.split('/');
-    let name = path.next_back().unwrap();
-    let ncid = super::group::group_from_path(ncid, path)?
-        .ok_or(error::Error::Str("Missing child group".into()))?;
-    Ok((ncid, name))
+    try_get_parent_ncid_and_stem(ncid, path)?
+        .ok_or_else(|| error::Error::Str("One of the child groups does not exist".into()))
 }

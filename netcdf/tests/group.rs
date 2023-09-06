@@ -94,7 +94,7 @@ fn add_and_get_from_path() {
         root.group("a/b").unwrap().variable("var").unwrap().name(),
         root.variable("a/b/var").unwrap().name(),
     );
-    assert!(root.group("missing/subgrp").is_none());
+    assert!(file.group("missing/subgrp").is_err());
     match file.attribute("a/b/attr").unwrap().value().unwrap() {
         netcdf::AttrValue::Str(string) => assert_eq!(string, "test"),
         _ => panic!(),

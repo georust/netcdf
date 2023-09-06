@@ -58,15 +58,7 @@ pub enum Endianness {
 
 #[allow(clippy::len_without_is_empty)]
 impl<'g> Variable<'g> {
-    pub(crate) fn find_from_path<'i>(
-        mut ncid: nc_type,
-        mut path: impl Iterator<Item = &'i str> + DoubleEndedIterator,
-    ) -> error::Result<Option<Variable<'g>>> {
-        let name = path.next_back().unwrap_or("");
-        ncid = match super::group::group_from_path(ncid, path)? {
-            Some(ncid) => ncid,
-            None => return Ok(None),
-        };
+    pub(crate) fn find_from_name(ncid: nc_type, name: &str) -> error::Result<Option<Variable<'g>>> {
         let cname = super::utils::short_name_to_bytes(name)?;
         let mut varid = 0;
         let e =
@@ -126,7 +118,7 @@ impl<'g> Variable<'g> {
     /// Get an attribute of this variable
     pub fn attribute<'a>(&'a self, name: &str) -> Option<Attribute<'a>> {
         // Need to lock when reading the first attribute (per variable)
-        Attribute::find_from_path(self.ncid, Some(self.varid), name.split('/'))
+        Attribute::find_from_name(self.ncid, Some(self.varid), name)
             .expect("Could not retrieve attribute")
     }
     /// Iterator over all the attributes of this variable

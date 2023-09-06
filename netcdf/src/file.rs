@@ -1,6 +1,8 @@
 //! Open, create, and append netcdf files
 
 #![allow(clippy::similar_names)]
+use crate::{get_parent_ncid_and_stem, try_get_ncid, try_get_parent_ncid_and_stem};
+
 use super::attribute::{AttrValue, Attribute};
 use super::dimension::{self, Dimension};
 use super::error;
@@ -179,7 +181,9 @@ impl File {
 
     /// Get a variable from the group
     pub fn variable<'f>(&'f self, name: &str) -> Option<Variable<'f>> {
-        Variable::find_from_path(self.ncid(), name.split('/')).unwrap()
+        let (ncid, name) =
+            super::group::try_get_parent_ncid_and_stem(self.ncid(), name).unwrap()?;
+        Variable::find_from_name(ncid, name).unwrap()
     }
     /// Iterate over all variables in a group
     pub fn variables(&self) -> impl Iterator<Item = Variable> {
@@ -189,7 +193,8 @@ impl File {
     }
     /// Get a single attribute
     pub fn attribute<'f>(&'f self, name: &str) -> Option<Attribute<'f>> {
-        Attribute::find_from_path(self.ncid(), None, name.split('/')).unwrap()
+        let (ncid, name) = try_get_parent_ncid_and_stem(self.ncid(), name).unwrap()?;
+        Attribute::find_from_name(ncid, None, name).unwrap()
     }
     /// Get all attributes in the root group
     pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
@@ -200,7 +205,9 @@ impl File {
 
     /// Get a single dimension
     pub fn dimension<'f>(&self, name: &str) -> Option<Dimension<'f>> {
-        super::dimension::dimension_from_name(self.ncid(), name).unwrap()
+        let (ncid, name) =
+            super::group::try_get_parent_ncid_and_stem(self.ncid(), name).unwrap()?;
+        super::dimension::dimension_from_name(ncid, name).unwrap()
     }
     /// Iterator over all dimensions in the root group
     pub fn dimensions(&self) -> impl Iterator<Item = Dimension> {
@@ -215,7 +222,8 @@ impl File {
     ///
     /// Not a `netCDF-4` file
     pub fn group<'f>(&'f self, name: &str) -> error::Result<Option<Group<'f>>> {
-        super::group::group_from_path(self.ncid(), name.split('/')).map(|ncid| {
+        let (ncid, name) = get_parent_ncid_and_stem(self.ncid(), name)?;
+        try_get_ncid(ncid, name).map(|ncid: Option<i32>| {
             ncid.map(|ncid| Group {
                 ncid,
                 _file: PhantomData,
@@ -298,13 +306,13 @@ impl MutableFile {
     where
         T: Into<AttrValue>,
     {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.ncid(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         Attribute::put(ncid, NC_GLOBAL, name, val.into())
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
     pub fn add_dimension<'f>(&'f mut self, name: &str, len: usize) -> error::Result<Dimension<'f>> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.ncid(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         super::dimension::add_dimension_at(ncid, name, len)
     }
     /// Adds a dimension with unbounded size
@@ -316,7 +324,7 @@ impl MutableFile {
     pub fn add_group<'f>(&'f mut self, name: &str) -> error::Result<GroupMut<'f>> {
         Ok(GroupMut(
             Group {
-                ncid: super::group::add_group_at_path(self.ncid(), name.split('/'))?,
+                ncid: super::group::add_group_at_path(self.ncid(), name)?,
                 _file: PhantomData,
             },
             PhantomData,
@@ -335,7 +343,7 @@ impl MutableFile {
     where
         T: NcPutGet,
     {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.ncid(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         VariableMut::add_from_str(ncid, T::NCTYPE, name, dims)
     }
 
@@ -346,7 +354,7 @@ impl MutableFile {
         dims: &[&str],
         typ: &super::types::VariableType,
     ) -> error::Result<VariableMut<'f>> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.ncid(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         VariableMut::add_from_str(ncid, typ.id(), name, dims)
     }
 
@@ -356,7 +364,7 @@ impl MutableFile {
         name: &str,
         size: usize,
     ) -> error::Result<super::types::OpaqueType> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.ncid(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         super::types::OpaqueType::add(ncid, name, size)
     }
     /// Add a variable length datatype
@@ -364,7 +372,7 @@ impl MutableFile {
         &mut self,
         name: &str,
     ) -> error::Result<super::types::VlenType> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.ncid(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         super::types::VlenType::add::<T>(ncid, name)
     }
     /// Add an enum datatype
@@ -373,7 +381,7 @@ impl MutableFile {
         name: &str,
         mappings: &[(&str, T)],
     ) -> error::Result<super::types::EnumType> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.ncid(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         super::types::EnumType::add::<T>(ncid, name, mappings)
     }
 
@@ -382,7 +390,7 @@ impl MutableFile {
         &mut self,
         name: &str,
     ) -> error::Result<super::types::CompoundBuilder> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.ncid(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         super::types::CompoundType::add(ncid, name)
     }
 
@@ -392,7 +400,7 @@ impl MutableFile {
         name: &str,
         dims: &[&str],
     ) -> error::Result<VariableMut<'f>> {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.ncid(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         VariableMut::add_from_str(ncid, NC_STRING, name, dims)
     }
     /// Adds a variable from a set of unique identifiers, recursing upwards
@@ -405,7 +413,7 @@ impl MutableFile {
     where
         T: NcPutGet,
     {
-        let (ncid, name) = super::group::get_subgroup_ncid_and_stem_from_path(self.ncid(), name)?;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         super::variable::add_variable_from_identifiers(ncid, name, dims, T::NCTYPE)
     }
 }
