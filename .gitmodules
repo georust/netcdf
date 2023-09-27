@@ -1,4 +1,4 @@
 [submodule "netcdf-src/source"]
 	path = netcdf-src/source
-	url = https://github.com/magnusuMET/netcdf-c.git
-        branch = bugfix/patched_v4.9.1_for_rust_netcdf
+	url = https://github.com/Unidata/netcdf-c
+	rev = 718349098979dcc4a2b13c8d957ef31361dd636b
