@@ -84,6 +84,10 @@ impl<'f> Group<'f> {
             .unwrap()
             .map(Result::unwrap)
     }
+    /// Get the attribute value
+    pub fn attribute_value(&self, name: &str) -> Option<error::Result<AttrValue>> {
+        self.attribute(name).as_ref().map(Attribute::value)
+    }
 
     /// Get a single dimension
     pub fn dimension<'g>(&'g self, name: &str) -> Option<Dimension<'g>>

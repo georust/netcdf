@@ -128,6 +128,10 @@ impl<'g> Variable<'g> {
             .expect("Could not get attributes")
             .map(Result::unwrap)
     }
+    /// Get the attribute value
+    pub fn attribute_value(&self, name: &str) -> Option<error::Result<AttrValue>> {
+        self.attribute(name).as_ref().map(Attribute::value)
+    }
     /// Dimensions for a variable
     pub fn dimensions(&self) -> &[Dimension] {
         &self.dimensions
@@ -784,6 +788,23 @@ impl<'g> Variable<'g> {
     }
 
     /// Get multiple values from a variable
+    ///
+    /// Take notice:
+    /// `scale_factor` and `offset_factor` and other attributes are not
+    /// automatically applied. To take such into account, you can use code like below
+    /// ```rust,no_run
+    /// # use netcdf::attribute::AttrValue;
+    /// # let f = netcdf::create("file.nc")?;
+    /// # let var = f.variable("stuff").unwrap();
+    /// // let var = ...
+    /// // let values = ...
+    /// if let Some(scale_offset) = var.attribute_value("scale_offset").transpose()? {
+    ///     let scale_offset: f64 = scale_offset.try_into()?;
+    ///     // values += scale_offset
+    /// }
+    /// # Result::<(), netcdf::error::Error>::Ok(())
+    /// ```
+    /// where `Option::transpose` is used to bubble up any read errors
     pub fn values<T: NcPutGet, E>(&self, extents: E) -> error::Result<Vec<T>>
     where
         E: TryInto<Extents>,
