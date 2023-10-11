@@ -1,6 +1,6 @@
 [package]
 name = "netcdf-src"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Magnus Ulimoen <magnusu@met.no>"]
 edition = "2021"
 description = "Build scripts for building `netCDF` from source"
