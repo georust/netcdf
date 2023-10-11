@@ -1,4 +1,4 @@
 [submodule "netcdf-src/source"]
 	path = netcdf-src/source
-	url = https://github.com/Unidata/netcdf-c.git
-        rev = 9328ba17cb53f13a63707547c94f4715243dafdf
+	url = https://github.com/gigainfosystems/netcdf-c
+	rev = ecd665aa0f1f5d68f27ce654c684728305cb03d9
