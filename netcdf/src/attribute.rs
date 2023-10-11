@@ -3,7 +3,6 @@
 #![allow(clippy::similar_names)]
 use super::error;
 use netcdf_sys::*;
-use std::convert::TryInto;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::os::raw::c_char;
@@ -886,4 +885,183 @@ impl From<Vec<&str>> for AttrValue {
 fn conversion() {
     let x = 1.0f32;
     let _b: AttrValue = x.into();
+}
+
+impl TryFrom<AttrValue> for u8 {
+    type Error = error::Error;
+    fn try_from(attr: AttrValue) -> Result<u8, Self::Error> {
+        match attr {
+            AttrValue::Uchar(x) => Ok(x),
+            AttrValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Ushort(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+
+impl TryFrom<AttrValue> for i8 {
+    type Error = error::Error;
+    fn try_from(attr: AttrValue) -> Result<i8, Self::Error> {
+        match attr {
+            AttrValue::Uchar(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Schar(x) => Ok(x),
+            AttrValue::Ushort(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+
+impl TryFrom<AttrValue> for u16 {
+    type Error = error::Error;
+    fn try_from(attr: AttrValue) -> Result<u16, Self::Error> {
+        match attr {
+            AttrValue::Uchar(x) => Ok((x).into()),
+            AttrValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Ushort(x) => Ok(x),
+            AttrValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+
+impl TryFrom<AttrValue> for i16 {
+    type Error = error::Error;
+    fn try_from(attr: AttrValue) -> Result<i16, Self::Error> {
+        match attr {
+            AttrValue::Uchar(x) => Ok((x).into()),
+            AttrValue::Schar(x) => Ok((x).into()),
+            AttrValue::Ushort(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Short(x) => Ok(x),
+            AttrValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+impl TryFrom<AttrValue> for u32 {
+    type Error = error::Error;
+    fn try_from(attr: AttrValue) -> Result<u32, Self::Error> {
+        match attr {
+            AttrValue::Uchar(x) => Ok((x).into()),
+            AttrValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Ushort(x) => Ok((x).into()),
+            AttrValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Uint(x) => Ok(x),
+            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+impl TryFrom<AttrValue> for i32 {
+    type Error = error::Error;
+    fn try_from(attr: AttrValue) -> Result<i32, Self::Error> {
+        match attr {
+            AttrValue::Uchar(x) => Ok((x).into()),
+            AttrValue::Schar(x) => Ok((x).into()),
+            AttrValue::Ushort(x) => Ok((x).into()),
+            AttrValue::Short(x) => Ok((x).into()),
+            AttrValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Int(x) => Ok(x),
+            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+impl TryFrom<AttrValue> for u64 {
+    type Error = error::Error;
+    fn try_from(attr: AttrValue) -> Result<u64, Self::Error> {
+        match attr {
+            AttrValue::Uchar(x) => Ok((x).into()),
+            AttrValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Ushort(x) => Ok((x).into()),
+            AttrValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Uint(x) => Ok((x).into()),
+            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Ulonglong(x) => Ok(x),
+            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+impl TryFrom<AttrValue> for i64 {
+    type Error = error::Error;
+    fn try_from(attr: AttrValue) -> Result<i64, Self::Error> {
+        match attr {
+            AttrValue::Uchar(x) => Ok((x).into()),
+            AttrValue::Schar(x) => Ok((x).into()),
+            AttrValue::Ushort(x) => Ok((x).into()),
+            AttrValue::Short(x) => Ok((x).into()),
+            AttrValue::Uint(x) => Ok((x).into()),
+            AttrValue::Int(x) => Ok((x).into()),
+            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttrValue::Longlong(x) => Ok(x),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+impl TryFrom<AttrValue> for f32 {
+    type Error = error::Error;
+    fn try_from(attr: AttrValue) -> Result<f32, Self::Error> {
+        match attr {
+            AttrValue::Uchar(x) => Ok(x as _),
+            AttrValue::Schar(x) => Ok(x as _),
+            AttrValue::Ushort(x) => Ok(x as _),
+            AttrValue::Short(x) => Ok(x as _),
+            AttrValue::Uint(x) => Ok(x as _),
+            AttrValue::Int(x) => Ok(x as _),
+            AttrValue::Ulonglong(x) => Ok(x as _),
+            AttrValue::Longlong(x) => Ok(x as _),
+            AttrValue::Float(x) => Ok(x),
+            AttrValue::Double(x) => Ok(x as _),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+impl TryFrom<AttrValue> for f64 {
+    type Error = error::Error;
+    fn try_from(attr: AttrValue) -> Result<f64, Self::Error> {
+        match attr {
+            AttrValue::Uchar(x) => Ok(x as _),
+            AttrValue::Schar(x) => Ok(x as _),
+            AttrValue::Ushort(x) => Ok(x as _),
+            AttrValue::Short(x) => Ok(x as _),
+            AttrValue::Uint(x) => Ok(x as _),
+            AttrValue::Int(x) => Ok(x as _),
+            AttrValue::Ulonglong(x) => Ok(x as _),
+            AttrValue::Longlong(x) => Ok(x as _),
+            AttrValue::Float(x) => Ok(x as _),
+            AttrValue::Double(x) => Ok(x),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+
+#[test]
+fn roundtrip_attrvalue() {
+    let x: u8 = 5;
+    let attr: AttrValue = x.into();
+    assert_eq!(x, attr.try_into().unwrap());
+
+    let x: f32 = 5.0;
+    let attr: AttrValue = x.into();
+    assert_eq!(x, attr.try_into().unwrap());
 }
