@@ -18,6 +18,10 @@ extern "C" {
 
     pub fn nc_inq_filter_avail(ncid: c_int, id: c_uint) -> c_int;
 
+}
+
+#[cfg(feature = "4.9.0")]
+extern "C" {
     pub fn nc_def_var_bzip2(ncid: c_int, varid: c_int, level: c_int) -> c_int;
     pub fn nc_inq_var_bzip2(
         ncid: c_int,
