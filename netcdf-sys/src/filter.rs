@@ -18,6 +18,10 @@ extern "C" {
 
     pub fn nc_inq_filter_avail(ncid: c_int, id: c_uint) -> c_int;
 
+}
+
+#[cfg(feature = "4.9.0")]
+extern "C" {
     pub fn nc_def_var_bzip2(ncid: c_int, varid: c_int, level: c_int) -> c_int;
     pub fn nc_inq_var_bzip2(
         ncid: c_int,
@@ -26,12 +30,12 @@ extern "C" {
         levelp: *mut c_int,
     ) -> c_int;
 
-    pub fn nc_def_var_zstandars(ncid: c_int, varid: c_int, level: c_int) -> c_int;
+    pub fn nc_def_var_zstandard(ncid: c_int, varid: c_int, level: c_int) -> c_int;
     pub fn nc_inq_var_zstandard(
         ncid: c_int,
         varid: c_int,
         hasfilterp: *mut c_int,
-        levelp: *mut c_uint,
+        levelp: *mut c_int,
     ) -> c_int;
 
     pub fn nc_def_var_blosc(
