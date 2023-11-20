@@ -37,6 +37,11 @@ This crate depends on `libnetcdf`, but a static build from source is also suppor
 
 The crate is built on several platforms using github actions, and is currently known to build form from source on all major platforms (linux, macos, windows (gnu+msvc)), and through the package installers `conda` and `apt`.
 
+### Building without `netcdf-c`
+1. `git clone https://github.com/georust/netcdf`
+2. `git submodule update --init --recursive`
+3. `cargo build --features static`
+
 
 ## Documentation
 
