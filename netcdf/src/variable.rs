@@ -855,6 +855,69 @@ impl<'g> Variable<'g> {
         self.values_arr_mono(&extents)
     }
 
+    #[cfg(feature = "ndarray")]
+    /// Get values into an ndarray
+    pub fn values_arr_into<T: NcPutGet, E, D>(
+        &self,
+        extents: E,
+        mut out: ndarray::ArrayViewMut<T, D>,
+    ) -> error::Result<()>
+    where
+        D: ndarray::Dimension,
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents = extents.try_into().map_err(|e| e.into())?;
+
+        let dims = self.dimensions();
+        let mut start = Vec::with_capacity(dims.len());
+        let mut count = Vec::with_capacity(dims.len());
+        let mut stride = Vec::with_capacity(dims.len());
+
+        let mut rem_outshape = out.shape();
+
+        for (pos, item) in extents.iter_with_dims(dims)?.enumerate() {
+            start.push(item.start);
+            count.push(item.count);
+            stride.push(item.stride);
+            if !item.is_an_index {
+                let cur_dim_len = if let Some((&head, rest)) = rem_outshape.split_first() {
+                    rem_outshape = rest;
+                    head
+                } else {
+                    return Err(("Output array dimensionality is less than extents").into());
+                };
+                if item.count != cur_dim_len {
+                    return Err(format!("Item count (position {pos}) as {} but expected in output was {cur_dim_len}", item.count).into());
+                }
+            }
+        }
+        if !rem_outshape.is_empty() {
+            return Err(("Output array dimensionality is larger than extents").into());
+        }
+
+        let slice = if let Some(slice) = out.as_slice_mut() {
+            slice
+        } else {
+            return Err("Output array must be in standard layout".into());
+        };
+
+        assert_eq!(
+            slice.len(),
+            count.iter().copied().fold(1, usize::saturating_mul),
+            "Output size and number of elements to get are not compatible"
+        );
+
+        // Safety:
+        // start, count, stride are correct length
+        // slice is valid pointer, with enough space to hold all elements
+        unsafe {
+            T::get_vars(self, &start, &count, &stride, slice.as_mut_ptr())?;
+        }
+
+        Ok(())
+    }
+
     /// Get the fill value of a variable
     pub fn fill_value<T: NcPutGet>(&self) -> error::Result<Option<T>> {
         if T::NCTYPE != self.vartype {

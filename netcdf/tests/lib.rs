@@ -1696,3 +1696,49 @@ fn ndarray_put() {
     put_values!(var, (5..6, .., ..), values, s![.., .., .., 0], Failure);
     put_values!(var, (5..15, .., ..), values, s![.., .., .., 0]);
 }
+
+#[test]
+#[cfg(feature = "ndarray")]
+fn ndarray_get_into() {
+    use ndarray::s;
+
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("get_into.nc");
+
+    let mut f = netcdf::create(path).unwrap();
+    f.add_dimension("d1", 4).unwrap();
+    f.add_dimension("d2", 5).unwrap();
+    f.add_dimension("d3", 6).unwrap();
+
+    let values = ndarray::Array::<u64, _>::from_shape_fn((4, 5, 6), |(k, j, i)| {
+        (100 * k + 10 * j + i).try_into().unwrap()
+    });
+
+    let mut var = f.add_variable::<u64>("var", &["d1", "d2", "d3"]).unwrap();
+
+    var.put_values_arr(.., values.view()).unwrap();
+
+    let mut outarray = ndarray::Array::<u64, _>::zeros((4, 5, 6));
+
+    var.values_arr_into(.., outarray.view_mut()).unwrap();
+    assert_eq!(values, outarray);
+    outarray.fill(0);
+
+    var.values_arr_into((1, .., ..), outarray.slice_mut(s![0, .., ..]))
+        .unwrap();
+    assert_eq!(values.slice(s![1, .., ..]), outarray.slice(s![0, .., ..]));
+    outarray.fill(0);
+
+    var.values_arr_into((3, 1, ..), outarray.slice_mut(s![0, 0, ..]))
+        .unwrap();
+    assert_eq!(values.slice(s![3, 1, ..]), outarray.slice(s![0, 0, ..]));
+    outarray.fill(0);
+
+    var.values_arr_into((.., .., 1), outarray.slice_mut(s![.., .., 1]))
+        .unwrap_err();
+
+    let mut outarray = ndarray::Array::<u64, _>::zeros((3, 4, 5, 6));
+    var.values_arr_into((.., .., ..), outarray.slice_mut(s![0, .., .., ..]))
+        .unwrap();
+    assert_eq!(values, outarray.slice(s![0, .., .., ..]));
+}
