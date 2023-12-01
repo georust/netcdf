@@ -1268,6 +1268,82 @@ impl<'g> VariableMut<'g> {
         let extent = indices.try_into().map_err(Into::into)?;
         self.put_vlen_mono(vec, &extent)
     }
+
+    #[cfg(feature = "ndarray")]
+    /// Put values in an ndarray into the variable
+    pub fn put_values_arr<T: NcPutGet, E, D>(
+        &mut self,
+        extent: E,
+        arr: ndarray::ArrayView<T, D>,
+    ) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+        D: ndarray::Dimension,
+    {
+        let extent = extent.try_into().map_err(|e| e.into())?;
+
+        let slice = if let Some(slice) = arr.as_slice() {
+            slice
+        } else {
+            return Err(
+                "Slice is not contiguous or in c-order, you might want to use `as_standard_layout`"
+                    .into(),
+            );
+        };
+
+        let dimlen = self.dimensions.len();
+        let mut start = Vec::with_capacity(dimlen);
+        let mut count = Vec::with_capacity(dimlen);
+        let mut stride = Vec::with_capacity(dimlen);
+
+        let mut remaining_arrshape = arr.shape();
+        for (pos, item) in extent.iter_with_dims(self.dimensions())?.enumerate() {
+            if item.is_an_index {
+                start.push(item.start);
+                count.push(item.count);
+                stride.push(item.stride);
+                continue;
+            }
+            let arr_len = if let Some((&head, rest)) = remaining_arrshape.split_first() {
+                remaining_arrshape = rest;
+                head
+            } else {
+                return Err("Extents have greater dimensionality than the input array".into());
+            };
+
+            start.push(item.start);
+            if arr_len != item.count {
+                if arr_len > item.count && item.is_growable && !item.is_upwards_limited {
+                    // Item is allowed to grow to accomodate the
+                    // extra values in the array
+                } else {
+                    return Err(format!(
+                        "Variable dimension (at position {pos}) has length {}, but input array has a size of {arr_len}",
+                        item.count,
+                    )
+                    .into());
+                }
+            }
+            count.push(arr_len);
+            stride.push(item.stride);
+        }
+        if !remaining_arrshape.is_empty() {
+            return Err("Extents have lesser dimensionality than the input array".into());
+        }
+
+        assert_eq!(
+            arr.len(),
+            count.iter().copied().fold(1, usize::saturating_mul),
+            "Mismatch between the number of elements in array and the calculated `count`s"
+        );
+
+        // Safety:
+        // Dimensionality matches (always pushing in for loop)
+        // slice is valid pointer since we assert the size above
+        // slice is valid pointer since memory order is standard_layout (C)
+        unsafe { T::put_vars(self, &start, &count, &stride, slice.as_ptr()) }
+    }
 }
 
 impl<'g> VariableMut<'g> {

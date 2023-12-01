@@ -461,11 +461,17 @@ impl From<()> for Extents {
 
 pub(crate) type StartCountStride = (Vec<usize>, Vec<usize>, Vec<isize>);
 
+#[allow(dead_code)]
 pub(crate) struct StartCountStrideIterItem {
     pub(crate) start: usize,
     pub(crate) count: usize,
     pub(crate) stride: isize,
+    /// Extent is an index
     pub(crate) is_an_index: bool,
+    /// The dimension can increase
+    pub(crate) is_growable: bool,
+    /// The extent has an upper bound
+    pub(crate) is_upwards_limited: bool,
 }
 
 enum StartCountStrideIter<'a> {
@@ -482,6 +488,8 @@ impl<'a> Iterator for StartCountStrideIter<'a> {
                 count: dim.len(),
                 stride: 1,
                 is_an_index: false,
+                is_growable: dim.is_unlimited(),
+                is_upwards_limited: false,
             }),
             Self::Extent(iter) => iter.next().map(|(extent, dim)| match *extent {
                 Extent::Index(start) => Self::Item {
@@ -489,6 +497,8 @@ impl<'a> Iterator for StartCountStrideIter<'a> {
                     count: 1,
                     stride: 1,
                     is_an_index: true,
+                    is_growable: dim.is_unlimited(),
+                    is_upwards_limited: true,
                 },
                 Extent::Slice { start, stride } => stride.try_into().map_or_else(
                     |_| Self::Item {
@@ -496,12 +506,16 @@ impl<'a> Iterator for StartCountStrideIter<'a> {
                         count: 0,
                         stride, // negative stride is not used
                         is_an_index: false,
+                        is_growable: dim.is_unlimited(),
+                        is_upwards_limited: false,
                     },
                     |stride| Self::Item {
                         start,
                         count: (start..dim.len()).step_by(stride).count(),
                         stride: stride as isize,
                         is_an_index: false,
+                        is_growable: dim.is_unlimited(),
+                        is_upwards_limited: false,
                     },
                 ),
                 Extent::SliceCount {
@@ -513,6 +527,8 @@ impl<'a> Iterator for StartCountStrideIter<'a> {
                     count,
                     stride,
                     is_an_index: false,
+                    is_growable: dim.is_unlimited(),
+                    is_upwards_limited: true,
                 },
                 Extent::SliceEnd { start, end, stride } => stride.try_into().map_or_else(
                     |_| Self::Item {
@@ -520,12 +536,16 @@ impl<'a> Iterator for StartCountStrideIter<'a> {
                         count: 0,
                         stride, // negative stride is not used
                         is_an_index: false,
+                        is_growable: dim.is_unlimited(),
+                        is_upwards_limited: true,
                     },
                     |stride| Self::Item {
                         start,
                         count: (start..end).step_by(stride).count(),
                         stride: stride as isize,
                         is_an_index: false,
+                        is_growable: dim.is_unlimited(),
+                        is_upwards_limited: true,
                     },
                 ),
             }),

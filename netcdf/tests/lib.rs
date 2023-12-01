@@ -1619,3 +1619,80 @@ fn drop_dim_on_simple_indices() {
     let fill_value = var.fill_value().unwrap().unwrap();
     assert_eq!(value, fill_value);
 }
+
+#[test]
+#[cfg(feature = "ndarray")]
+fn ndarray_put() {
+    use ndarray::s;
+
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("stuff.nc");
+
+    let mut f = netcdf::create(path).unwrap();
+    f.add_dimension("d1", 10).unwrap();
+    f.add_dimension("d2", 11).unwrap();
+    f.add_dimension("d3", 12).unwrap();
+    f.add_dimension("d4", 13).unwrap();
+    f.add_unlimited_dimension("grow").unwrap();
+
+    let values = ndarray::Array::<u8, _>::zeros((10, 11, 12, 13));
+
+    let mut var = f
+        .add_variable::<u8>("var", &["d1", "d2", "d3", "d4"])
+        .unwrap();
+
+    macro_rules! put_values {
+        ($var:expr, $values:expr, $extent:expr) => {
+            put_values!($var, $extent, $values, $extent)
+        };
+        ($var:expr, $extent:expr, $values:expr, $slice:expr) => {
+            $var.put_values_arr($extent, $values.slice($slice).as_standard_layout().view())
+                .unwrap()
+        };
+        ($var:expr, $extent:expr, $values:expr, $slice:expr, Failure) => {
+            $var.put_values_arr($extent, $values.slice($slice).as_standard_layout().view())
+                .unwrap_err()
+        };
+    }
+
+    var.put_values_arr(.., values.view()).unwrap();
+    put_values!(var, values, s![3, .., .., ..]);
+    put_values!(var, values, s![5, .., 2, 3]);
+    put_values!(var, values, s![5, .., 2, 3..5]);
+
+    put_values!(var, .., values, s![.., .., .., ..]);
+    put_values!(var, (4, 6, .., ..), values, s![4, 6, .., ..]);
+
+    put_values!(var, (4, 6, 2, ..), values, s![4, 6, 2, ..]);
+    put_values!(var, (4, 6, .., 4), values, s![4, 6, .., 4]);
+
+    put_values!(var, values, s![4..;3, 6, .., 4]);
+    put_values!(var, .., values, s![.., .., .., 1], Failure);
+    put_values!(var, (.., .., .., 1), values, s![.., .., .., ..], Failure);
+
+    std::mem::drop(var);
+    let mut var = f.add_variable::<u8>("grow", &["grow", "d2", "d3"]).unwrap();
+
+    // let values = ndarray::Array::<u8, _>::zeros((10, 11, 12, 13));
+    put_values!(var, .., values, s![.., .., .., ..], Failure);
+    put_values!(var, .., values, s![..0, .., .., 0]);
+    put_values!(var, .., values, s![..1, .., .., 0]);
+    put_values!(var, .., values, s![.., .., .., 0]);
+    // Should fail since we don't know where to put the value (front? back?)
+    put_values!(var, .., values, s![..1, .., .., 0], Failure);
+
+    put_values!(var, (1, 4, 3), values, s![1, 1, 0, 0]);
+
+    put_values!(var, (1, 3..4, 3), values, s![1, 1, 5..6, 0]);
+    put_values!(var, (0, 0, 0), values, s![0, 0, .., ..], Failure);
+    // And weird implementation makes it such that we can append from a position which
+    // is not at the end, maybe this should be an error?
+    put_values!(var, (6.., .., ..), values, s![.., .., .., 0]);
+    // Can put at the same spot
+    put_values!(var, (6.., .., ..), values, s![.., .., .., 0]);
+    // But not if in the middle
+    put_values!(var, (5.., .., ..), values, s![.., .., .., 0], Failure);
+    // If the number of items is specified we can't put more items
+    put_values!(var, (5..6, .., ..), values, s![.., .., .., 0], Failure);
+    put_values!(var, (5..15, .., ..), values, s![.., .., .., 0]);
+}
