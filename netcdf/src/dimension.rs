@@ -11,14 +11,15 @@ use std::marker::PhantomData;
 pub struct Dimension<'g> {
     /// None when unlimited (size = 0)
     pub(crate) len: Option<core::num::NonZeroUsize>,
-    pub(crate) id: Identifier,
+    pub(crate) id: DimensionIdentifier,
     pub(crate) _group: PhantomData<&'g nc_type>,
 }
 
-/// Unique identifier for a dimensions in a file. Used when
-/// names can not be used directly
+/// Unique identifier for a dimension in a file. Used when
+/// names can not be used directly, for example when dealing
+/// with nested groups
 #[derive(Debug, Copy, Clone)]
-pub struct Identifier {
+pub struct DimensionIdentifier {
     pub(crate) ncid: nc_type,
     pub(crate) dimid: nc_type,
 }
@@ -65,7 +66,7 @@ impl<'g> Dimension<'g> {
 
     /// Grabs the unique identifier for this dimension, which
     /// can be used in `add_variable_from_identifiers`
-    pub fn identifier(&self) -> Identifier {
+    pub fn identifier(&self) -> DimensionIdentifier {
         self.id
     }
 }
@@ -118,7 +119,7 @@ pub(crate) fn from_name<'f>(loc: nc_type, name: &str) -> error::Result<Option<Di
 
     Ok(Some(Dimension {
         len: core::num::NonZeroUsize::new(dimlen),
-        id: Identifier { ncid: loc, dimid },
+        id: DimensionIdentifier { ncid: loc, dimid },
         _group: PhantomData,
     }))
 }
@@ -170,7 +171,7 @@ pub(crate) fn dimensions_from_location<'g>(
         }
         Ok(Dimension {
             len: core::num::NonZeroUsize::new(dimlen),
-            id: Identifier { ncid, dimid },
+            id: DimensionIdentifier { ncid, dimid },
             _group: PhantomData,
         })
     }))
@@ -220,7 +221,7 @@ pub(crate) fn dimensions_from_variable<'g>(
         }
         Ok(Dimension {
             len: core::num::NonZeroUsize::new(dimlen),
-            id: Identifier { ncid, dimid },
+            id: DimensionIdentifier { ncid, dimid },
             _group: PhantomData,
         })
     }))
@@ -265,7 +266,7 @@ pub(crate) fn dimension_from_name<'f>(
     }
     Ok(Some(Dimension {
         len: core::num::NonZeroUsize::new(dimlen),
-        id: super::dimension::Identifier { ncid, dimid },
+        id: super::dimension::DimensionIdentifier { ncid, dimid },
         _group: PhantomData,
     }))
 }
@@ -284,7 +285,7 @@ pub(crate) fn add_dimension_at<'f>(
     }
     Ok(Dimension {
         len: core::num::NonZeroUsize::new(dimid.try_into()?),
-        id: Identifier { ncid, dimid },
+        id: DimensionIdentifier { ncid, dimid },
         _group: PhantomData,
     })
 }

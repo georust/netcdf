@@ -66,7 +66,7 @@ fn fetch_from_path() {
         file.variable("grp/subgrp/var").unwrap().name(),
     );
     match file.attribute("grp/subgrp/attr").unwrap().value().unwrap() {
-        netcdf::AttrValue::Str(string) => assert_eq!(string, "test"),
+        netcdf::AttributeValue::Str(string) => assert_eq!(string, "test"),
         _ => panic!(),
     }
 }

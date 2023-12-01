@@ -169,7 +169,7 @@ impl fmt::Display for Error {
 }
 
 /// Result type used in this crate
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub(crate) fn checked(err: nc_type) -> Result<()> {
     if err != netcdf_sys::NC_NOERR {

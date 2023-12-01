@@ -27,10 +27,7 @@ fn use_string_to_open() {
 fn bad_filename() {
     let f = test_location().join("blah_stuff.nc");
     let res_file = netcdf::open(f);
-    assert!(matches!(
-        res_file.unwrap_err(),
-        netcdf::error::Error::Netcdf(2)
-    ));
+    assert!(matches!(res_file.unwrap_err(), netcdf::Error::Netcdf(2)));
 }
 
 // Read tests
@@ -173,9 +170,9 @@ fn netcdf_error() {
     use std::error::Error;
     println!("{} {:?}", err, err.source());
 
-    let err: netcdf::error::Error = "hello".into();
+    let err: netcdf::Error = "hello".into();
     println!("{}", err);
-    let err: netcdf::error::Error = String::from("hello").into();
+    let err: netcdf::Error = String::from("hello").into();
     println!("{}", err);
 
     let d = tempfile::tempdir().expect("Could not get tempdir");
@@ -318,7 +315,7 @@ fn create() {
 #[test]
 #[cfg(feature = "ndarray")]
 fn def_dims_vars_attrs() {
-    use netcdf::attribute::AttrValue;
+    use netcdf::AttributeValue;
     let d = tempfile::tempdir().unwrap();
     {
         let f = d.path().join("def_dims_vars_attrs.nc");
@@ -406,14 +403,14 @@ fn def_dims_vars_attrs() {
 
         // verify global attrs
         assert_eq!(
-            AttrValue::Int(3),
+            AttributeValue::Int(3),
             file.attribute("testattr1")
                 .expect("Could not find attribute")
                 .value()
                 .unwrap()
         );
         assert_eq!(
-            AttrValue::Str("Global string attr".into()),
+            AttributeValue::Str("Global string attr".into()),
             file.attribute("testattr2")
                 .expect("Could not find attribute")
                 .value()
@@ -422,7 +419,7 @@ fn def_dims_vars_attrs() {
 
         // verify var attrs
         assert_eq!(
-            AttrValue::Int(5),
+            AttributeValue::Int(5),
             file.variable(var_name)
                 .expect("Could not find variable")
                 .attribute("varattr1")
@@ -431,7 +428,7 @@ fn def_dims_vars_attrs() {
                 .unwrap()
         );
         assert_eq!(
-            AttrValue::Str("Variable string attr".into()),
+            AttributeValue::Str("Variable string attr".into()),
             file.variable(var_name)
                 .expect("Could not find variable")
                 .attribute("varattr2")
@@ -718,7 +715,7 @@ fn put_values() {
 #[test]
 /// Test setting a fill value when creating a Variable
 fn set_fill_value() {
-    use netcdf::attribute::AttrValue;
+    use netcdf::AttributeValue;
     let d = tempfile::tempdir().unwrap();
     let f = d.path().join("fill_value.nc");
     let dim_name = "some_dimension";
@@ -744,7 +741,7 @@ fn set_fill_value() {
         .value()
         .unwrap();
     // compare requested fill_value and attribute _FillValue
-    assert_eq!(AttrValue::Int(fill_value), attr);
+    assert_eq!(AttributeValue::Int(fill_value), attr);
 
     let fill = var.fill_value::<i32>().unwrap();
     assert_eq!(fill, Some(fill_value));
@@ -755,7 +752,7 @@ fn set_fill_value() {
 
 #[test]
 fn more_fill_values() {
-    use netcdf::attribute::AttrValue;
+    use netcdf::AttributeValue;
     let d = tempfile::tempdir().expect("Could not create tempdir");
     let path = d.path().join("more_fill_values.nc");
     let mut file = netcdf::create(path).expect("Could not open file");
@@ -785,12 +782,12 @@ fn more_fill_values() {
     var.set_fill_value(2_i32).unwrap();
     assert_eq!(
         var.attribute("_FillValue").unwrap().value().unwrap(),
-        AttrValue::Int(2)
+        AttributeValue::Int(2)
     );
     var.set_fill_value(3_i32).unwrap();
     assert_eq!(
         var.attribute("_FillValue").unwrap().value().unwrap(),
-        AttrValue::Int(3)
+        AttributeValue::Int(3)
     );
     unsafe { var.set_nofill().unwrap() };
     assert_eq!(var.fill_value::<i32>().unwrap(), None);
@@ -862,7 +859,7 @@ fn use_compression_chunking() {
     let var = &mut file.add_variable::<i32>("chunked3", &["x"]).unwrap();
     assert!(matches!(
         var.chunking(&[2, 2]).unwrap_err(),
-        netcdf::error::Error::SliceLen
+        netcdf::Error::SliceLen
     ));
 
     file.add_dimension("y", 0).unwrap();
@@ -929,7 +926,7 @@ fn add_conflicting_dimensions() {
 
     file.add_dimension("x", 10).unwrap();
     let e = file.add_dimension("x", 11).unwrap_err();
-    assert!(matches!(e, netcdf::error::Error::AlreadyExists));
+    assert!(matches!(e, netcdf::Error::AlreadyExists));
     assert_eq!(file.dimension("x").unwrap().len(), 10);
 }
 
@@ -945,7 +942,7 @@ fn add_conflicting_variables() {
 
     let e = file.add_variable::<f32>("x", &["y"]).unwrap_err();
     assert!(match e {
-        netcdf::error::Error::AlreadyExists => {
+        netcdf::Error::AlreadyExists => {
             true
         }
         e => {
@@ -984,7 +981,7 @@ fn unlimited_dimension_single_putting() {
 
 fn check_equal<T>(var: &netcdf::Variable, check: &[T])
 where
-    T: netcdf::variable::NcPutGet
+    T: netcdf::NcPutGet
         + std::clone::Clone
         + std::default::Default
         + std::fmt::Debug
@@ -1267,7 +1264,7 @@ fn dimension_identifiers() {
 #[test]
 /// Test setting/getting endian value when creating a Variable
 fn set_get_endian() {
-    use netcdf::variable::Endianness;
+    use netcdf::Endianness;
     let d = tempfile::tempdir().unwrap();
     let f = d.path().join("append.nc");
     let dim_name = "some_dimension";
@@ -1355,17 +1352,17 @@ mod strided {
         var.values_to(
             &mut buffer,
             (
-                netcdf::extent::Extent::SliceCount {
+                netcdf::Extent::SliceCount {
                     start: 0,
                     count: 2,
                     stride: 2,
                 },
-                netcdf::extent::Extent::SliceCount {
+                netcdf::Extent::SliceCount {
                     start: 0,
                     count: 5,
                     stride: 1,
                 },
-                netcdf::extent::Extent::SliceCount {
+                netcdf::Extent::SliceCount {
                     start: 0,
                     count: 3,
                     stride: 3,
@@ -1400,17 +1397,17 @@ mod strided {
         var.values_to(
             &mut buffer,
             (
-                netcdf::extent::Extent::SliceCount {
+                netcdf::Extent::SliceCount {
                     start: 2,
                     count: 1,
                     stride: 2,
                 },
-                netcdf::extent::Extent::SliceCount {
+                netcdf::Extent::SliceCount {
                     start: 0,
                     count: 2,
                     stride: 1,
                 },
-                netcdf::extent::Extent::SliceCount {
+                netcdf::Extent::SliceCount {
                     start: 4,
                     count: 2,
                     stride: 3,
@@ -1511,7 +1508,7 @@ fn dimension_identifiers_from_different_ncids() {
         .add_variable_from_identifiers::<u8>("var", &[d1.identifier()])
         .unwrap_err()
     {
-        netcdf::error::Error::WrongDataset => (),
+        netcdf::Error::WrongDataset => (),
         _ => panic!(),
     }
 

@@ -1,8 +1,7 @@
 //! All netcdf items belong in the root group, which can
 //! be interacted with to get the underlying data
 
-use super::attribute::AttrValue;
-use super::attribute::Attribute;
+use super::attribute::{Attribute, AttributeValue};
 use super::dimension::Dimension;
 use super::error;
 use super::variable::{NcPutGet, Variable, VariableMut};
@@ -20,7 +19,10 @@ pub struct Group<'f> {
 }
 
 #[derive(Debug)]
-/// Mutable access to a group
+/// Mutable access to a group.
+///
+/// This type derefs to a [`Group`](Group), which means [`GroupMut`](Self)
+/// can be used where [`Group`](Group) is expected
 #[allow(clippy::module_name_repetitions)]
 pub struct GroupMut<'f>(
     pub(crate) Group<'f>,
@@ -85,7 +87,7 @@ impl<'f> Group<'f> {
             .map(Result::unwrap)
     }
     /// Get the attribute value
-    pub fn attribute_value(&self, name: &str) -> Option<error::Result<AttrValue>> {
+    pub fn attribute_value(&self, name: &str) -> Option<error::Result<AttributeValue>> {
         self.attribute(name).as_ref().map(Attribute::value)
     }
 
@@ -207,7 +209,7 @@ impl<'f> GroupMut<'f> {
     /// Add an attribute to the group
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where
-        T: Into<AttrValue>,
+        T: Into<AttributeValue>,
     {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         Attribute::put(ncid, NC_GLOBAL, name, val.into())
@@ -268,7 +270,7 @@ impl<'f> GroupMut<'f> {
     pub fn add_variable_from_identifiers<'g, T>(
         &'g mut self,
         name: &str,
-        dims: &[super::dimension::Identifier],
+        dims: &[super::dimension::DimensionIdentifier],
     ) -> error::Result<VariableMut<'g>>
     where
         T: NcPutGet,

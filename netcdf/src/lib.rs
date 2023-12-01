@@ -9,8 +9,8 @@
 //! See the [`CF Conventions`](http://cfconventions.org/) for conventions used for climate and
 //! forecast models.
 //!
-//! To explore the documentation, see the `Functions` section, in particular
-//! `open()`, `create()`, and `append()`.
+//! To explore the documentation, see the [`Functions`](#functions) section, in particular
+//! [`open()`](open), [`create()`](create), and [`append()`](append).
 //!
 //! For more information see:
 //! * [The official introduction to `netCDF`](https://docs.unidata.ucar.edu/nug/current/netcdf_introduction.html)
@@ -91,25 +91,28 @@ use lazy_static::lazy_static;
 use netcdf_sys::nc_type;
 use std::sync::Mutex;
 
-pub mod attribute;
-pub mod dimension;
-pub mod error;
-pub mod extent;
-pub mod file;
-pub mod group;
+pub(crate) mod attribute;
+pub(crate) mod dimension;
+pub(crate) mod error;
+pub(crate) mod extent;
+pub(crate) mod file;
+pub(crate) mod group;
 pub mod types;
-pub mod variable;
+pub(crate) mod variable;
 
-pub use attribute::*;
-pub use dimension::*;
-pub use file::*;
-pub use group::*;
-pub use variable::*;
+pub use attribute::{Attribute, AttributeValue};
+pub use dimension::{Dimension, DimensionIdentifier};
+pub use error::{Error, Result};
+pub use extent::{Extent, Extents};
+pub(crate) use file::RawFile;
+pub use file::{File, FileMut, Options};
+pub use group::{Group, GroupMut};
+pub use variable::{Endianness, NcPutGet, Variable, VariableMut};
 
 /// Open a netcdf file in create mode
 ///
 /// Will create a `netCDF4` file and overwrite existing file
-pub fn create<P>(name: P) -> error::Result<MutableFile>
+pub fn create<P>(name: P) -> error::Result<FileMut>
 where
     P: AsRef<std::path::Path>,
 {
@@ -117,7 +120,7 @@ where
 }
 
 /// Open a `netCDF` file in create mode with the given options
-pub fn create_with<P>(name: P, options: Options) -> error::Result<MutableFile>
+pub fn create_with<P>(name: P, options: Options) -> error::Result<FileMut>
 where
     P: AsRef<std::path::Path>,
 {
@@ -125,7 +128,7 @@ where
 }
 
 /// Open a `netCDF` file in append mode
-pub fn append<P>(name: P) -> error::Result<MutableFile>
+pub fn append<P>(name: P) -> error::Result<FileMut>
 where
     P: AsRef<std::path::Path>,
 {
@@ -133,7 +136,7 @@ where
 }
 
 /// Open a `netCDF` file in append mode with the given options
-pub fn append_with<P>(name: P, options: Options) -> error::Result<MutableFile>
+pub fn append_with<P>(name: P, options: Options) -> error::Result<FileMut>
 where
     P: AsRef<std::path::Path>,
 {

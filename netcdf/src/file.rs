@@ -1,9 +1,9 @@
 //! Open, create, and append netcdf files
 
 #![allow(clippy::similar_names)]
-use crate::{get_parent_ncid_and_stem, try_get_ncid, try_get_parent_ncid_and_stem};
+use crate::group::{get_parent_ncid_and_stem, try_get_ncid, try_get_parent_ncid_and_stem};
 
-use super::attribute::{AttrValue, Attribute};
+use super::attribute::{Attribute, AttributeValue};
 use super::dimension::{self, Dimension};
 use super::error;
 use super::group::{Group, GroupMut};
@@ -13,6 +13,7 @@ use std::marker::PhantomData;
 use std::path;
 
 #[derive(Debug)]
+#[repr(transparent)]
 pub(crate) struct RawFile {
     ncid: nc_type,
 }
@@ -77,13 +78,13 @@ impl RawFile {
     }
 
     /// Open a `netCDF` file in append mode (read/write).
-    pub(crate) fn append_with(path: &path::Path, options: Options) -> error::Result<MutableFile> {
+    pub(crate) fn append_with(path: &path::Path, options: Options) -> error::Result<FileMut> {
         let file = Self::open_with(path, options | Options::WRITE)?;
-        Ok(MutableFile(file))
+        Ok(FileMut(file))
     }
 
     /// Create a new `netCDF` file
-    pub(crate) fn create_with(path: &path::Path, options: Options) -> error::Result<MutableFile> {
+    pub(crate) fn create_with(path: &path::Path, options: Options) -> error::Result<FileMut> {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = -1;
         unsafe {
@@ -92,7 +93,7 @@ impl RawFile {
             }))?;
         }
 
-        Ok(MutableFile(File(Self { ncid })))
+        Ok(FileMut(File(Self { ncid })))
     }
 
     #[cfg(feature = "has-mmap")]
@@ -121,6 +122,7 @@ impl RawFile {
 #[derive(Debug)]
 /// Read only accessible file
 #[allow(clippy::module_name_repetitions)]
+#[repr(transparent)]
 pub struct File(RawFile);
 
 impl File {
@@ -244,19 +246,23 @@ impl File {
     }
 }
 
-/// Mutable access to file
+/// Mutable access to file.
+///
+/// This type derefs to a [`File`](File), which means [`FileMut`](Self)
+/// can be used where [`File`](File) is expected
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
-pub struct MutableFile(File);
+#[repr(transparent)]
+pub struct FileMut(File);
 
-impl std::ops::Deref for MutableFile {
+impl std::ops::Deref for FileMut {
     type Target = File;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl MutableFile {
+impl FileMut {
     /// Mutable access to the root group
     ///
     /// Return None if this can't be a root group
@@ -304,7 +310,7 @@ impl MutableFile {
     /// Add an attribute to the root group
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where
-        T: Into<AttrValue>,
+        T: Into<AttributeValue>,
     {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         Attribute::put(ncid, NC_GLOBAL, name, val.into())
@@ -408,7 +414,7 @@ impl MutableFile {
     pub fn add_variable_from_identifiers<'f, T>(
         &'f mut self,
         name: &str,
-        dims: &[dimension::Identifier],
+        dims: &[dimension::DimensionIdentifier],
     ) -> error::Result<VariableMut<'f>>
     where
         T: NcPutGet,

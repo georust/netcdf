@@ -96,7 +96,7 @@ fn add_and_get_from_path() {
     );
     assert!(file.group("missing/subgrp").is_err());
     match file.attribute("a/b/attr").unwrap().value().unwrap() {
-        netcdf::AttrValue::Str(string) => assert_eq!(string, "test"),
+        netcdf::AttributeValue::Str(string) => assert_eq!(string, "test"),
         _ => panic!(),
     }
 }
