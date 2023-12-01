@@ -38,6 +38,7 @@
 //! let data_i32 = var.value::<i32, _>((40, 0, 0))?;
 //!
 //! // You can use `values_arr()` to get all the data from the variable.
+//! // This requires the `ndarray` feature
 //! // Passing `..` will give you the entire slice
 //! # #[cfg(feature = "ndarray")]
 //! let data = var.values_arr::<i32, _>(..)?;
@@ -46,6 +47,7 @@
 //! // `(40, 0, 0)` and get a dataset of size `100, 100` from this
 //! # #[cfg(feature = "ndarray")]
 //! let data = var.values_arr::<i32, _>(([40, 0 ,0], [1, 100, 100]))?;
+//! # #[cfg(feature = "ndarray")]
 //! let data = var.values_arr::<i32, _>((40, ..100, ..100))?;
 //! # Ok(()) }
 //! ```
