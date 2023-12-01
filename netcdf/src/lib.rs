@@ -87,9 +87,7 @@
 #![allow(clippy::wildcard_imports)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
-use lazy_static::lazy_static;
 use netcdf_sys::nc_type;
-use std::sync::Mutex;
 
 pub mod attribute;
 pub mod dimension;
@@ -162,15 +160,10 @@ pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<MemFile<
     RawFile::open_from_memory(name, mem)
 }
 
-lazy_static! {
-    /// Use this when accessing `netCDF` functions
-    pub(crate) static ref LOCK: Mutex<()> = Mutex::new(());
-}
-
 /// All functions should be wrapped in this locker. Disregarding this, expect
 /// segfaults, especially on non-threadsafe hdf5 builds
 pub(crate) fn with_lock<F: FnMut() -> nc_type>(mut f: F) -> nc_type {
-    let _l = LOCK.lock().unwrap();
+    let _l = netcdf_sys::libnetcdf_lock.lock().unwrap();
     f()
 }
 

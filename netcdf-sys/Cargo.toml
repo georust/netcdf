@@ -17,7 +17,7 @@ categories = ["ffi", "filesystem", "science"]
 exclude = [
     "testdata/**",
 ]
-rust-version = "1.60"
+rust-version = "1.70"
 
 [dependencies]
 libz-sys = { version = "1.0.25" }
@@ -26,7 +26,6 @@ hdf5-sys = { version = "0.8.0" }
 netcdf-src = { path = "../netcdf-src", version = "0.3.0", optional = true }
 
 [dev-dependencies]
-lazy_static = "1.4.0"
 
 [features]
 default = []

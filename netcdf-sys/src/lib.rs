@@ -30,23 +30,19 @@ mod filter;
 #[cfg(feature = "4.8.0")]
 pub use filter::*;
 
+use std::sync::Mutex;
+
+/// Global netCDF lock for using all functions in the netCDF library
+///
+/// Per the NetCDF FAQ: "THE C-BASED LIBRARIES ARE NOT THREAD-SAFE"
+pub static libnetcdf_lock: Mutex<()> = Mutex::new(());
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::env;
     use std::ffi;
     use std::path;
-
-    use lazy_static::lazy_static;
-    use std::sync::Mutex;
-
-    // Per the NetCDF FAQ, "THE C-BASED LIBRARIES ARE NOT THREAD-SAFE"
-    // So, here is our global mutex.
-    // Use lazy-static dependency to avoid use of static_mutex feature which
-    // breaks compatibility with stable channel.
-    lazy_static! {
-        pub static ref libnetcdf_lock: Mutex<()> = Mutex::new(());
-    }
 
     #[test]
     fn test_nc_open_close() {
