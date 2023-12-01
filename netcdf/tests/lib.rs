@@ -1585,3 +1585,37 @@ fn invalid_utf8_as_path() {
     let retrieved_path = file.path().unwrap();
     assert_eq!(fullpath, retrieved_path);
 }
+
+#[test]
+#[cfg(feature = "ndarray")]
+fn drop_dim_on_simple_indices() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("read_write_netcdf");
+
+    let mut f = netcdf::create(path).unwrap();
+    f.add_dimension("d1", 10).unwrap();
+    f.add_dimension("d2", 11).unwrap();
+    f.add_dimension("d3", 12).unwrap();
+    f.add_dimension("d4", 13).unwrap();
+
+    let var = f
+        .add_variable::<i8>("v", &["d1", "d2", "d3", "d4"])
+        .unwrap();
+
+    let values = var.values_arr::<i8, _>(..).unwrap();
+    assert_eq!(values.shape(), &[10, 11, 12, 13]);
+    let values = var.values_arr::<i8, _>((.., .., .., 1)).unwrap();
+    assert_eq!(values.shape(), &[10, 11, 12]);
+    let values = var.values_arr::<i8, _>((.., 9, .., 1)).unwrap();
+    assert_eq!(values.shape(), &[10, 12]);
+
+    let values = var.values_arr::<i8, _>((.., 9, .., 1..=1)).unwrap();
+    assert_eq!(values.shape(), &[10, 12, 1]);
+
+    let values = var.values_arr::<i8, _>((2, 9, 3, 1)).unwrap();
+    assert_eq!(values.shape(), &[]);
+    // Really awkward to get this one value...
+    let value = values.into_dimensionality().unwrap().into_scalar();
+    let fill_value = var.fill_value().unwrap().unwrap();
+    assert_eq!(value, fill_value);
+}

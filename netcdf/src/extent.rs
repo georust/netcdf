@@ -206,6 +206,7 @@ impl From<RangeFull> for Extent {
 impl_for_ref!(RangeFull: Extent);
 
 impl Extent {
+    #[allow(unused)]
     const fn stride(&self) -> Option<isize> {
         match *self {
             Self::Slice { start: _, stride }
@@ -460,19 +461,100 @@ impl From<()> for Extents {
 
 pub(crate) type StartCountStride = (Vec<usize>, Vec<usize>, Vec<isize>);
 
+pub(crate) struct StartCountStrideIterItem {
+    pub(crate) start: usize,
+    pub(crate) count: usize,
+    pub(crate) stride: isize,
+    pub(crate) is_an_index: bool,
+}
+
+enum StartCountStrideIter<'a> {
+    All(std::slice::Iter<'a, Dimension<'a>>),
+    Extent(std::iter::Zip<std::slice::Iter<'a, Extent>, std::slice::Iter<'a, Dimension<'a>>>),
+}
+
+impl<'a> Iterator for StartCountStrideIter<'a> {
+    type Item = StartCountStrideIterItem;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::All(iter) => iter.next().map(|dim| Self::Item {
+                start: 0,
+                count: dim.len(),
+                stride: 1,
+                is_an_index: false,
+            }),
+            Self::Extent(iter) => iter.next().map(|(extent, dim)| match *extent {
+                Extent::Index(start) => Self::Item {
+                    start,
+                    count: 1,
+                    stride: 1,
+                    is_an_index: true,
+                },
+                Extent::Slice { start, stride } => stride.try_into().map_or_else(
+                    |_| Self::Item {
+                        start,
+                        count: 0,
+                        stride, // negative stride is not used
+                        is_an_index: false,
+                    },
+                    |stride| Self::Item {
+                        start,
+                        count: (start..dim.len()).step_by(stride).count(),
+                        stride: stride as isize,
+                        is_an_index: false,
+                    },
+                ),
+                Extent::SliceCount {
+                    start,
+                    count,
+                    stride,
+                } => Self::Item {
+                    start,
+                    count,
+                    stride,
+                    is_an_index: false,
+                },
+                Extent::SliceEnd { start, end, stride } => stride.try_into().map_or_else(
+                    |_| Self::Item {
+                        start,
+                        count: 0,
+                        stride, // negative stride is not used
+                        is_an_index: false,
+                    },
+                    |stride| Self::Item {
+                        start,
+                        count: (start..end).step_by(stride).count(),
+                        stride: stride as isize,
+                        is_an_index: false,
+                    },
+                ),
+            }),
+        }
+    }
+}
+
 impl Extents {
     pub(crate) fn get_start_count_stride(
         &self,
         dims: &[Dimension],
     ) -> Result<StartCountStride, error::Error> {
-        let (start, count, stride): StartCountStride = match self {
-            Self::All => {
-                let start = dims.iter().map(|_| 0).collect();
-                let counts = dims.iter().map(Dimension::len).collect();
-                let stride = dims.iter().map(|_| 1).collect();
+        let mut start = vec![];
+        let mut count = vec![];
+        let mut stride = vec![];
+        for item in self.iter_with_dims(dims)? {
+            start.push(item.start);
+            count.push(item.count);
+            stride.push(item.stride);
+        }
+        Ok((start, count, stride))
+    }
 
-                (start, counts, stride)
-            }
+    pub(crate) fn iter_with_dims<'a>(
+        &'a self,
+        dims: &'a [Dimension],
+    ) -> Result<impl Iterator<Item = StartCountStrideIterItem> + 'a, error::Error> {
+        match self {
+            Self::All => Ok(StartCountStrideIter::All(dims.iter())),
             Self::Extent(extents) => {
                 if extents.len() != dims.len() {
                     return Err(error::Error::DimensionMismatch {
@@ -480,32 +562,11 @@ impl Extents {
                         actual: extents.len(),
                     });
                 }
-                let (start, count) = dims
-                    .iter()
-                    .zip(extents)
-                    .map(|(d, &e)| match e {
-                        Extent::Index(start) => (start, 1),
-                        Extent::Slice { start, stride } => usize::try_from(stride).map_or_else(
-                            |_| (start, 0),
-                            |stride| (start, (start..d.len()).step_by(stride).count()),
-                        ),
-                        Extent::SliceCount {
-                            start,
-                            count,
-                            stride: _,
-                        } => (start, count),
-                        Extent::SliceEnd { start, end, stride } => usize::try_from(stride)
-                            .map_or_else(
-                                |_| (start, 0),
-                                |stride| (start, (start..end).step_by(stride).count()),
-                            ),
-                    })
-                    .unzip();
-                let stride = extents.iter().map(|e| e.stride().unwrap_or(1)).collect();
-                (start, count, stride)
+                Ok(StartCountStrideIter::Extent(
+                    extents.iter().zip(dims.iter()),
+                ))
             }
-        };
-        Ok((start, count, stride))
+        }
     }
 }
 

@@ -820,7 +820,19 @@ impl<'g> Variable<'g> {
     /// Fetches variable
     fn values_arr_mono<T: NcPutGet>(&self, extents: &Extents) -> error::Result<ArrayD<T>> {
         let dims = self.dimensions();
-        let (start, count, stride) = extents.get_start_count_stride(dims)?;
+        let mut start = vec![];
+        let mut count = vec![];
+        let mut stride = vec![];
+        let mut shape = vec![];
+
+        for item in extents.iter_with_dims(dims)? {
+            start.push(item.start);
+            count.push(item.count);
+            stride.push(item.stride);
+            if !item.is_an_index {
+                shape.push(item.count);
+            }
+        }
 
         let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
         let mut values = Vec::with_capacity(number_of_elements);
@@ -829,7 +841,7 @@ impl<'g> Variable<'g> {
             values.set_len(number_of_elements);
         };
 
-        Ok(ArrayD::from_shape_vec(count, values).unwrap())
+        Ok(ArrayD::from_shape_vec(shape, values).unwrap())
     }
 
     #[cfg(feature = "ndarray")]
