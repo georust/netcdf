@@ -1,0 +1,37 @@
+---
+name: Release
+
+on:
+  push:
+    tags:
+      - "netcdf-v*"
+      - "netcdf-sys-v*"
+      - "netcdf-src-v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: Install netCDF
+      run: sudo apt-get update && sudo apt-get install libnetcdf-dev
+    - name: Install rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+    - name: Publish netcdf-src
+      if: "${{ startsWith(github.ref_name, 'netcdf-src-v') }}"
+      run: cargo publish --package netcdf-src --token "${{ secrets.CRATES_IO_TOKEN }}"
+    - name: Publish netcdf-sys
+      if: "${{ startsWith(github.ref_name, 'netcdf-sys-v') }}"
+      run: cargo publish --package netcdf-sys --token "${{ secrets.CRATES_IO_TOKEN }}"
+    - name: Publish netcdf
+      if: "${{ startsWith(github.ref_name, 'netcdf-v') }}"
+      run: cargo publish --package netcdf --token "${{ secrets.CRATES_IO_TOKEN }}"
