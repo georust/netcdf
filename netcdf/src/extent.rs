@@ -247,7 +247,7 @@ impl Extent {
 ///
 /// This type can be constructed in many ways
 /// ```rust,no_run
-/// use netcdf::extent::{Extent, Extents};
+/// use netcdf::{Extent, Extents};
 /// // Get all values
 /// let _: Extents = (..).into();
 /// // Get array with only first 10 of the first dimension

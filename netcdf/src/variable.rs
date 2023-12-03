@@ -7,8 +7,7 @@ use std::marker::Sized;
 use std::mem::MaybeUninit;
 use std::ptr::addr_of;
 
-use super::attribute::AttrValue;
-use super::attribute::Attribute;
+use super::attribute::{Attribute, AttributeValue};
 use super::dimension::Dimension;
 use super::error;
 use super::extent::Extents;
@@ -32,6 +31,9 @@ pub struct Variable<'g> {
 
 #[derive(Debug)]
 /// Mutable access to a variable.
+///
+/// This type derefs to a [`Variable`](Variable), which means [`VariableMut`](Self)
+/// can be used where [`Variable`](Variable) is expected
 #[allow(clippy::module_name_repetitions)]
 pub struct VariableMut<'g>(
     pub(crate) Variable<'g>,
@@ -129,7 +131,7 @@ impl<'g> Variable<'g> {
             .map(Result::unwrap)
     }
     /// Get the attribute value
-    pub fn attribute_value(&self, name: &str) -> Option<error::Result<AttrValue>> {
+    pub fn attribute_value(&self, name: &str) -> Option<error::Result<AttributeValue>> {
         self.attribute(name).as_ref().map(Attribute::value)
     }
     /// Dimensions for a variable
@@ -707,7 +709,7 @@ impl<'g> VariableMut<'g> {
     /// Adds an attribute to the variable
     pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<Attribute>
     where
-        T: Into<AttrValue>,
+        T: Into<AttributeValue>,
     {
         Attribute::put(self.ncid, self.varid, name, val.into())
     }
@@ -793,7 +795,7 @@ impl<'g> Variable<'g> {
     /// `scale_factor` and `offset_factor` and other attributes are not
     /// automatically applied. To take such into account, you can use code like below
     /// ```rust,no_run
-    /// # use netcdf::attribute::AttrValue;
+    /// # use netcdf::AttributeValue;
     /// # let f = netcdf::create("file.nc")?;
     /// # let var = f.variable("stuff").unwrap();
     /// // let var = ...
@@ -802,7 +804,7 @@ impl<'g> Variable<'g> {
     ///     let scale_offset: f64 = scale_offset.try_into()?;
     ///     // values += scale_offset
     /// }
-    /// # Result::<(), netcdf::error::Error>::Ok(())
+    /// # Result::<(), netcdf::Error>::Ok(())
     /// ```
     /// where `Option::transpose` is used to bubble up any read errors
     pub fn values<T: NcPutGet, E>(&self, extents: E) -> error::Result<Vec<T>>
@@ -1347,7 +1349,7 @@ pub(crate) fn variables_at_ncid<'g>(
 pub(crate) fn add_variable_from_identifiers<'g>(
     ncid: nc_type,
     name: &str,
-    dims: &[super::dimension::Identifier],
+    dims: &[super::dimension::DimensionIdentifier],
     xtype: nc_type,
 ) -> error::Result<VariableMut<'g>> {
     let cname = super::utils::short_name_to_bytes(name)?;

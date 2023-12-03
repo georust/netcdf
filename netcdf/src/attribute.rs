@@ -82,7 +82,7 @@ impl<'a> Attribute<'a> {
     ///
     /// Unsupported type or netcdf error
     #[allow(clippy::too_many_lines)]
-    pub fn value(&self) -> error::Result<AttrValue> {
+    pub fn value(&self) -> error::Result<AttributeValue> {
         let attlen = self.num_elems()?;
         let typ = self.typ()?;
 
@@ -100,7 +100,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Uchar(value))
+                    Ok(AttributeValue::Uchar(value))
                 }
                 len => {
                     let mut values = vec![0_u8; len];
@@ -114,7 +114,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Uchars(values))
+                    Ok(AttributeValue::Uchars(values))
                 }
             },
             NC_BYTE => match attlen {
@@ -130,7 +130,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Schar(value))
+                    Ok(AttributeValue::Schar(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
@@ -144,7 +144,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Schars(values))
+                    Ok(AttributeValue::Schars(values))
                 }
             },
             NC_SHORT => match attlen {
@@ -160,7 +160,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Short(value))
+                    Ok(AttributeValue::Short(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
@@ -174,7 +174,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Shorts(values))
+                    Ok(AttributeValue::Shorts(values))
                 }
             },
             NC_USHORT => match attlen {
@@ -190,7 +190,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Ushort(value))
+                    Ok(AttributeValue::Ushort(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
@@ -204,7 +204,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Ushorts(values))
+                    Ok(AttributeValue::Ushorts(values))
                 }
             },
             NC_INT => match attlen {
@@ -220,7 +220,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Int(value))
+                    Ok(AttributeValue::Int(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
@@ -234,7 +234,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Ints(values))
+                    Ok(AttributeValue::Ints(values))
                 }
             },
             NC_UINT => match attlen {
@@ -250,7 +250,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Uint(value))
+                    Ok(AttributeValue::Uint(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
@@ -264,7 +264,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Uints(values))
+                    Ok(AttributeValue::Uints(values))
                 }
             },
             NC_INT64 => match attlen {
@@ -280,7 +280,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Longlong(value))
+                    Ok(AttributeValue::Longlong(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
@@ -295,7 +295,7 @@ impl<'a> Attribute<'a> {
                         }))?;
                     }
 
-                    Ok(AttrValue::Longlongs(values))
+                    Ok(AttributeValue::Longlongs(values))
                 }
             },
             NC_UINT64 => match attlen {
@@ -311,7 +311,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Ulonglong(value))
+                    Ok(AttributeValue::Ulonglong(value))
                 }
                 len => {
                     let mut values = vec![0; len as _];
@@ -326,7 +326,7 @@ impl<'a> Attribute<'a> {
                         }))?;
                     }
 
-                    Ok(AttrValue::Ulonglongs(values))
+                    Ok(AttributeValue::Ulonglongs(values))
                 }
             },
             NC_FLOAT => match attlen {
@@ -342,7 +342,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Float(value))
+                    Ok(AttributeValue::Float(value))
                 }
                 len => {
                     let mut values = vec![0.0; len as _];
@@ -356,7 +356,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Floats(values))
+                    Ok(AttributeValue::Floats(values))
                 }
             },
             NC_DOUBLE => match attlen {
@@ -372,7 +372,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Double(value))
+                    Ok(AttributeValue::Double(value))
                 }
                 len => {
                     let mut values = vec![0.0; len as _];
@@ -386,7 +386,7 @@ impl<'a> Attribute<'a> {
                             )
                         }))?;
                     }
-                    Ok(AttrValue::Doubles(values))
+                    Ok(AttributeValue::Doubles(values))
                 }
             },
             NC_CHAR => {
@@ -403,7 +403,7 @@ impl<'a> Attribute<'a> {
                     }))?;
                 }
                 let pos = buf.iter().position(|&x| x == 0).unwrap_or(buf.len());
-                Ok(AttrValue::Str(String::from(String::from_utf8_lossy(
+                Ok(AttributeValue::Str(String::from(String::from_utf8_lossy(
                     &buf[..pos],
                 ))))
             }
@@ -432,7 +432,7 @@ impl<'a> Attribute<'a> {
                         .collect();
                     super::with_lock(|| nc_free_string(attlen, buf.as_mut_ptr()));
                 }
-                Ok(AttrValue::Strs(result))
+                Ok(AttributeValue::Strs(result))
             }
             x => Err(error::Error::TypeUnknown(x)),
         }
@@ -503,7 +503,7 @@ impl<'a> Iterator for AttributeIterator<'a> {
 /// returned from the file
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq)]
-pub enum AttrValue {
+pub enum AttributeValue {
     Uchar(u8),
     Uchars(Vec<u8>),
     Schar(i8),
@@ -535,16 +535,16 @@ impl<'a> Attribute<'a> {
         ncid: nc_type,
         varid: nc_type,
         name: &str,
-        val: AttrValue,
+        val: AttributeValue,
     ) -> error::Result<Self> {
         let cname = super::utils::short_name_to_bytes(name)?;
 
         error::checked(unsafe {
             match val {
-                AttrValue::Uchar(x) => super::with_lock(|| {
+                AttributeValue::Uchar(x) => super::with_lock(|| {
                     nc_put_att_uchar(ncid, varid, cname.as_ptr().cast(), NC_UBYTE, 1, &x)
                 }),
-                AttrValue::Uchars(x) => super::with_lock(|| {
+                AttributeValue::Uchars(x) => super::with_lock(|| {
                     nc_put_att_uchar(
                         ncid,
                         varid,
@@ -554,10 +554,10 @@ impl<'a> Attribute<'a> {
                         x.as_ptr(),
                     )
                 }),
-                AttrValue::Schar(x) => super::with_lock(|| {
+                AttributeValue::Schar(x) => super::with_lock(|| {
                     nc_put_att_schar(ncid, varid, cname.as_ptr().cast(), NC_BYTE, 1, &x)
                 }),
-                AttrValue::Schars(x) => super::with_lock(|| {
+                AttributeValue::Schars(x) => super::with_lock(|| {
                     nc_put_att_schar(
                         ncid,
                         varid,
@@ -567,10 +567,10 @@ impl<'a> Attribute<'a> {
                         x.as_ptr(),
                     )
                 }),
-                AttrValue::Ushort(x) => super::with_lock(|| {
+                AttributeValue::Ushort(x) => super::with_lock(|| {
                     nc_put_att_ushort(ncid, varid, cname.as_ptr().cast(), NC_USHORT, 1, &x)
                 }),
-                AttrValue::Ushorts(x) => super::with_lock(|| {
+                AttributeValue::Ushorts(x) => super::with_lock(|| {
                     nc_put_att_ushort(
                         ncid,
                         varid,
@@ -580,10 +580,10 @@ impl<'a> Attribute<'a> {
                         x.as_ptr(),
                     )
                 }),
-                AttrValue::Short(x) => super::with_lock(|| {
+                AttributeValue::Short(x) => super::with_lock(|| {
                     nc_put_att_short(ncid, varid, cname.as_ptr().cast(), NC_SHORT, 1, &x)
                 }),
-                AttrValue::Shorts(x) => super::with_lock(|| {
+                AttributeValue::Shorts(x) => super::with_lock(|| {
                     nc_put_att_short(
                         ncid,
                         varid,
@@ -593,10 +593,10 @@ impl<'a> Attribute<'a> {
                         x.as_ptr(),
                     )
                 }),
-                AttrValue::Uint(x) => super::with_lock(|| {
+                AttributeValue::Uint(x) => super::with_lock(|| {
                     nc_put_att_uint(ncid, varid, cname.as_ptr().cast(), NC_UINT, 1, &x)
                 }),
-                AttrValue::Uints(x) => super::with_lock(|| {
+                AttributeValue::Uints(x) => super::with_lock(|| {
                     nc_put_att_uint(
                         ncid,
                         varid,
@@ -606,10 +606,10 @@ impl<'a> Attribute<'a> {
                         x.as_ptr(),
                     )
                 }),
-                AttrValue::Int(x) => super::with_lock(|| {
+                AttributeValue::Int(x) => super::with_lock(|| {
                     nc_put_att_int(ncid, varid, cname.as_ptr().cast(), NC_INT, 1, &x)
                 }),
-                AttrValue::Ints(x) => super::with_lock(|| {
+                AttributeValue::Ints(x) => super::with_lock(|| {
                     nc_put_att_int(
                         ncid,
                         varid,
@@ -619,10 +619,10 @@ impl<'a> Attribute<'a> {
                         x.as_ptr(),
                     )
                 }),
-                AttrValue::Ulonglong(x) => super::with_lock(|| {
+                AttributeValue::Ulonglong(x) => super::with_lock(|| {
                     nc_put_att_ulonglong(ncid, varid, cname.as_ptr().cast(), NC_UINT64, 1, &x)
                 }),
-                AttrValue::Ulonglongs(x) => super::with_lock(|| {
+                AttributeValue::Ulonglongs(x) => super::with_lock(|| {
                     nc_put_att_ulonglong(
                         ncid,
                         varid,
@@ -632,10 +632,10 @@ impl<'a> Attribute<'a> {
                         x.as_ptr(),
                     )
                 }),
-                AttrValue::Longlong(x) => super::with_lock(|| {
+                AttributeValue::Longlong(x) => super::with_lock(|| {
                     nc_put_att_longlong(ncid, varid, cname.as_ptr().cast(), NC_INT64, 1, &x)
                 }),
-                AttrValue::Longlongs(x) => super::with_lock(|| {
+                AttributeValue::Longlongs(x) => super::with_lock(|| {
                     nc_put_att_longlong(
                         ncid,
                         varid,
@@ -645,10 +645,10 @@ impl<'a> Attribute<'a> {
                         x.as_ptr(),
                     )
                 }),
-                AttrValue::Float(x) => super::with_lock(|| {
+                AttributeValue::Float(x) => super::with_lock(|| {
                     nc_put_att_float(ncid, varid, cname.as_ptr().cast(), NC_FLOAT, 1, &x)
                 }),
-                AttrValue::Floats(x) => super::with_lock(|| {
+                AttributeValue::Floats(x) => super::with_lock(|| {
                     nc_put_att_float(
                         ncid,
                         varid,
@@ -658,10 +658,10 @@ impl<'a> Attribute<'a> {
                         x.as_ptr(),
                     )
                 }),
-                AttrValue::Double(x) => super::with_lock(|| {
+                AttributeValue::Double(x) => super::with_lock(|| {
                     nc_put_att_double(ncid, varid, cname.as_ptr().cast(), NC_DOUBLE, 1, &x)
                 }),
-                AttrValue::Doubles(x) => super::with_lock(|| {
+                AttributeValue::Doubles(x) => super::with_lock(|| {
                     nc_put_att_double(
                         ncid,
                         varid,
@@ -671,7 +671,7 @@ impl<'a> Attribute<'a> {
                         x.as_ptr(),
                     )
                 }),
-                AttrValue::Str(ref x) => super::with_lock(|| {
+                AttributeValue::Str(ref x) => super::with_lock(|| {
                     nc_put_att_text(
                         ncid,
                         varid,
@@ -680,7 +680,7 @@ impl<'a> Attribute<'a> {
                         x.as_ptr().cast(),
                     )
                 }),
-                AttrValue::Strs(ref x) => {
+                AttributeValue::Strs(ref x) => {
                     let cstrings: Vec<CString> = x
                         .iter()
                         .map(String::as_str)
@@ -750,132 +750,132 @@ impl<'a> Attribute<'a> {
 }
 
 // Boring implementations
-impl From<u8> for AttrValue {
+impl From<u8> for AttributeValue {
     fn from(x: u8) -> Self {
         Self::Uchar(x)
     }
 }
-impl From<Vec<u8>> for AttrValue {
+impl From<Vec<u8>> for AttributeValue {
     fn from(x: Vec<u8>) -> Self {
         Self::Uchars(x)
     }
 }
-impl From<i8> for AttrValue {
+impl From<i8> for AttributeValue {
     fn from(x: i8) -> Self {
         Self::Schar(x)
     }
 }
-impl From<Vec<i8>> for AttrValue {
+impl From<Vec<i8>> for AttributeValue {
     fn from(x: Vec<i8>) -> Self {
         Self::Schars(x)
     }
 }
-impl From<u16> for AttrValue {
+impl From<u16> for AttributeValue {
     fn from(x: u16) -> Self {
         Self::Ushort(x)
     }
 }
-impl From<Vec<u16>> for AttrValue {
+impl From<Vec<u16>> for AttributeValue {
     fn from(x: Vec<u16>) -> Self {
         Self::Ushorts(x)
     }
 }
-impl From<i16> for AttrValue {
+impl From<i16> for AttributeValue {
     fn from(x: i16) -> Self {
         Self::Short(x)
     }
 }
-impl From<Vec<i16>> for AttrValue {
+impl From<Vec<i16>> for AttributeValue {
     fn from(x: Vec<i16>) -> Self {
         Self::Shorts(x)
     }
 }
-impl From<u32> for AttrValue {
+impl From<u32> for AttributeValue {
     fn from(x: u32) -> Self {
         Self::Uint(x)
     }
 }
-impl From<Vec<u32>> for AttrValue {
+impl From<Vec<u32>> for AttributeValue {
     fn from(x: Vec<u32>) -> Self {
         Self::Uints(x)
     }
 }
-impl From<i32> for AttrValue {
+impl From<i32> for AttributeValue {
     fn from(x: i32) -> Self {
         Self::Int(x)
     }
 }
-impl From<Vec<i32>> for AttrValue {
+impl From<Vec<i32>> for AttributeValue {
     fn from(x: Vec<i32>) -> Self {
         Self::Ints(x)
     }
 }
-impl From<u64> for AttrValue {
+impl From<u64> for AttributeValue {
     fn from(x: u64) -> Self {
         Self::Ulonglong(x)
     }
 }
-impl From<Vec<u64>> for AttrValue {
+impl From<Vec<u64>> for AttributeValue {
     fn from(x: Vec<u64>) -> Self {
         Self::Ulonglongs(x)
     }
 }
-impl From<i64> for AttrValue {
+impl From<i64> for AttributeValue {
     fn from(x: i64) -> Self {
         Self::Longlong(x)
     }
 }
-impl From<Vec<i64>> for AttrValue {
+impl From<Vec<i64>> for AttributeValue {
     fn from(x: Vec<i64>) -> Self {
         Self::Longlongs(x)
     }
 }
-impl From<f32> for AttrValue {
+impl From<f32> for AttributeValue {
     fn from(x: f32) -> Self {
         Self::Float(x)
     }
 }
-impl From<Vec<f32>> for AttrValue {
+impl From<Vec<f32>> for AttributeValue {
     fn from(x: Vec<f32>) -> Self {
         Self::Floats(x)
     }
 }
-impl From<f64> for AttrValue {
+impl From<f64> for AttributeValue {
     fn from(x: f64) -> Self {
         Self::Double(x)
     }
 }
-impl From<Vec<f64>> for AttrValue {
+impl From<Vec<f64>> for AttributeValue {
     fn from(x: Vec<f64>) -> Self {
         Self::Doubles(x)
     }
 }
-impl From<&str> for AttrValue {
+impl From<&str> for AttributeValue {
     fn from(x: &str) -> Self {
         Self::Str(x.to_string())
     }
 }
-impl From<String> for AttrValue {
+impl From<String> for AttributeValue {
     fn from(x: String) -> Self {
         Self::Str(x)
     }
 }
-impl From<Vec<String>> for AttrValue {
+impl From<Vec<String>> for AttributeValue {
     fn from(x: Vec<String>) -> Self {
         Self::Strs(x)
     }
 }
-impl From<&[String]> for AttrValue {
+impl From<&[String]> for AttributeValue {
     fn from(x: &[String]) -> Self {
         Self::Strs(x.to_vec())
     }
 }
-impl From<&[&str]> for AttrValue {
+impl From<&[&str]> for AttributeValue {
     fn from(x: &[&str]) -> Self {
         Self::Strs(x.iter().map(|&s| String::from(s)).collect())
     }
 }
-impl From<Vec<&str>> for AttrValue {
+impl From<Vec<&str>> for AttributeValue {
     fn from(x: Vec<&str>) -> Self {
         Self::from(x.as_slice())
     }
@@ -884,172 +884,172 @@ impl From<Vec<&str>> for AttrValue {
 #[test]
 fn conversion() {
     let x = 1.0f32;
-    let _b: AttrValue = x.into();
+    let _b: AttributeValue = x.into();
 }
 
-impl TryFrom<AttrValue> for u8 {
+impl TryFrom<AttributeValue> for u8 {
     type Error = error::Error;
-    fn try_from(attr: AttrValue) -> Result<u8, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<u8, Self::Error> {
         match attr {
-            AttrValue::Uchar(x) => Ok(x),
-            AttrValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Ushort(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
-            _ => Err("Conversion not supported".into()),
-        }
-    }
-}
-
-impl TryFrom<AttrValue> for i8 {
-    type Error = error::Error;
-    fn try_from(attr: AttrValue) -> Result<i8, Self::Error> {
-        match attr {
-            AttrValue::Uchar(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Schar(x) => Ok(x),
-            AttrValue::Ushort(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uchar(x) => Ok(x),
+            AttributeValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Ushort(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
             _ => Err("Conversion not supported".into()),
         }
     }
 }
 
-impl TryFrom<AttrValue> for u16 {
+impl TryFrom<AttributeValue> for i8 {
     type Error = error::Error;
-    fn try_from(attr: AttrValue) -> Result<u16, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<i8, Self::Error> {
         match attr {
-            AttrValue::Uchar(x) => Ok((x).into()),
-            AttrValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Ushort(x) => Ok(x),
-            AttrValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uchar(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Schar(x) => Ok(x),
+            AttributeValue::Ushort(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
             _ => Err("Conversion not supported".into()),
         }
     }
 }
 
-impl TryFrom<AttrValue> for i16 {
+impl TryFrom<AttributeValue> for u16 {
     type Error = error::Error;
-    fn try_from(attr: AttrValue) -> Result<i16, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<u16, Self::Error> {
         match attr {
-            AttrValue::Uchar(x) => Ok((x).into()),
-            AttrValue::Schar(x) => Ok((x).into()),
-            AttrValue::Ushort(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Short(x) => Ok(x),
-            AttrValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uchar(x) => Ok((x).into()),
+            AttributeValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Ushort(x) => Ok(x),
+            AttributeValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
             _ => Err("Conversion not supported".into()),
         }
     }
 }
-impl TryFrom<AttrValue> for u32 {
+
+impl TryFrom<AttributeValue> for i16 {
     type Error = error::Error;
-    fn try_from(attr: AttrValue) -> Result<u32, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<i16, Self::Error> {
         match attr {
-            AttrValue::Uchar(x) => Ok((x).into()),
-            AttrValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Ushort(x) => Ok((x).into()),
-            AttrValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Uint(x) => Ok(x),
-            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uchar(x) => Ok((x).into()),
+            AttributeValue::Schar(x) => Ok((x).into()),
+            AttributeValue::Ushort(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Short(x) => Ok(x),
+            AttributeValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
             _ => Err("Conversion not supported".into()),
         }
     }
 }
-impl TryFrom<AttrValue> for i32 {
+impl TryFrom<AttributeValue> for u32 {
     type Error = error::Error;
-    fn try_from(attr: AttrValue) -> Result<i32, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<u32, Self::Error> {
         match attr {
-            AttrValue::Uchar(x) => Ok((x).into()),
-            AttrValue::Schar(x) => Ok((x).into()),
-            AttrValue::Ushort(x) => Ok((x).into()),
-            AttrValue::Short(x) => Ok((x).into()),
-            AttrValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Int(x) => Ok(x),
-            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uchar(x) => Ok((x).into()),
+            AttributeValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Ushort(x) => Ok((x).into()),
+            AttributeValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uint(x) => Ok(x),
+            AttributeValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
             _ => Err("Conversion not supported".into()),
         }
     }
 }
-impl TryFrom<AttrValue> for u64 {
+impl TryFrom<AttributeValue> for i32 {
     type Error = error::Error;
-    fn try_from(attr: AttrValue) -> Result<u64, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<i32, Self::Error> {
         match attr {
-            AttrValue::Uchar(x) => Ok((x).into()),
-            AttrValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Ushort(x) => Ok((x).into()),
-            AttrValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Uint(x) => Ok((x).into()),
-            AttrValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Ulonglong(x) => Ok(x),
-            AttrValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uchar(x) => Ok((x).into()),
+            AttributeValue::Schar(x) => Ok((x).into()),
+            AttributeValue::Ushort(x) => Ok((x).into()),
+            AttributeValue::Short(x) => Ok((x).into()),
+            AttributeValue::Uint(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Int(x) => Ok(x),
+            AttributeValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
             _ => Err("Conversion not supported".into()),
         }
     }
 }
-impl TryFrom<AttrValue> for i64 {
+impl TryFrom<AttributeValue> for u64 {
     type Error = error::Error;
-    fn try_from(attr: AttrValue) -> Result<i64, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<u64, Self::Error> {
         match attr {
-            AttrValue::Uchar(x) => Ok((x).into()),
-            AttrValue::Schar(x) => Ok((x).into()),
-            AttrValue::Ushort(x) => Ok((x).into()),
-            AttrValue::Short(x) => Ok((x).into()),
-            AttrValue::Uint(x) => Ok((x).into()),
-            AttrValue::Int(x) => Ok((x).into()),
-            AttrValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
-            AttrValue::Longlong(x) => Ok(x),
+            AttributeValue::Uchar(x) => Ok((x).into()),
+            AttributeValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Ushort(x) => Ok((x).into()),
+            AttributeValue::Short(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Uint(x) => Ok((x).into()),
+            AttributeValue::Int(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Ulonglong(x) => Ok(x),
+            AttributeValue::Longlong(x) => (x).try_into().map_err(error::Error::Conversion),
             _ => Err("Conversion not supported".into()),
         }
     }
 }
-impl TryFrom<AttrValue> for f32 {
+impl TryFrom<AttributeValue> for i64 {
     type Error = error::Error;
-    fn try_from(attr: AttrValue) -> Result<f32, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<i64, Self::Error> {
         match attr {
-            AttrValue::Uchar(x) => Ok(x as _),
-            AttrValue::Schar(x) => Ok(x as _),
-            AttrValue::Ushort(x) => Ok(x as _),
-            AttrValue::Short(x) => Ok(x as _),
-            AttrValue::Uint(x) => Ok(x as _),
-            AttrValue::Int(x) => Ok(x as _),
-            AttrValue::Ulonglong(x) => Ok(x as _),
-            AttrValue::Longlong(x) => Ok(x as _),
-            AttrValue::Float(x) => Ok(x),
-            AttrValue::Double(x) => Ok(x as _),
+            AttributeValue::Uchar(x) => Ok((x).into()),
+            AttributeValue::Schar(x) => Ok((x).into()),
+            AttributeValue::Ushort(x) => Ok((x).into()),
+            AttributeValue::Short(x) => Ok((x).into()),
+            AttributeValue::Uint(x) => Ok((x).into()),
+            AttributeValue::Int(x) => Ok((x).into()),
+            AttributeValue::Ulonglong(x) => (x).try_into().map_err(error::Error::Conversion),
+            AttributeValue::Longlong(x) => Ok(x),
             _ => Err("Conversion not supported".into()),
         }
     }
 }
-impl TryFrom<AttrValue> for f64 {
+impl TryFrom<AttributeValue> for f32 {
     type Error = error::Error;
-    fn try_from(attr: AttrValue) -> Result<f64, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<f32, Self::Error> {
         match attr {
-            AttrValue::Uchar(x) => Ok(x as _),
-            AttrValue::Schar(x) => Ok(x as _),
-            AttrValue::Ushort(x) => Ok(x as _),
-            AttrValue::Short(x) => Ok(x as _),
-            AttrValue::Uint(x) => Ok(x as _),
-            AttrValue::Int(x) => Ok(x as _),
-            AttrValue::Ulonglong(x) => Ok(x as _),
-            AttrValue::Longlong(x) => Ok(x as _),
-            AttrValue::Float(x) => Ok(x as _),
-            AttrValue::Double(x) => Ok(x),
+            AttributeValue::Uchar(x) => Ok(x as _),
+            AttributeValue::Schar(x) => Ok(x as _),
+            AttributeValue::Ushort(x) => Ok(x as _),
+            AttributeValue::Short(x) => Ok(x as _),
+            AttributeValue::Uint(x) => Ok(x as _),
+            AttributeValue::Int(x) => Ok(x as _),
+            AttributeValue::Ulonglong(x) => Ok(x as _),
+            AttributeValue::Longlong(x) => Ok(x as _),
+            AttributeValue::Float(x) => Ok(x),
+            AttributeValue::Double(x) => Ok(x as _),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+impl TryFrom<AttributeValue> for f64 {
+    type Error = error::Error;
+    fn try_from(attr: AttributeValue) -> Result<f64, Self::Error> {
+        match attr {
+            AttributeValue::Uchar(x) => Ok(x as _),
+            AttributeValue::Schar(x) => Ok(x as _),
+            AttributeValue::Ushort(x) => Ok(x as _),
+            AttributeValue::Short(x) => Ok(x as _),
+            AttributeValue::Uint(x) => Ok(x as _),
+            AttributeValue::Int(x) => Ok(x as _),
+            AttributeValue::Ulonglong(x) => Ok(x as _),
+            AttributeValue::Longlong(x) => Ok(x as _),
+            AttributeValue::Float(x) => Ok(x as _),
+            AttributeValue::Double(x) => Ok(x),
             _ => Err("Conversion not supported".into()),
         }
     }
@@ -1058,10 +1058,10 @@ impl TryFrom<AttrValue> for f64 {
 #[test]
 fn roundtrip_attrvalue() {
     let x: u8 = 5;
-    let attr: AttrValue = x.into();
+    let attr: AttributeValue = x.into();
     assert_eq!(x, attr.try_into().unwrap());
 
     let x: f32 = 5.0;
-    let attr: AttrValue = x.into();
+    let attr: AttributeValue = x.into();
     assert_eq!(x, attr.try_into().unwrap());
 }

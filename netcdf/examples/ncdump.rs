@@ -91,7 +91,7 @@ fn print_file(g: &netcdf::File) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn print_group(g: &netcdf::group::Group) -> Result<(), Box<dyn std::error::Error>> {
+fn print_group(g: &netcdf::Group) -> Result<(), Box<dyn std::error::Error>> {
     println!("Group: {}", g.name());
 
     let mut dims = g.dimensions().peekable();
