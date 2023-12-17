@@ -5,3 +5,4 @@ members = [
     "netcdf-src",
 ]
 default-members = ["netcdf", "netcdf-sys"]
+resolver = "2"

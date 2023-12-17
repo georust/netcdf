@@ -1585,3 +1585,160 @@ fn invalid_utf8_as_path() {
     let retrieved_path = file.path().unwrap();
     assert_eq!(fullpath, retrieved_path);
 }
+
+#[test]
+#[cfg(feature = "ndarray")]
+fn drop_dim_on_simple_indices() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("read_write_netcdf");
+
+    let mut f = netcdf::create(path).unwrap();
+    f.add_dimension("d1", 10).unwrap();
+    f.add_dimension("d2", 11).unwrap();
+    f.add_dimension("d3", 12).unwrap();
+    f.add_dimension("d4", 13).unwrap();
+
+    let var = f
+        .add_variable::<i8>("v", &["d1", "d2", "d3", "d4"])
+        .unwrap();
+
+    let values = var.values_arr::<i8, _>(..).unwrap();
+    assert_eq!(values.shape(), &[10, 11, 12, 13]);
+    let values = var.values_arr::<i8, _>((.., .., .., 1)).unwrap();
+    assert_eq!(values.shape(), &[10, 11, 12]);
+    let values = var.values_arr::<i8, _>((.., 9, .., 1)).unwrap();
+    assert_eq!(values.shape(), &[10, 12]);
+
+    let values = var.values_arr::<i8, _>((.., 9, .., 1..=1)).unwrap();
+    assert_eq!(values.shape(), &[10, 12, 1]);
+
+    let values = var.values_arr::<i8, _>((2, 9, 3, 1)).unwrap();
+    assert_eq!(values.shape(), &[]);
+    // Really awkward to get this one value...
+    let value = values.into_dimensionality().unwrap().into_scalar();
+    let fill_value = var.fill_value().unwrap().unwrap();
+    assert_eq!(value, fill_value);
+}
+
+#[test]
+#[cfg(feature = "ndarray")]
+fn ndarray_put() {
+    use ndarray::s;
+
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("stuff.nc");
+
+    let mut f = netcdf::create(path).unwrap();
+    f.add_dimension("d1", 10).unwrap();
+    f.add_dimension("d2", 11).unwrap();
+    f.add_dimension("d3", 12).unwrap();
+    f.add_dimension("d4", 13).unwrap();
+    f.add_unlimited_dimension("grow").unwrap();
+
+    let values = ndarray::Array::<u8, _>::zeros((10, 11, 12, 13));
+
+    let mut var = f
+        .add_variable::<u8>("var", &["d1", "d2", "d3", "d4"])
+        .unwrap();
+
+    macro_rules! put_values {
+        ($var:expr, $values:expr, $extent:expr) => {
+            put_values!($var, $extent, $values, $extent)
+        };
+        ($var:expr, $extent:expr, $values:expr, $slice:expr) => {
+            $var.put_values_arr($extent, $values.slice($slice).as_standard_layout().view())
+                .unwrap()
+        };
+        ($var:expr, $extent:expr, $values:expr, $slice:expr, Failure) => {
+            $var.put_values_arr($extent, $values.slice($slice).as_standard_layout().view())
+                .unwrap_err()
+        };
+    }
+
+    var.put_values_arr(.., values.view()).unwrap();
+    put_values!(var, values, s![3, .., .., ..]);
+    put_values!(var, values, s![5, .., 2, 3]);
+    put_values!(var, values, s![5, .., 2, 3..5]);
+
+    put_values!(var, .., values, s![.., .., .., ..]);
+    put_values!(var, (4, 6, .., ..), values, s![4, 6, .., ..]);
+
+    put_values!(var, (4, 6, 2, ..), values, s![4, 6, 2, ..]);
+    put_values!(var, (4, 6, .., 4), values, s![4, 6, .., 4]);
+
+    put_values!(var, values, s![4..;3, 6, .., 4]);
+    put_values!(var, .., values, s![.., .., .., 1], Failure);
+    put_values!(var, (.., .., .., 1), values, s![.., .., .., ..], Failure);
+
+    std::mem::drop(var);
+    let mut var = f.add_variable::<u8>("grow", &["grow", "d2", "d3"]).unwrap();
+
+    // let values = ndarray::Array::<u8, _>::zeros((10, 11, 12, 13));
+    put_values!(var, .., values, s![.., .., .., ..], Failure);
+    put_values!(var, .., values, s![..0, .., .., 0]);
+    put_values!(var, .., values, s![..1, .., .., 0]);
+    put_values!(var, .., values, s![.., .., .., 0]);
+    // Should fail since we don't know where to put the value (front? back?)
+    put_values!(var, .., values, s![..1, .., .., 0], Failure);
+
+    put_values!(var, (1, 4, 3), values, s![1, 1, 0, 0]);
+
+    put_values!(var, (1, 3..4, 3), values, s![1, 1, 5..6, 0]);
+    put_values!(var, (0, 0, 0), values, s![0, 0, .., ..], Failure);
+    // And weird implementation makes it such that we can append from a position which
+    // is not at the end, maybe this should be an error?
+    put_values!(var, (6.., .., ..), values, s![.., .., .., 0]);
+    // Can put at the same spot
+    put_values!(var, (6.., .., ..), values, s![.., .., .., 0]);
+    // But not if in the middle
+    put_values!(var, (5.., .., ..), values, s![.., .., .., 0], Failure);
+    // If the number of items is specified we can't put more items
+    put_values!(var, (5..6, .., ..), values, s![.., .., .., 0], Failure);
+    put_values!(var, (5..15, .., ..), values, s![.., .., .., 0]);
+}
+
+#[test]
+#[cfg(feature = "ndarray")]
+fn ndarray_get_into() {
+    use ndarray::s;
+
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("get_into.nc");
+
+    let mut f = netcdf::create(path).unwrap();
+    f.add_dimension("d1", 4).unwrap();
+    f.add_dimension("d2", 5).unwrap();
+    f.add_dimension("d3", 6).unwrap();
+
+    let values = ndarray::Array::<u64, _>::from_shape_fn((4, 5, 6), |(k, j, i)| {
+        (100 * k + 10 * j + i).try_into().unwrap()
+    });
+
+    let mut var = f.add_variable::<u64>("var", &["d1", "d2", "d3"]).unwrap();
+
+    var.put_values_arr(.., values.view()).unwrap();
+
+    let mut outarray = ndarray::Array::<u64, _>::zeros((4, 5, 6));
+
+    var.values_arr_into(.., outarray.view_mut()).unwrap();
+    assert_eq!(values, outarray);
+    outarray.fill(0);
+
+    var.values_arr_into((1, .., ..), outarray.slice_mut(s![0, .., ..]))
+        .unwrap();
+    assert_eq!(values.slice(s![1, .., ..]), outarray.slice(s![0, .., ..]));
+    outarray.fill(0);
+
+    var.values_arr_into((3, 1, ..), outarray.slice_mut(s![0, 0, ..]))
+        .unwrap();
+    assert_eq!(values.slice(s![3, 1, ..]), outarray.slice(s![0, 0, ..]));
+    outarray.fill(0);
+
+    var.values_arr_into((.., .., 1), outarray.slice_mut(s![.., .., 1]))
+        .unwrap_err();
+
+    let mut outarray = ndarray::Array::<u64, _>::zeros((3, 4, 5, 6));
+    var.values_arr_into((.., .., ..), outarray.slice_mut(s![0, .., .., ..]))
+        .unwrap();
+    assert_eq!(values, outarray.slice(s![0, .., .., ..]));
+}

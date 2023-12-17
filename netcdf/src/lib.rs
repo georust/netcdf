@@ -38,6 +38,7 @@
 //! let data_i32 = var.value::<i32, _>((40, 0, 0))?;
 //!
 //! // You can use `values_arr()` to get all the data from the variable.
+//! // This requires the `ndarray` feature
 //! // Passing `..` will give you the entire slice
 //! # #[cfg(feature = "ndarray")]
 //! let data = var.values_arr::<i32, _>(..)?;
@@ -46,7 +47,14 @@
 //! // `(40, 0, 0)` and get a dataset of size `100, 100` from this
 //! # #[cfg(feature = "ndarray")]
 //! let data = var.values_arr::<i32, _>(([40, 0 ,0], [1, 100, 100]))?;
+//! # #[cfg(feature = "ndarray")]
 //! let data = var.values_arr::<i32, _>((40, ..100, ..100))?;
+//!
+//! // You can read into an ndarray to reuse an allocation
+//! # #[cfg(feature = "ndarray")]
+//! let mut data = ndarray::Array::<f32, _>::zeros((100, 100));
+//! # #[cfg(feature = "ndarray")]
+//! var.values_arr_into((0, .., ..), data.view_mut())?;
 //! # Ok(()) }
 //! ```
 //!
@@ -67,7 +75,8 @@
 //!             "crab_coolness_level",
 //!             &["time", "ncrabs"],
 //! )?;
-//! // Metadata can be added to the variable
+//! // Metadata can be added to the variable, but will not be used when
+//! // writing or reading data
 //! var.add_attribute("units", "Kelvin")?;
 //! var.add_attribute("add_offset", 273.15_f32)?;
 //!
@@ -78,6 +87,12 @@
 //! // Values can be added along the unlimited dimension, which
 //! // resizes along the `time` axis
 //! var.put_values(&data, (11, ..))?;
+//!
+//! // Using the ndarray feature you can also use
+//! # #[cfg(feature = "ndarray")]
+//! let values = ndarray::Array::from_shape_fn((5, 10), |(j, i)| (j * 10 + i) as f32);
+//! # #[cfg(feature = "ndarray")]
+//! var.put_values_arr((11.., ..), values.view())?;
 //! # Ok(()) }
 //! ```
 
