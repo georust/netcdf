@@ -1055,6 +1055,16 @@ impl TryFrom<AttributeValue> for f64 {
     }
 }
 
+impl TryFrom<AttributeValue> for String {
+    type Error = error::Error;
+    fn try_from(attr: AttributeValue) -> Result<String, Self::Error> {
+        match attr {
+            AttributeValue::Str(s) => Ok(s),
+            _ => Err("Conversion not supported".into()),
+        }
+    }
+}
+
 #[test]
 fn roundtrip_attrvalue() {
     let x: u8 = 5;

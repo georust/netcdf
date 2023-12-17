@@ -73,7 +73,7 @@ fn var_as_different_types() {
 
     let mut data = vec![0; 6 * 12];
     let var = &file.variable("data").expect("Could not find variable");
-    var.values_to(&mut data, ..).unwrap();
+    var.get_values_into(&mut data, ..).unwrap();
 
     for (x, d) in data.iter().enumerate() {
         assert_eq!(*d, x as i32);
@@ -81,7 +81,7 @@ fn var_as_different_types() {
 
     // do the same thing but cast to float
     let mut data = vec![0.0; 6 * 12];
-    var.values_to(&mut data, ..).unwrap();
+    var.get_values_into(&mut data, ..).unwrap();
 
     for (x, d) in data.iter().enumerate() {
         assert!((*d - x as f32).abs() < 1e-5);
@@ -96,8 +96,8 @@ fn test_index_fetch() {
 
     let var = &file.variable("data").expect("Could not find variable");
     // Gets first value
-    let first_val: i32 = var.value([0, 0]).unwrap();
-    let other_val: i32 = var.value([5, 3]).unwrap();
+    let first_val: i32 = var.get_value([0, 0]).unwrap();
+    let other_val: i32 = var.get_value([5, 3]).unwrap();
 
     assert_eq!(first_val, 0);
     assert_eq!(other_val, 63);
@@ -111,7 +111,7 @@ fn last_dim_varies_fastest() {
     let file = netcdf::open(&f).unwrap();
 
     let var = &file.variable("data").expect("Could not find variable");
-    let data = var.values_arr::<i32, _>(..).unwrap();
+    let data = var.get::<i32, _>(..).unwrap();
 
     let nx = var.dimensions()[0].len();
     let ny = var.dimensions()[1].len();
@@ -203,7 +203,7 @@ fn ndarray_read_with_indices() {
         var.dimensions()[2].len(),
     ];
     let indices = [0, 0, 3, 0];
-    let values = var.values_arr::<f32, _>((indices, sizes)).unwrap();
+    let values = var.get::<f32, _>((indices, sizes)).unwrap();
 
     assert_eq!(values.shape(), sizes);
 
@@ -214,7 +214,7 @@ fn ndarray_read_with_indices() {
         2,
         var.dimensions()[2].len(),
     ];
-    let values = var.values_arr::<f32, _>((indices, sizes)).unwrap();
+    let values = var.get::<f32, _>((indices, sizes)).unwrap();
     assert_eq!(values.shape(), sizes);
 }
 
@@ -229,7 +229,7 @@ fn nc4_groups() {
 
     let mut data = vec![0i32; 6 * 12];
     let var = &grp1.variable("data").unwrap();
-    var.values_to(&mut data, ..).unwrap();
+    var.get_values_into(&mut data, ..).unwrap();
     for (i, x) in data.iter().enumerate() {
         assert_eq!(*x, i as i32);
     }
@@ -361,8 +361,8 @@ fn def_dims_vars_attrs() {
 
         // test var attrs
         let mut var = file.variable_mut(var_name).unwrap();
-        var.add_attribute("varattr1", 5).unwrap();
-        var.add_attribute("varattr2", "Variable string attr".to_string())
+        var.put_attribute("varattr1", 5).unwrap();
+        var.put_attribute("varattr2", "Variable string attr".to_string())
             .unwrap();
     }
 
@@ -387,7 +387,7 @@ fn def_dims_vars_attrs() {
         let data_file = file
             .variable(var_name)
             .expect("Could not find variable")
-            .values_arr::<i32, _>(..)
+            .get::<i32, _>(..)
             .unwrap();
         assert_eq!(data_test.len(), data_file.len());
         assert_eq!(data_test, data_file);
@@ -397,7 +397,7 @@ fn def_dims_vars_attrs() {
         let data_file = file
             .variable(var_name)
             .expect("Could not find variable")
-            .values_arr::<f32, _>(..)
+            .get::<f32, _>(..)
             .unwrap();
         assert_eq!(data_test, data_file);
 
@@ -522,7 +522,7 @@ fn all_var_types() {
         let mut data = vec![0i8; 10];
         file.variable("var_byte")
             .unwrap()
-            .values_to(&mut data, ..)
+            .get_values_into(&mut data, ..)
             .unwrap();
         assert_eq!(vec![42i8; 10], data);
 
@@ -530,7 +530,7 @@ fn all_var_types() {
         let mut data = vec![0u8; 10];
         file.variable("var_char")
             .unwrap()
-            .values_to(&mut data, ..)
+            .get_values_into(&mut data, ..)
             .unwrap();
         assert_eq!(vec![42u8; 10], data);
 
@@ -538,7 +538,7 @@ fn all_var_types() {
         let mut data = vec![0i16; 10];
         file.variable("var_short")
             .unwrap()
-            .values_to(&mut data, ..)
+            .get_values_into(&mut data, ..)
             .unwrap();
         assert_eq!(vec![42i16; 10], data);
 
@@ -546,7 +546,7 @@ fn all_var_types() {
         let mut data = vec![0u16; 10];
         file.variable("var_ushort")
             .unwrap()
-            .values_to(&mut data, ..)
+            .get_values_into(&mut data, ..)
             .unwrap();
         assert_eq!(vec![42u16; 10], data);
 
@@ -554,7 +554,7 @@ fn all_var_types() {
         let mut data = vec![0i32; 10];
         file.variable("var_int")
             .unwrap()
-            .values_to(&mut data, ..)
+            .get_values_into(&mut data, ..)
             .unwrap();
         assert_eq!(vec![42i32; 10], data);
 
@@ -562,7 +562,7 @@ fn all_var_types() {
         let mut data = vec![0u32; 10];
         file.variable("var_uint")
             .unwrap()
-            .values_to(&mut data, ..)
+            .get_values_into(&mut data, ..)
             .unwrap();
         assert_eq!(vec![42u32; 10], data);
 
@@ -570,7 +570,7 @@ fn all_var_types() {
         let mut data = vec![0i64; 10];
         file.variable("var_int64")
             .unwrap()
-            .values_to(&mut data, ..)
+            .get_values_into(&mut data, ..)
             .unwrap();
         assert_eq!(vec![42i64; 10], data);
 
@@ -578,7 +578,7 @@ fn all_var_types() {
         let mut data = vec![0u64; 10];
         file.variable("var_uint64")
             .unwrap()
-            .values_to(&mut data, ..)
+            .get_values_into(&mut data, ..)
             .unwrap();
         assert_eq!(vec![42u64; 10], data);
 
@@ -586,7 +586,7 @@ fn all_var_types() {
         let mut data = vec![0.0f32; 10];
         file.variable("var_float")
             .unwrap()
-            .values_to(&mut data, ..)
+            .get_values_into(&mut data, ..)
             .unwrap();
         assert_eq!(vec![42.2f32; 10], data);
 
@@ -594,7 +594,7 @@ fn all_var_types() {
         let mut data = vec![0.0f64; 10];
         file.variable("var_double")
             .unwrap()
-            .values_to(&mut data, ..)
+            .get_values_into(&mut data, ..)
             .unwrap();
         assert_eq!(vec![42.2f64; 10], data);
     }
@@ -609,7 +609,7 @@ fn fetch_ndarray() {
     let file = netcdf::open(f).unwrap();
 
     let pres = &file.variable("pressure").expect("Could not find variable");
-    let values_array = pres.values_arr::<f64, _>(..).unwrap();
+    let values_array = pres.get::<f64, _>(..).unwrap();
     assert_eq!(values_array.shape(), &[2, 2, 6, 12]);
 }
 
@@ -674,7 +674,7 @@ fn put_single_value() {
     // and test the values of 'some_variable'
     let file = netcdf::open(&f).unwrap();
     let var = &file.variable(var_name).expect("Could not find variable");
-    assert_eq!(100.0, var.value(indices).unwrap());
+    assert_eq!(100.0, var.get_value(indices).unwrap());
 }
 
 #[test]
@@ -708,7 +708,7 @@ fn put_values() {
     let file = netcdf::open(&f).unwrap();
     let var = &file.variable(var_name).expect("Could not find variable");
     let mut d = vec![0i32; 3];
-    var.values_to(d.as_mut_slice(), ..).unwrap();
+    var.get_values_into(d.as_mut_slice(), ..).unwrap();
     assert_eq!(d, [1, 100, 200]);
 }
 
@@ -730,7 +730,7 @@ fn set_fill_value() {
     var.put_values(&[2, 3], &[1..]).unwrap();
 
     let mut rvar = [0i32; 3];
-    var.values_to(&mut rvar, ..).unwrap();
+    var.get_values_into(&mut rvar, ..).unwrap();
 
     assert_eq!(rvar, [fill_value, 2, 3]);
 
@@ -764,8 +764,8 @@ fn more_fill_values() {
     var.put_value(6, [1]).unwrap();
     assert_eq!(var.fill_value::<i32>().unwrap(), Some(1));
 
-    assert_eq!(var.value::<i32, _>([0]).unwrap(), 1_i32);
-    assert_eq!(var.value::<i32, _>([1]).unwrap(), 6_i32);
+    assert_eq!(var.get_value::<i32, _>([0]).unwrap(), 1_i32);
+    assert_eq!(var.get_value::<i32, _>([1]).unwrap(), 6_i32);
 
     let var = &mut file.add_variable::<i32>("v1", &["x"]).unwrap();
     unsafe {
@@ -775,7 +775,7 @@ fn more_fill_values() {
     assert_eq!(var.fill_value::<i32>().unwrap(), None);
 
     // assert_eq!(var.value::<i32>(Some(&[0])).unwrap(), GARBAGE);
-    assert_eq!(var.value::<i32, _>([1]).unwrap(), 6_i32);
+    assert_eq!(var.get_value::<i32, _>([1]).unwrap(), 6_i32);
     assert!(var.attribute("_FillValue").is_none());
 
     let var = &mut file.add_variable::<i32>("v2", &["x"]).unwrap();
@@ -796,7 +796,7 @@ fn more_fill_values() {
     assert_eq!(var.fill_value::<i32>().unwrap(), None);
 
     // assert_eq!(var.value::<i32>(Some(&[0])).unwrap(), GARBAGE);
-    assert_eq!(var.value::<i32, _>([1]).unwrap(), 6_i32);
+    assert_eq!(var.get_value::<i32, _>([1]).unwrap(), 6_i32);
 
     // Following is the expected behaviour, but is not followed by netcdf
     // assert!(var.attribute("_FillValue").is_none());
@@ -812,7 +812,8 @@ fn read_slice_into_buffer() {
     let mut values = vec![0i8; 6 * 3];
     let ind = &[0, 0];
     let len = &[6, 3];
-    pres.values_to(values.as_mut_slice(), (ind, len)).unwrap();
+    pres.get_values_into(values.as_mut_slice(), (ind, len))
+        .unwrap();
     let expected_values = [
         0i8, 1, 2, 12, 13, 14, 24, 25, 26, 36, 37, 38, 48, 49, 50, 60, 61, 62,
     ];
@@ -830,7 +831,7 @@ fn read_mismatched() {
     let pres = &file.variable("data").expect("variable not found");
 
     let mut d = vec![0; 40];
-    pres.values_to(d.as_mut_slice(), (..40, 1)).unwrap();
+    pres.get_values_into(d.as_mut_slice(), (..40, 1)).unwrap();
 }
 
 #[test]
@@ -842,8 +843,8 @@ fn use_compression_chunking() {
     file.add_dimension("x", 10).unwrap();
 
     let var = &mut file.add_variable::<i32>("compressed", &["x"]).unwrap();
-    var.compression(5, false).unwrap();
-    var.chunking(&[5]).unwrap();
+    var.set_compression(5, false).unwrap();
+    var.set_chunking(&[5]).unwrap();
 
     let v = vec![0i32; 10];
     var.put_values(&v, ..).unwrap();
@@ -851,21 +852,21 @@ fn use_compression_chunking() {
     let var = &mut file
         .add_variable::<i32>("compressed2", &["x", "x"])
         .unwrap();
-    var.compression(9, true).unwrap();
-    var.chunking(&[5, 5]).unwrap();
+    var.set_compression(9, true).unwrap();
+    var.set_chunking(&[5, 5]).unwrap();
     var.put_values(&[1i32, 2, 3, 4, 5, 6, 7, 8, 9, 10], (..10, ..1))
         .unwrap();
 
     let var = &mut file.add_variable::<i32>("chunked3", &["x"]).unwrap();
     assert!(matches!(
-        var.chunking(&[2, 2]).unwrap_err(),
+        var.set_chunking(&[2, 2]).unwrap_err(),
         netcdf::Error::SliceLen
     ));
 
     file.add_dimension("y", 0).unwrap();
     let var = &mut file.add_variable::<u8>("chunked4", &["y", "x"]).unwrap();
 
-    var.chunking(&[100, 2]).unwrap();
+    var.set_chunking(&[100, 2]).unwrap();
 }
 
 #[test]
@@ -888,7 +889,7 @@ fn set_compression_all_variables_in_a_group() {
         .expect("Could not create variable");
 
     for mut var in file.variables_mut() {
-        var.compression(9, false)
+        var.set_compression(9, false)
             .expect("Could not set compression level");
     }
 }
@@ -974,7 +975,7 @@ fn unlimited_dimension_single_putting() {
     assert_eq!(var.dimensions()[1].len(), 2);
 
     let mut v = vec![0; 6];
-    var.values_to(&mut v, [..3, ..2]).unwrap();
+    var.get_values_into(&mut v, [..3, ..2]).unwrap();
 
     assert_eq!(v, &[1, 2, 0, 0, 3, 0]);
 }
@@ -988,7 +989,7 @@ where
         + std::cmp::PartialEq,
 {
     let mut v: Vec<T> = vec![Default::default(); check.len()];
-    var.values_to(&mut v, ..).unwrap();
+    var.get_values_into(&mut v, ..).unwrap();
     assert_eq!(v.as_slice(), check);
 }
 
@@ -1026,12 +1027,12 @@ fn unlimited_dimension_multi_putting() {
     var.put_values(&[0u8, 1, 2, 3], (.., ..)).unwrap_err();
     var.put_values(&[0u8, 1, 2, 3], [..1, ..4]).unwrap();
     let mut v = vec![0; 4];
-    var.values_to(&mut v, (0..1, 0..4)).unwrap();
+    var.get_values_into(&mut v, (0..1, 0..4)).unwrap();
     assert_eq!(v, &[0u8, 1, 2, 3]);
     var.put_values(&[4u8, 5, 6], (..3, ..1)).unwrap();
 
     let mut v = vec![0; 4 * 3];
-    var.values_to(&mut v, (..3, ..4)).unwrap();
+    var.get_values_into(&mut v, (..3, ..4)).unwrap();
 
     assert_eq!(v, &[4, 1, 2, 3, 5, 0, 0, 0, 6, 0, 0, 0]);
 }
@@ -1062,25 +1063,25 @@ fn single_length_variable() {
     let var = &mut file.add_variable::<u8>("x", &[]).unwrap();
 
     var.put_value(3u8, ..).unwrap();
-    assert_eq!(var.value::<u8, _>(..).unwrap(), 3_u8);
+    assert_eq!(var.get_value::<u8, _>(..).unwrap(), 3_u8);
 
     var.put_values::<u8, _>(&[], ..).unwrap_err();
-    assert_eq!(var.value::<u8, _>(()).unwrap(), 3_u8);
+    assert_eq!(var.get_value::<u8, _>(()).unwrap(), 3_u8);
 
     var.put_values::<u8, _>(&[2, 3], ..).unwrap_err();
 
     let idx: [usize; 0] = [];
     var.put_values::<u8, _>(&[6], idx).unwrap();
-    assert_eq!(var.value::<u8, _>(()).unwrap(), 6_u8);
+    assert_eq!(var.get_value::<u8, _>(()).unwrap(), 6_u8);
 
     var.put_values::<u8, _>(&[6], ()).unwrap();
-    assert_eq!(var.value::<u8, _>(()).unwrap(), 6_u8);
+    assert_eq!(var.get_value::<u8, _>(()).unwrap(), 6_u8);
 
     var.put_values::<u8, _>(&[8], ([], [])).unwrap();
-    assert_eq!(var.value::<u8, _>(()).unwrap(), 8_u8);
+    assert_eq!(var.get_value::<u8, _>(()).unwrap(), 8_u8);
 
     var.put_values::<u8, _>(&[10], 0).unwrap_err();
-    assert_eq!(var.value::<u8, _>(()).unwrap(), 8_u8);
+    assert_eq!(var.get_value::<u8, _>(()).unwrap(), 8_u8);
 
     std::mem::drop(file);
 
@@ -1088,7 +1089,7 @@ fn single_length_variable() {
 
     let var = &file.variable("x").unwrap();
 
-    assert_eq!(var.value::<u8, _>(()).unwrap(), 8);
+    assert_eq!(var.get_value::<u8, _>(()).unwrap(), 8);
 }
 
 #[test]
@@ -1132,19 +1133,19 @@ fn string_variables() {
 
     let var = &file.variable("str").unwrap();
 
-    assert_eq!(var.string_value([0]).unwrap(), "Hello world!");
-    assert_eq!(var.string_value([1]).unwrap(), "");
+    assert_eq!(var.get_string([0]).unwrap(), "Hello world!");
+    assert_eq!(var.get_string([1]).unwrap(), "");
     assert_eq!(
-        var.string_value([2]).unwrap(),
+        var.get_string([2]).unwrap(),
         "Trying a very long string just to see how that goes"
     );
     assert_eq!(
-        var.string_value([3]).unwrap(),
+        var.get_string([3]).unwrap(),
         "Foreign letters: ßæøå, #41&i1/99"
     );
 
     let var = &file.variable("y").unwrap();
-    var.string_value([1]).unwrap_err();
+    var.get_string([1]).unwrap_err();
 }
 
 #[test]
@@ -1277,8 +1278,8 @@ fn set_get_endian() {
             let var = &mut file_w
                 .add_variable::<i32>("some_variable", &[dim_name])
                 .unwrap();
-            var.endian(*i).unwrap();
-            assert_eq!(var.endian_value().unwrap(), *i);
+            var.set_endianness(*i).unwrap();
+            assert_eq!(var.endianness().unwrap(), *i);
             var.put_values::<i32, _>(&[1, 2, 3], ..).unwrap();
             // close it (done when `file_w` goes out of scope)
         }
@@ -1287,7 +1288,7 @@ fn set_get_endian() {
             // and get "some variable" endian_value
             let file_o = netcdf::open(&f).unwrap();
             let var = &file_o.variable("some_variable").unwrap();
-            assert_eq!(var.endian_value().unwrap(), *i);
+            assert_eq!(var.endianness().unwrap(), *i);
             // close it (done when `file_a` goes out of scope)
         }
     }
@@ -1311,7 +1312,7 @@ mod strided {
         let var = file.variable("data").unwrap();
 
         let mut buffer = vec![0; 3 * 5 * 9];
-        var.values_to(
+        var.get_values_into(
             &mut buffer,
             ((0..).step_by(1), (0..).step_by(1), (0..).step_by(1)),
         )
@@ -1321,7 +1322,7 @@ mod strided {
         // var.values_strided_to(&mut buffer, None, None, &[0, 0, 0]).unwrap();
         // var.values_strided_to(&mut buffer, None, None, &[-1, -1, -1]).unwrap();
         let mut buffer = vec![0; 3 * 5 * 2];
-        var.values_to(
+        var.get_values_into(
             &mut buffer,
             ((0..).step_by(2), (0..).step_by(1), (0..).step_by(3)),
         )
@@ -1335,7 +1336,7 @@ mod strided {
         );
 
         let mut buffer = vec![0; 3 * 5 * 2];
-        var.values_to(
+        var.get_values_into(
             &mut buffer,
             ((0..).step_by(2), (0..).step_by(1), (0..).step_by(3)),
         )
@@ -1349,7 +1350,7 @@ mod strided {
         );
 
         let mut buffer = vec![0; 3 * 5 * 2];
-        var.values_to(
+        var.get_values_into(
             &mut buffer,
             (
                 netcdf::Extent::SliceCount {
@@ -1379,14 +1380,14 @@ mod strided {
         );
 
         let mut buffer = vec![0; 3 * 5 * 2];
-        var.values_to(
+        var.get_values_into(
             &mut buffer,
             ((0..2).step_by(2), (0..5).step_by(1), (0..4).step_by(3)),
         )
         .unwrap_err();
 
         let mut buffer = vec![0; 5 * 2];
-        var.values_to(
+        var.get_values_into(
             &mut buffer,
             ((2..).step_by(2), (0..).step_by(1), (4..).step_by(3)),
         )
@@ -1394,7 +1395,7 @@ mod strided {
         assert_eq!(&buffer, &[94, 97, 103, 106, 112, 115, 121, 124, 130, 133]);
 
         let mut buffer = vec![0; 2 * 2];
-        var.values_to(
+        var.get_values_into(
             &mut buffer,
             (
                 netcdf::Extent::SliceCount {
@@ -1434,14 +1435,14 @@ mod strided {
             .unwrap();
 
         let mut buf = vec![0; 7 * 9];
-        var.values_to(&mut buf, ..).unwrap();
+        var.get_values_into(&mut buf, ..).unwrap();
         assert_eq!(values, buf);
 
         var.put_values(&zeros, ..).unwrap();
         var.put_values(&values[1..][..12], ((0..=6).step_by(2), (0..=6).step_by(3)))
             .unwrap();
         let mut buf = vec![0; 7 * 9];
-        var.values_to(&mut buf, ..).unwrap();
+        var.get_values_into(&mut buf, ..).unwrap();
         assert_eq!(
             &buf,
             &vec![
@@ -1454,7 +1455,7 @@ mod strided {
         var.put_values(&values[1..][..12], ((0..).step_by(2), (0..).step_by(3)))
             .unwrap();
         let mut buf = vec![0; 7 * 9];
-        var.values_to(&mut buf, ..).unwrap();
+        var.get_values_into(&mut buf, ..).unwrap();
         assert_eq!(
             &buf,
             &vec![
@@ -1467,7 +1468,7 @@ mod strided {
         var.put_values(&values[1..][..15], [(0..).step_by(3), (0..).step_by(2)])
             .unwrap();
         let mut buf = vec![0; 7 * 9];
-        var.values_to(&mut buf, ..).unwrap();
+        var.get_values_into(&mut buf, ..).unwrap();
         assert_eq!(
             &buf,
             &vec![
@@ -1480,7 +1481,7 @@ mod strided {
         var.put_values(&values[1..][..6], ((2..).step_by(3), (3..).step_by(2)))
             .unwrap();
         let mut buf = vec![0; 7 * 9];
-        var.values_to(&mut buf, ..).unwrap();
+        var.get_values_into(&mut buf, ..).unwrap();
         assert_eq!(
             &buf,
             &vec![
@@ -1602,17 +1603,17 @@ fn drop_dim_on_simple_indices() {
         .add_variable::<i8>("v", &["d1", "d2", "d3", "d4"])
         .unwrap();
 
-    let values = var.values_arr::<i8, _>(..).unwrap();
+    let values = var.get::<i8, _>(..).unwrap();
     assert_eq!(values.shape(), &[10, 11, 12, 13]);
-    let values = var.values_arr::<i8, _>((.., .., .., 1)).unwrap();
+    let values = var.get::<i8, _>((.., .., .., 1)).unwrap();
     assert_eq!(values.shape(), &[10, 11, 12]);
-    let values = var.values_arr::<i8, _>((.., 9, .., 1)).unwrap();
+    let values = var.get::<i8, _>((.., 9, .., 1)).unwrap();
     assert_eq!(values.shape(), &[10, 12]);
 
-    let values = var.values_arr::<i8, _>((.., 9, .., 1..=1)).unwrap();
+    let values = var.get::<i8, _>((.., 9, .., 1..=1)).unwrap();
     assert_eq!(values.shape(), &[10, 12, 1]);
 
-    let values = var.values_arr::<i8, _>((2, 9, 3, 1)).unwrap();
+    let values = var.get::<i8, _>((2, 9, 3, 1)).unwrap();
     assert_eq!(values.shape(), &[]);
     // Really awkward to get this one value...
     let value = values.into_dimensionality().unwrap().into_scalar();
@@ -1646,16 +1647,16 @@ fn ndarray_put() {
             put_values!($var, $extent, $values, $extent)
         };
         ($var:expr, $extent:expr, $values:expr, $slice:expr) => {
-            $var.put_values_arr($extent, $values.slice($slice).as_standard_layout().view())
+            $var.put($extent, $values.slice($slice).as_standard_layout().view())
                 .unwrap()
         };
         ($var:expr, $extent:expr, $values:expr, $slice:expr, Failure) => {
-            $var.put_values_arr($extent, $values.slice($slice).as_standard_layout().view())
+            $var.put($extent, $values.slice($slice).as_standard_layout().view())
                 .unwrap_err()
         };
     }
 
-    var.put_values_arr(.., values.view()).unwrap();
+    var.put(.., values.view()).unwrap();
     put_values!(var, values, s![3, .., .., ..]);
     put_values!(var, values, s![5, .., 2, 3]);
     put_values!(var, values, s![5, .., 2, 3..5]);
@@ -1716,29 +1717,29 @@ fn ndarray_get_into() {
 
     let mut var = f.add_variable::<u64>("var", &["d1", "d2", "d3"]).unwrap();
 
-    var.put_values_arr(.., values.view()).unwrap();
+    var.put(.., values.view()).unwrap();
 
     let mut outarray = ndarray::Array::<u64, _>::zeros((4, 5, 6));
 
-    var.values_arr_into(.., outarray.view_mut()).unwrap();
+    var.get_into(.., outarray.view_mut()).unwrap();
     assert_eq!(values, outarray);
     outarray.fill(0);
 
-    var.values_arr_into((1, .., ..), outarray.slice_mut(s![0, .., ..]))
+    var.get_into((1, .., ..), outarray.slice_mut(s![0, .., ..]))
         .unwrap();
     assert_eq!(values.slice(s![1, .., ..]), outarray.slice(s![0, .., ..]));
     outarray.fill(0);
 
-    var.values_arr_into((3, 1, ..), outarray.slice_mut(s![0, 0, ..]))
+    var.get_into((3, 1, ..), outarray.slice_mut(s![0, 0, ..]))
         .unwrap();
     assert_eq!(values.slice(s![3, 1, ..]), outarray.slice(s![0, 0, ..]));
     outarray.fill(0);
 
-    var.values_arr_into((.., .., 1), outarray.slice_mut(s![.., .., 1]))
+    var.get_into((.., .., 1), outarray.slice_mut(s![.., .., 1]))
         .unwrap_err();
 
     let mut outarray = ndarray::Array::<u64, _>::zeros((3, 4, 5, 6));
-    var.values_arr_into((.., .., ..), outarray.slice_mut(s![0, .., .., ..]))
+    var.get_into((.., .., ..), outarray.slice_mut(s![0, .., .., ..]))
         .unwrap();
     assert_eq!(values, outarray.slice(s![0, .., .., ..]));
 }

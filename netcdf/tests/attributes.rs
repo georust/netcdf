@@ -25,7 +25,7 @@ fn attributes_read() {
     let var = &mut file
         .add_variable::<f32>("var", &[])
         .expect("Could not add variable");
-    var.add_attribute("att", "some attribute")
+    var.put_attribute("att", "some attribute")
         .expect("Could not add attribute");
     assert!(var.vartype().as_basic().unwrap().is_f32());
 
