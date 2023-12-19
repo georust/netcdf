@@ -100,7 +100,7 @@ impl RawFile {
     pub(crate) fn open_from_memory<'buffer>(
         name: Option<&str>,
         mem: &'buffer [u8],
-    ) -> error::Result<MemFile<'buffer>> {
+    ) -> error::Result<FileMem<'buffer>> {
         let cstr = std::ffi::CString::new(name.unwrap_or("/")).unwrap();
         let mut ncid = 0;
         unsafe {
@@ -115,7 +115,7 @@ impl RawFile {
             }))?;
         }
 
-        Ok(MemFile(File(Self { ncid }), PhantomData))
+        Ok(FileMem(File(Self { ncid }), PhantomData))
     }
 }
 
@@ -425,8 +425,8 @@ impl FileMut {
 }
 
 #[cfg(feature = "has-mmap")]
-/// The memory mapped file is kept in this structure to keep the
-/// lifetime of the buffer longer than the file.
+/// The memory mapped file is kept in this structure to extend
+/// the lifetime of the buffer.
 ///
 /// Access a [`File`] through the `Deref` trait,
 /// ```no_run
@@ -438,10 +438,10 @@ impl FileMut {
 /// # Ok(()) }
 /// ```
 #[allow(clippy::module_name_repetitions)]
-pub struct MemFile<'buffer>(File, std::marker::PhantomData<&'buffer [u8]>);
+pub struct FileMem<'buffer>(File, std::marker::PhantomData<&'buffer [u8]>);
 
 #[cfg(feature = "has-mmap")]
-impl<'a> std::ops::Deref for MemFile<'a> {
+impl<'a> std::ops::Deref for FileMem<'a> {
     type Target = File;
     fn deref(&self) -> &Self::Target {
         &self.0
