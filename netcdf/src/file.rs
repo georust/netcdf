@@ -109,7 +109,7 @@ impl RawFile {
                     cstr.as_ptr(),
                     NC_NOWRITE,
                     mem.len(),
-                    mem.as_ptr() as *const u8 as *mut _,
+                    mem.as_ptr().cast_mut().cast(),
                     &mut ncid,
                 )
             }))?;
