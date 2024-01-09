@@ -117,6 +117,8 @@ pub use attribute::{Attribute, AttributeValue};
 pub use dimension::{Dimension, DimensionIdentifier};
 pub use error::{Error, Result};
 pub use extent::{Extent, Extents};
+#[cfg(feature = "has-mmap")]
+pub use file::FileMem;
 pub(crate) use file::RawFile;
 pub use file::{File, FileMut, Options};
 pub use group::{Group, GroupMut};
@@ -174,7 +176,7 @@ where
 
 #[cfg(feature = "has-mmap")]
 /// Open a `netCDF` file from a buffer
-pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<MemFile<'a>> {
+pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<FileMem<'a>> {
     RawFile::open_from_memory(name, mem)
 }
 
