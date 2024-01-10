@@ -912,7 +912,7 @@ fn read_from_memory() {
     (*file)
         .variable("data")
         .expect("Could not find variable")
-        .values_to(&mut v, ..)
+        .get_values_into(&mut v, ..)
         .unwrap();
     for (i, v) in v.iter().enumerate() {
         assert_eq!(*v, i as _);
