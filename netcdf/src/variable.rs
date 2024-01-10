@@ -18,6 +18,15 @@ use netcdf_sys::*;
 
 #[allow(clippy::doc_markdown)]
 /// This struct defines a `netCDF` variable.
+///
+/// This type is used for retrieving data from a variable.
+/// Metadata on the `netCDF`-level can be retrieved using e.g.
+/// [`fill_value`](Self::fill_value), [`endinanness`](Self::endianness).
+/// Use [`attributes`](Self::attribute) to get additional metadata assigned
+/// by the data producer. This crate will not apply any of the transformations
+/// given by such attributes (e.g. `add_offset` and `scale_factor` are NOT considered).
+///
+/// Use the `get*`-functions to retrieve values.
 #[derive(Debug, Clone)]
 pub struct Variable<'g> {
     /// The variable name
@@ -32,8 +41,13 @@ pub struct Variable<'g> {
 #[derive(Debug)]
 /// Mutable access to a variable.
 ///
+/// This type is used for defining and inserting data into a variable.
+/// Some properties is required to be set before putting data, such as
+/// [`set_chunking`](Self::set_chunking) and [`set_compression`](Self::set_compression).
+/// After these are defined one can use the `put*`-functions to insert data into the variable.
+///
 /// This type derefs to a [`Variable`](Variable), which means [`VariableMut`](Self)
-/// can be used where [`Variable`](Variable) is expected
+/// can be used where [`Variable`](Variable) is expected.
 #[allow(clippy::module_name_repetitions)]
 pub struct VariableMut<'g>(
     pub(crate) Variable<'g>,
@@ -103,7 +117,7 @@ impl<'g> Variable<'g> {
         }))
     }
 
-    /// Get name of variable
+    /// Get the name of variable
     pub fn name(&self) -> String {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
@@ -131,6 +145,17 @@ impl<'g> Variable<'g> {
             .map(Result::unwrap)
     }
     /// Get the attribute value
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let var: netcdf::Variable = todo!();
+    /// let capture_date: String = var.attribute_value("capture_date").transpose()?
+    ///                               .expect("no such attribute").try_into()?;
+    /// println!("Captured at {capture_date}");
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn attribute_value(&self, name: &str) -> Option<error::Result<AttributeValue>> {
         self.attribute(name).as_ref().map(Attribute::value)
     }
@@ -154,7 +179,7 @@ impl<'g> Variable<'g> {
     /// # Errors
     ///
     /// Not a `netCDF-4` file
-    pub fn endian_value(&self) -> error::Result<Endianness> {
+    pub fn endianness(&self) -> error::Result<Endianness> {
         let mut e: nc_type = 0;
         unsafe {
             error::checked(super::with_lock(|| {
@@ -182,7 +207,7 @@ impl<'g> VariableMut<'g> {
     /// # Errors
     ///
     /// Not a `netcdf-4` file or `deflate_level` not valid
-    pub fn compression(&mut self, deflate_level: nc_type, shuffle: bool) -> error::Result<()> {
+    pub fn set_compression(&mut self, deflate_level: nc_type, shuffle: bool) -> error::Result<()> {
         unsafe {
             error::checked(super::with_lock(|| {
                 nc_def_var_deflate(
@@ -208,7 +233,7 @@ impl<'g> VariableMut<'g> {
     /// # Errors
     ///
     /// Not a `netCDF-4` file or invalid chunksize
-    pub fn chunking(&mut self, chunksize: &[usize]) -> error::Result<()> {
+    pub fn set_chunking(&mut self, chunksize: &[usize]) -> error::Result<()> {
         if self.dimensions.is_empty() {
             // Can't really set chunking, would lead to segfault
             return Ok(());
@@ -707,7 +732,7 @@ impl std::ops::Deref for NcString {
 
 impl<'g> VariableMut<'g> {
     /// Adds an attribute to the variable
-    pub fn add_attribute<T>(&mut self, name: &str, val: T) -> error::Result<Attribute>
+    pub fn put_attribute<T>(&mut self, name: &str, val: T) -> error::Result<Attribute>
     where
         T: Into<AttributeValue>,
     {
@@ -733,7 +758,7 @@ impl<'g> Variable<'g> {
 
     ///  Fetches one specific value at specific indices
     ///  indices must has the same length as self.dimensions.
-    pub fn value<T: NcPutGet, E>(&self, indices: E) -> error::Result<T>
+    pub fn get_value<T: NcPutGet, E>(&self, indices: E) -> error::Result<T>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -766,7 +791,7 @@ impl<'g> Variable<'g> {
 
     /// Reads a string variable. This involves two copies per read, and should
     /// be avoided in performance critical code
-    pub fn string_value<E>(&self, indices: E) -> error::Result<String>
+    pub fn get_string<E>(&self, indices: E) -> error::Result<String>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -807,7 +832,7 @@ impl<'g> Variable<'g> {
     /// # Result::<(), netcdf::Error>::Ok(())
     /// ```
     /// where `Option::transpose` is used to bubble up any read errors
-    pub fn values<T: NcPutGet, E>(&self, extents: E) -> error::Result<Vec<T>>
+    pub fn get_values<T: NcPutGet, E>(&self, extents: E) -> error::Result<Vec<T>>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -845,8 +870,8 @@ impl<'g> Variable<'g> {
     }
 
     #[cfg(feature = "ndarray")]
-    /// Fetches variable
-    pub fn values_arr<T: NcPutGet, E>(&self, extents: E) -> error::Result<ArrayD<T>>
+    /// Get values from a variable
+    pub fn get<T: NcPutGet, E>(&self, extents: E) -> error::Result<ArrayD<T>>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -856,8 +881,8 @@ impl<'g> Variable<'g> {
     }
 
     #[cfg(feature = "ndarray")]
-    /// Get values into an ndarray
-    pub fn values_arr_into<T: NcPutGet, E, D>(
+    /// Get values from a variable directly into an ndarray
+    pub fn get_into<T: NcPutGet, E, D>(
         &self,
         extents: E,
         mut out: ndarray::ArrayViewMut<T, D>,
@@ -961,7 +986,7 @@ impl<'g> Variable<'g> {
     }
     /// Fetches variable into slice
     /// buffer must be able to hold all the requested elements
-    pub fn values_to<T: NcPutGet, E>(&self, buffer: &mut [T], extents: E) -> error::Result<()>
+    pub fn get_values_into<T: NcPutGet, E>(&self, buffer: &mut [T], extents: E) -> error::Result<()>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -1011,7 +1036,7 @@ impl<'g> Variable<'g> {
     /// strings will be allocated in `buf`, and this library will
     /// not keep track of the allocations.
     /// This can lead to memory leaks.
-    pub fn raw_values<E>(&self, buf: &mut [u8], extents: E) -> error::Result<()>
+    pub fn get_raw_values<E>(&self, buf: &mut [u8], extents: E) -> error::Result<()>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -1064,7 +1089,7 @@ impl<'g> Variable<'g> {
         Ok(v)
     }
     /// Get a vlen element
-    pub fn vlen<T: NcPutGet, E>(&self, indices: E) -> error::Result<Vec<T>>
+    pub fn get_vlen<T: NcPutGet, E>(&self, indices: E) -> error::Result<Vec<T>>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -1221,7 +1246,7 @@ impl<'g> VariableMut<'g> {
     /// # Errors
     ///
     /// Not a `netCDF-4` file, late define
-    pub fn endian(&mut self, e: Endianness) -> error::Result<()> {
+    pub fn set_endianness(&mut self, e: Endianness) -> error::Result<()> {
         let endianness = match e {
             Endianness::Native => NC_ENDIAN_NATIVE,
             Endianness::Little => NC_ENDIAN_LITTLE,
@@ -1334,7 +1359,7 @@ impl<'g> VariableMut<'g> {
 
     #[cfg(feature = "ndarray")]
     /// Put values in an ndarray into the variable
-    pub fn put_values_arr<T: NcPutGet, E, D>(
+    pub fn put<T: NcPutGet, E, D>(
         &mut self,
         extent: E,
         arr: ndarray::ArrayView<T, D>,

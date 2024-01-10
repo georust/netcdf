@@ -29,32 +29,32 @@
 //! let var = &file.variable("data").expect("Could not find variable 'data'");
 //!
 //! // Read a single datapoint from a 1D variable as a numeric type
-//! let data_i32 = var.value::<i32, _>(4)?;
-//! let data_f32 : f32 = var.value(5)?;
+//! let data_i32 = var.get_value::<i32, _>(4)?;
+//! let data_f32 : f32 = var.get_value(5)?;
 //!
 //! // If your variable is multi-dimensional you need to use a
 //! // type that supports `Selection`, such as a tuple or array
-//! let data_i32 = var.value::<i32, _>([40, 0, 0])?;
-//! let data_i32 = var.value::<i32, _>((40, 0, 0))?;
+//! let data_i32 = var.get_value::<i32, _>([40, 0, 0])?;
+//! let data_i32 = var.get_value::<i32, _>((40, 0, 0))?;
 //!
 //! // You can use `values_arr()` to get all the data from the variable.
 //! // This requires the `ndarray` feature
 //! // Passing `..` will give you the entire slice
 //! # #[cfg(feature = "ndarray")]
-//! let data = var.values_arr::<i32, _>(..)?;
+//! let data = var.get::<i32, _>(..)?;
 //!
 //! // A subset can also be selected, the following will extract the slice at
 //! // `(40, 0, 0)` and get a dataset of size `100, 100` from this
 //! # #[cfg(feature = "ndarray")]
-//! let data = var.values_arr::<i32, _>(([40, 0 ,0], [1, 100, 100]))?;
+//! let data = var.get::<i32, _>(([40, 0 ,0], [1, 100, 100]))?;
 //! # #[cfg(feature = "ndarray")]
-//! let data = var.values_arr::<i32, _>((40, ..100, ..100))?;
+//! let data = var.get::<i32, _>((40, ..100, ..100))?;
 //!
 //! // You can read into an ndarray to reuse an allocation
 //! # #[cfg(feature = "ndarray")]
 //! let mut data = ndarray::Array::<f32, _>::zeros((100, 100));
 //! # #[cfg(feature = "ndarray")]
-//! var.values_arr_into((0, .., ..), data.view_mut())?;
+//! var.get_into((0, .., ..), data.view_mut())?;
 //! # Ok(()) }
 //! ```
 //!
@@ -77,8 +77,8 @@
 //! )?;
 //! // Metadata can be added to the variable, but will not be used when
 //! // writing or reading data
-//! var.add_attribute("units", "Kelvin")?;
-//! var.add_attribute("add_offset", 273.15_f32)?;
+//! var.put_attribute("units", "Kelvin")?;
+//! var.put_attribute("add_offset", 273.15_f32)?;
 //!
 //! // Data can then be created and added to the variable
 //! let data : Vec<i32> = vec![42; 10];
@@ -92,7 +92,7 @@
 //! # #[cfg(feature = "ndarray")]
 //! let values = ndarray::Array::from_shape_fn((5, 10), |(j, i)| (j * 10 + i) as f32);
 //! # #[cfg(feature = "ndarray")]
-//! var.put_values_arr((11.., ..), values.view())?;
+//! var.put((11.., ..), values.view())?;
 //! # Ok(()) }
 //! ```
 

@@ -64,12 +64,12 @@ fn find_variable() {
 
     for mut var in group.variables_mut() {
         if !var.dimensions().is_empty() {
-            var.compression(3, false).unwrap();
+            var.set_compression(3, false).unwrap();
         }
         if var.name() == "z" {
-            var.chunking(&[1]).unwrap();
+            var.set_chunking(&[1]).unwrap();
         } else {
-            var.chunking(&[]).unwrap();
+            var.set_chunking(&[]).unwrap();
         }
     }
 }
