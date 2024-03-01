@@ -1332,7 +1332,7 @@ impl<'g> VariableMut<'g> {
 
         let vlen = nc_vlen_t {
             len: vec.len(),
-            p: vec.as_ptr() as *mut _,
+            p: vec.as_ptr().cast_mut().cast(),
         };
 
         error::checked(super::with_lock(|| unsafe {

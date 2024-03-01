@@ -698,7 +698,7 @@ impl<'a> Attribute<'a> {
                             varid,
                             cname.as_ptr().cast(),
                             cstring_pointers.len(),
-                            cstring_pointers.as_ptr() as *mut *const _,
+                            cstring_pointers.as_ptr().cast_mut(),
                         )
                     })
                 }
@@ -891,7 +891,7 @@ fn conversion() {
 
 impl TryFrom<AttributeValue> for u8 {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<u8, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Uchar(x) => Ok(x),
             AttributeValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
@@ -908,7 +908,7 @@ impl TryFrom<AttributeValue> for u8 {
 
 impl TryFrom<AttributeValue> for i8 {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<i8, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Uchar(x) => (x).try_into().map_err(error::Error::Conversion),
             AttributeValue::Schar(x) => Ok(x),
@@ -925,7 +925,7 @@ impl TryFrom<AttributeValue> for i8 {
 
 impl TryFrom<AttributeValue> for u16 {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<u16, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Uchar(x) => Ok((x).into()),
             AttributeValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
@@ -942,7 +942,7 @@ impl TryFrom<AttributeValue> for u16 {
 
 impl TryFrom<AttributeValue> for i16 {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<i16, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Uchar(x) => Ok((x).into()),
             AttributeValue::Schar(x) => Ok((x).into()),
@@ -958,7 +958,7 @@ impl TryFrom<AttributeValue> for i16 {
 }
 impl TryFrom<AttributeValue> for u32 {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<u32, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Uchar(x) => Ok((x).into()),
             AttributeValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
@@ -974,7 +974,7 @@ impl TryFrom<AttributeValue> for u32 {
 }
 impl TryFrom<AttributeValue> for i32 {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<i32, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Uchar(x) => Ok((x).into()),
             AttributeValue::Schar(x) => Ok((x).into()),
@@ -990,7 +990,7 @@ impl TryFrom<AttributeValue> for i32 {
 }
 impl TryFrom<AttributeValue> for u64 {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<u64, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Uchar(x) => Ok((x).into()),
             AttributeValue::Schar(x) => (x).try_into().map_err(error::Error::Conversion),
@@ -1006,7 +1006,7 @@ impl TryFrom<AttributeValue> for u64 {
 }
 impl TryFrom<AttributeValue> for i64 {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<i64, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Uchar(x) => Ok((x).into()),
             AttributeValue::Schar(x) => Ok((x).into()),
@@ -1022,7 +1022,7 @@ impl TryFrom<AttributeValue> for i64 {
 }
 impl TryFrom<AttributeValue> for f32 {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<f32, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Uchar(x) => Ok(x as _),
             AttributeValue::Schar(x) => Ok(x as _),
@@ -1040,7 +1040,7 @@ impl TryFrom<AttributeValue> for f32 {
 }
 impl TryFrom<AttributeValue> for f64 {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<f64, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Uchar(x) => Ok(x as _),
             AttributeValue::Schar(x) => Ok(x as _),
@@ -1059,7 +1059,7 @@ impl TryFrom<AttributeValue> for f64 {
 
 impl TryFrom<AttributeValue> for String {
     type Error = error::Error;
-    fn try_from(attr: AttributeValue) -> Result<String, Self::Error> {
+    fn try_from(attr: AttributeValue) -> Result<Self, Self::Error> {
         match attr {
             AttributeValue::Str(s) => Ok(s),
             _ => Err("Conversion not supported".into()),
