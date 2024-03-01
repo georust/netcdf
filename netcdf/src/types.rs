@@ -1,9 +1,9 @@
 //! Contains functions and enums describing variable types
 
+use netcdf_sys::*;
+
 use super::error;
 use crate::with_lock;
-use netcdf_sys::*;
-use std::convert::TryInto;
 
 /// Basic numeric types
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

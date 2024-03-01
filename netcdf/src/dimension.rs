@@ -1,10 +1,11 @@
 //! Interact with netcdf dimensions
-
 #![allow(clippy::similar_names)]
-use super::error;
-use netcdf_sys::*;
-use std::convert::TryInto;
+
 use std::marker::PhantomData;
+
+use netcdf_sys::*;
+
+use super::error;
 
 /// Represents a netcdf dimension
 #[derive(Debug, Clone)]
