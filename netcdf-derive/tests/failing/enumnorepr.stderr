@@ -1,0 +1,10 @@
+error: Can not derive NcType for enum without suitable repr
+ --> tests/failing/enumnorepr.rs:2:1
+  |
+2 | / enum NoRepr {
+3 | |     A,
+4 | |     B,
+5 | | }
+  | |_^
+  |
+  = help: Add #[repr(i32)] (or another integer type) as an attribute to the enum

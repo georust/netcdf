@@ -131,7 +131,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with: {toolchain: '${{matrix.rust}}'}
       - name: Build and test
-        run: cargo test -vv --features static --workspace
+        run: cargo test -vv --features static --workspace --exclude netcdf-derive
 
   addr_san:
     name: Address sanitizer
@@ -147,4 +147,4 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
-        run: cargo test --features netcdf-sys/static --target x86_64-unknown-linux-gnu --workspace
+        run: cargo test --features netcdf-sys/static --target x86_64-unknown-linux-gnu --workspace --exclude netcdf-derive

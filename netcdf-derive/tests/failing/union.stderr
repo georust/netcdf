@@ -1,0 +1,10 @@
+error: Can not derive NcType for union
+ --> tests/failing/union.rs:2:1
+  |
+2 | / union NoSupportedUnion {
+3 | |     A: i32,
+4 | |     B: u32,
+5 | | }
+  | |_^
+  |
+  = note: netCDF has no concept of Union type
