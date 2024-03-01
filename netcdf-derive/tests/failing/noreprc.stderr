@@ -1,0 +1,9 @@
+error: Can not derive NcType for struct without fixed layout
+ --> tests/failing/noreprc.rs:2:1
+  |
+2 | / struct NoReprC {
+3 | |     a: u8,
+4 | | }
+  | |_^
+  |
+  = help: struct must have attribute #[repr(C)]

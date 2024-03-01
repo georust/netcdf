@@ -453,7 +453,7 @@ macro_rules! impl_tuple {
 impl_tuple! { T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, }
 
 impl From<()> for Extents {
-    fn from(_: ()) -> Self {
+    fn from((): ()) -> Self {
         Self::Extent(vec![])
     }
 }
@@ -511,7 +511,7 @@ impl<'a> Iterator for StartCountStrideIter<'a> {
                     |stride| Self::Item {
                         start,
                         count: (start..dim.len()).step_by(stride).count(),
-                        stride: stride as isize,
+                        stride: stride.try_into().expect("stride must be < isize::MAX"),
                         is_an_index: false,
                         is_growable: dim.is_unlimited(),
                         is_upwards_limited: false,
@@ -541,7 +541,7 @@ impl<'a> Iterator for StartCountStrideIter<'a> {
                     |stride| Self::Item {
                         start,
                         count: (start..end).step_by(stride).count(),
-                        stride: stride as isize,
+                        stride: stride.try_into().expect("stride must be < isize::MAX"),
                         is_an_index: false,
                         is_growable: dim.is_unlimited(),
                         is_upwards_limited: true,

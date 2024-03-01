@@ -16,12 +16,14 @@ exclude = ["examples/**", "tests/**"]
 build = "build.rs"
 
 [features]
-default = ["ndarray"]
+default = ["ndarray", "derive"]
 static = ["netcdf-sys/static"]
+derive = ["dep:netcdf-derive"]
 
 [dependencies]
 ndarray = { version = "0.15", optional = true }
 netcdf-sys = { workspace = true }
+netcdf-derive = { workspace = true, optional = true }
 bitflags = "2.4.2"
 libc = "0.2.155"
 

@@ -8,7 +8,9 @@ use netcdf_sys::*;
 use super::attribute::{Attribute, AttributeValue};
 use super::dimension::Dimension;
 use super::error;
-use super::variable::{NcPutGet, Variable, VariableMut};
+use super::types::{NcTypeDescriptor, NcVariableType};
+use super::utils::with_lock;
+use super::variable::{Variable, VariableMut};
 
 /// Main component of the netcdf format. Holds all variables,
 /// attributes, and dimensions. A group can always see the parents items,
@@ -42,7 +44,7 @@ impl<'f> Group<'f> {
     pub fn name(&self) -> String {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(with_lock(|| {
                 nc_inq_grpname(self.ncid, name.as_mut_ptr().cast())
             }))
             .unwrap();
@@ -131,7 +133,7 @@ impl<'f> Group<'f> {
     }
 
     /// Return all types in this group
-    pub fn types(&self) -> impl Iterator<Item = super::types::VariableType> {
+    pub fn types(&self) -> impl Iterator<Item = NcVariableType> {
         super::types::all_at_location(self.ncid)
             .map(|x| x.map(Result::unwrap))
             .unwrap()
@@ -169,43 +171,17 @@ impl<'f> GroupMut<'f> {
         self.groups().map(|g| GroupMut(g, PhantomData))
     }
 
+    /// Add a derived type
+    pub fn add_type<T: NcTypeDescriptor>(&mut self) -> error::Result<nc_type> {
+        crate::types::add_type(self.ncid, T::type_descriptor(), false)
+    }
+
+    /// Add a type using a descriptor
+    pub fn add_type_from_descriptor(&mut self, typ: NcVariableType) -> error::Result<nc_type> {
+        crate::types::add_type(self.ncid, typ, false)
+    }
+
     /// Add an opaque datatype, with `size` bytes
-    pub fn add_opaque_type(
-        &'f mut self,
-        name: &str,
-        size: usize,
-    ) -> error::Result<super::types::OpaqueType> {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
-        super::types::OpaqueType::add(ncid, name, size)
-    }
-
-    /// Add a variable length datatype
-    pub fn add_vlen_type<T: NcPutGet>(
-        &'f mut self,
-        name: &str,
-    ) -> error::Result<super::types::VlenType> {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
-        super::types::VlenType::add::<T>(ncid, name)
-    }
-
-    /// Add an enum datatype
-    pub fn add_enum_type<T: NcPutGet>(
-        &'f mut self,
-        name: &str,
-        mappings: &[(&str, T)],
-    ) -> error::Result<super::types::EnumType> {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
-        super::types::EnumType::add::<T>(ncid, name, mappings)
-    }
-
-    /// Build a compound type
-    pub fn add_compound_type(
-        &mut self,
-        name: &str,
-    ) -> error::Result<super::types::CompoundBuilder> {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
-        super::types::CompoundType::add(ncid, name)
-    }
 
     /// Add an attribute to the group
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
@@ -251,20 +227,11 @@ impl<'f> GroupMut<'f> {
         dims: &[&str],
     ) -> error::Result<VariableMut<'g>>
     where
-        T: NcPutGet,
+        T: NcTypeDescriptor,
         'f: 'g,
     {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
-        VariableMut::add_from_str(ncid, T::NCTYPE, name, dims)
-    }
-    /// Adds a variable with a basic type of string
-    pub fn add_string_variable<'g>(
-        &mut self,
-        name: &str,
-        dims: &[&str],
-    ) -> error::Result<VariableMut<'g>> {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
-        VariableMut::add_from_str(ncid, NC_STRING, name, dims)
+        VariableMut::add_from_str(ncid, &T::type_descriptor(), name, dims)
     }
     /// Adds a variable from a set of unique identifiers, recursing upwards
     /// from the current group if necessary.
@@ -274,10 +241,13 @@ impl<'f> GroupMut<'f> {
         dims: &[super::dimension::DimensionIdentifier],
     ) -> error::Result<VariableMut<'g>>
     where
-        T: NcPutGet,
+        T: NcTypeDescriptor,
     {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
-        super::variable::add_variable_from_identifiers(ncid, name, dims, T::NCTYPE)
+        let Some(xtype) = super::types::find_type(self.ncid, &T::type_descriptor())? else {
+            return Err("Type not found at this location".into());
+        };
+        super::variable::add_variable_from_identifiers(ncid, name, dims, xtype)
     }
 
     /// Create a variable with the specified type
@@ -285,23 +255,38 @@ impl<'f> GroupMut<'f> {
         &'f mut self,
         name: &str,
         dims: &[&str],
-        typ: &super::types::VariableType,
+        typ: &super::types::NcVariableType,
     ) -> error::Result<VariableMut<'f>> {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
-        VariableMut::add_from_str(ncid, typ.id(), name, dims)
+        VariableMut::add_from_str(ncid, typ, name, dims)
+    }
+    /// Adds a variable from a set of unique identifiers, recursing upwards
+    /// from the current group if necessary. The variable type is specified
+    /// using a type descriptor.
+    pub fn add_variable_from_identifiers_with_type<'g>(
+        &'g mut self,
+        name: &str,
+        dims: &[super::dimension::DimensionIdentifier],
+        typ: &super::types::NcVariableType,
+    ) -> error::Result<VariableMut<'g>> {
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
+        let Some(xtype) = super::types::find_type(ncid, typ)? else {
+            return Err("Type is not defined".into());
+        };
+        super::variable::add_variable_from_identifiers(ncid, name, dims, xtype)
     }
 }
 
 pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<Item = Group<'f>>> {
     let mut num_grps = 0;
     unsafe {
-        error::checked(super::with_lock(|| {
+        error::checked(with_lock(|| {
             nc_inq_grps(ncid, &mut num_grps, std::ptr::null_mut())
         }))?;
     }
     let mut grps = vec![0; num_grps.try_into()?];
     unsafe {
-        error::checked(super::with_lock(|| {
+        error::checked(with_lock(|| {
             nc_inq_grps(ncid, std::ptr::null_mut(), grps.as_mut_ptr())
         }))?;
     }
@@ -326,7 +311,7 @@ pub(crate) fn add_group_at_path(mut ncid: nc_type, path: &str) -> error::Result<
 pub(crate) fn add_group(mut ncid: nc_type, name: &str) -> error::Result<nc_type> {
     let byte_name = super::utils::short_name_to_bytes(name)?;
     unsafe {
-        error::checked(super::with_lock(|| {
+        error::checked(with_lock(|| {
             nc_def_grp(ncid, byte_name.as_ptr().cast(), &mut ncid)
         }))?;
     }
@@ -335,8 +320,7 @@ pub(crate) fn add_group(mut ncid: nc_type, name: &str) -> error::Result<nc_type>
 
 pub(crate) fn try_get_ncid(mut ncid: nc_type, name: &str) -> error::Result<Option<nc_type>> {
     let byte_name = super::utils::short_name_to_bytes(name)?;
-    let e =
-        unsafe { super::with_lock(|| nc_inq_grp_ncid(ncid, byte_name.as_ptr().cast(), &mut ncid)) };
+    let e = unsafe { with_lock(|| nc_inq_grp_ncid(ncid, byte_name.as_ptr().cast(), &mut ncid)) };
     if e == NC_ENOGRP {
         return Ok(None);
     }

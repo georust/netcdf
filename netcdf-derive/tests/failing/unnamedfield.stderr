@@ -1,0 +1,7 @@
+error: Can not derive NcType for struct with unnamed field
+ --> tests/failing/unnamedfield.rs:3:20
+  |
+3 | struct UnnamedField(u8);
+  |                    ^^^^
+  |
+  = note: #[derive(NcType)]

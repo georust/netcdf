@@ -1,0 +1,6 @@
+error: Can not derive NcType for unit struct
+ --> tests/failing/unittype.rs:2:1
+  |
+2 | / #[repr(C)]
+3 | | struct B;
+  | |_________^

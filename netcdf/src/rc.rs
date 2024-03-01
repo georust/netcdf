@@ -5,7 +5,7 @@ use std::ptr::NonNull;
 pub fn set(key: &str, value: &str) -> crate::error::Result<()> {
     let key = CString::new(key)?;
     let value = CString::new(value)?;
-    crate::error::checked(crate::with_lock(|| unsafe {
+    crate::error::checked(crate::utils::with_lock(|| unsafe {
         netcdf_sys::nc_rc_set(key.as_ptr(), value.as_ptr())
     }))
 }

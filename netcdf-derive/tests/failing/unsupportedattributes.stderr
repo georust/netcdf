@@ -1,0 +1,17 @@
+error: NcType encountered an unknown attribute
+ --> tests/failing/unsupportedattributes.rs:4:14
+  |
+4 |     #[netcdf(gibberish)]
+  |              ^^^^^^^^^
+
+error: NcType encountered an unknown attribute
+  --> tests/failing/unsupportedattributes.rs:10:10
+   |
+10 | #[netcdf(gibberish)]
+   |          ^^^^^^^^^
+
+error: NcType encountered an unknown attribute
+  --> tests/failing/unsupportedattributes.rs:18:14
+   |
+18 |     #[netcdf(gibberish)]
+   |              ^^^^^^^^^

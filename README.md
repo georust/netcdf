@@ -22,12 +22,9 @@ Supported:
 * Open/Append/Create modes
 * Reading from memory
 * Unlimited dimensions
-* String variables
-* User defined types (variable length, enum, compound, opaque)
+* User defined types (enum, compound, other types requires additional work)
 
-Not (yet) supported:
-
-* Nested user defined types
+Not (yet) supported (PRs welcome):
 * Writing using memory-mapped file
 
 All variable data is read into a contiguous buffer, or into an [ndarray](https://github.com/rust-ndarray/ndarray) if the `ndarray` feature is activated.

@@ -110,6 +110,7 @@ pub(crate) mod error;
 pub(crate) mod extent;
 pub(crate) mod file;
 pub(crate) mod group;
+pub(crate) mod putget;
 #[cfg(feature = "4.9.2")]
 pub mod rc;
 pub mod types;
@@ -124,7 +125,11 @@ pub use file::FileMem;
 pub(crate) use file::RawFile;
 pub use file::{File, FileMut, Options};
 pub use group::{Group, GroupMut};
-pub use variable::{Endianness, NcPutGet, Variable, VariableMut};
+#[cfg(feature = "derive")]
+pub use netcdf_derive::NcType;
+#[doc(inline)]
+pub use types::NcTypeDescriptor;
+pub use variable::{Endianness, Variable, VariableMut};
 
 /// Open a netcdf file in create mode
 ///
@@ -182,16 +187,9 @@ pub fn open_mem<'a>(name: Option<&str>, mem: &'a [u8]) -> error::Result<FileMem<
     RawFile::open_from_memory(name, mem)
 }
 
-/// All functions should be wrapped in this locker. Disregarding this, expect
-/// segfaults, especially on non-threadsafe hdf5 builds
-pub(crate) fn with_lock<F: FnMut() -> nc_type>(mut f: F) -> nc_type {
-    let _l = netcdf_sys::libnetcdf_lock.lock().unwrap();
-    f()
-}
-
 pub(crate) mod utils {
     use super::error;
-    use netcdf_sys::{NC_EMAXNAME, NC_MAX_NAME};
+    use netcdf_sys::{nc_type, NC_EMAXNAME, NC_MAX_NAME};
     /// Use this function for short `netCDF` names to avoid the allocation
     /// for a `CString`
     pub(crate) fn short_name_to_bytes(name: &str) -> error::Result<[u8; NC_MAX_NAME as usize + 1]> {
@@ -203,5 +201,16 @@ pub(crate) mod utils {
             bytes[..len].copy_from_slice(name.as_bytes());
             Ok(bytes)
         }
+    }
+
+    /// All functions should be wrapped in this locker. Disregarding this, expect
+    /// segfaults, especially on non-threadsafe hdf5 builds
+    pub(crate) fn with_lock<F: FnMut() -> nc_type>(mut f: F) -> nc_type {
+        let _l = netcdf_sys::libnetcdf_lock.lock().unwrap();
+        f()
+    }
+
+    pub(crate) fn checked_with_lock<F: FnMut() -> nc_type>(f: F) -> error::Result<()> {
+        error::checked(with_lock(f))
     }
 }
