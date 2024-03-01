@@ -1,20 +1,19 @@
 //! Variables in the netcdf file
 #![allow(clippy::similar_names)]
-use std::convert::TryInto;
 use std::ffi::{c_char, CStr};
 use std::marker::PhantomData;
-use std::marker::Sized;
 use std::mem::MaybeUninit;
 use std::ptr::addr_of;
+
+#[cfg(feature = "ndarray")]
+use ndarray::ArrayD;
+use netcdf_sys::*;
 
 use super::attribute::{Attribute, AttributeValue};
 use super::dimension::Dimension;
 use super::error;
 use super::extent::Extents;
 use super::types::VariableType;
-#[cfg(feature = "ndarray")]
-use ndarray::ArrayD;
-use netcdf_sys::*;
 
 #[allow(clippy::doc_markdown)]
 /// This struct defines a `netCDF` variable.

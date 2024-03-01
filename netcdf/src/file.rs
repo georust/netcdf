@@ -1,16 +1,17 @@
 //! Open, create, and append netcdf files
-
 #![allow(clippy::similar_names)]
-use crate::group::{get_parent_ncid_and_stem, try_get_ncid, try_get_parent_ncid_and_stem};
+
+use std::marker::PhantomData;
+use std::path;
+
+use netcdf_sys::*;
 
 use super::attribute::{Attribute, AttributeValue};
 use super::dimension::{self, Dimension};
 use super::error;
 use super::group::{Group, GroupMut};
 use super::variable::{NcPutGet, Variable, VariableMut};
-use netcdf_sys::*;
-use std::marker::PhantomData;
-use std::path;
+use crate::group::{get_parent_ncid_and_stem, try_get_ncid, try_get_parent_ncid_and_stem};
 
 #[derive(Debug)]
 #[repr(transparent)]

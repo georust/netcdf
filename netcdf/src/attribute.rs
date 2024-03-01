@@ -1,11 +1,13 @@
 //! Add and read attributes from netcdf groups and variables
-
 #![allow(clippy::similar_names)]
-use super::error;
-use netcdf_sys::*;
+
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::os::raw::c_char;
+
+use netcdf_sys::*;
+
+use super::error;
 
 /// Extra properties of a variable or a group can be represented
 /// with attributes. Primarily added with `add_attribute` on

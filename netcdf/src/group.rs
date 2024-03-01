@@ -1,13 +1,14 @@
 //! All netcdf items belong in the root group, which can
 //! be interacted with to get the underlying data
 
+use std::marker::PhantomData;
+
+use netcdf_sys::*;
+
 use super::attribute::{Attribute, AttributeValue};
 use super::dimension::Dimension;
 use super::error;
 use super::variable::{NcPutGet, Variable, VariableMut};
-use netcdf_sys::*;
-use std::convert::TryInto;
-use std::marker::PhantomData;
 
 /// Main component of the netcdf format. Holds all variables,
 /// attributes, and dimensions. A group can always see the parents items,

@@ -1,11 +1,13 @@
 //! Errors that can appear when interacting with netcdf files.
 //! This module contains conversion traits and the result type
 //! used in this crate.
-
 #![allow(clippy::similar_names)]
-use super::nc_type;
-use netcdf_sys::nc_strerror;
+
 use std::num::TryFromIntError;
+
+use netcdf_sys::nc_strerror;
+
+use super::nc_type;
 
 /// Various error types that can occur in this crate
 #[derive(Debug)]
