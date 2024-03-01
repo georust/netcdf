@@ -11,6 +11,11 @@ on:
   schedule:
   - cron: '0 0 15 * *'
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -20,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with: {submodules: true}
     - name: Install netCDF
       run: sudo apt-get update && sudo apt-get install libnetcdf-dev
@@ -54,7 +59,7 @@ jobs:
           rust: nightly
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with: {submodules: false}
 
     - name: Install netcdf
@@ -86,13 +91,13 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with: {submodules: false}
       - name: Install Rust (${{matrix.rust}})
         uses: dtolnay/rust-toolchain@stable
         with: {toolchain: '${{matrix.rust}}'}
       - name: Install conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with: {auto-update-conda: false, activate-environment: testenv}
       - name: Install netCDF
         run: conda install -y -c ${{matrix.channel}} libnetcdf=4.8.1
@@ -120,7 +125,7 @@ jobs:
           shell: bash -l {0}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with: {submodules: true}
       - name: Install Rust (${{matrix.rust}})
         uses: dtolnay/rust-toolchain@stable
@@ -133,7 +138,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with: {submodules: true}
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
