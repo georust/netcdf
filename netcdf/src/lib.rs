@@ -71,7 +71,7 @@
 //! file.add_unlimited_dimension("time")?;
 //!
 //! // A variable can now be declared, and must be created from the dimension names.
-//! let mut var = file.add_variable::<i32>(
+//! let mut var = file.add_variable::<i32, _>(
 //!             "crab_coolness_level",
 //!             &["time", "ncrabs"],
 //! )?;
@@ -114,7 +114,7 @@ pub mod types;
 pub(crate) mod variable;
 
 pub use attribute::{Attribute, AttributeValue};
-pub use dimension::{Dimension, DimensionIdentifier};
+pub use dimension::{AsNcDimensions, Dimension, DimensionIdentifier};
 pub use error::{Error, Result};
 pub use extent::{Extent, Extents};
 #[cfg(feature = "has-mmap")]

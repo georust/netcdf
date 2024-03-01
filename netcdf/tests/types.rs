@@ -6,16 +6,16 @@ fn test_roundtrip_types() {
     let path = d.path().join("test_roundtrip_types.nc");
     {
         let mut file = netcdf::create(&path).unwrap();
-        file.add_variable::<i8>("i8", &[]).unwrap();
-        file.add_variable::<u8>("u8", &[]).unwrap();
-        file.add_variable::<i16>("i16", &[]).unwrap();
-        file.add_variable::<u16>("u16", &[]).unwrap();
-        file.add_variable::<i32>("i32", &[]).unwrap();
-        file.add_variable::<u32>("u32", &[]).unwrap();
-        file.add_variable::<i64>("i64", &[]).unwrap();
-        file.add_variable::<u64>("u64", &[]).unwrap();
-        file.add_variable::<f32>("f32", &[]).unwrap();
-        file.add_variable::<f64>("f64", &[]).unwrap();
+        file.add_variable::<i8, _>("i8", ()).unwrap();
+        file.add_variable::<u8, _>("u8", ()).unwrap();
+        file.add_variable::<i16, _>("i16", ()).unwrap();
+        file.add_variable::<u16, _>("u16", ()).unwrap();
+        file.add_variable::<i32, _>("i32", ()).unwrap();
+        file.add_variable::<u32, _>("u32", ()).unwrap();
+        file.add_variable::<i64, _>("i64", ()).unwrap();
+        file.add_variable::<u64, _>("u64", ()).unwrap();
+        file.add_variable::<f32, _>("f32", ()).unwrap();
+        file.add_variable::<f64, _>("f64", ()).unwrap();
         file.add_string_variable("string", &[]).unwrap();
     }
 

@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use netcdf_sys::*;
 
 use super::attribute::{Attribute, AttributeValue};
-use super::dimension::Dimension;
+use super::dimension::{AsNcDimensions, Dimension};
 use super::error;
 use super::variable::{NcPutGet, Variable, VariableMut};
 
@@ -244,18 +244,23 @@ impl<'f> GroupMut<'f> {
     /// Create a Variable into the dataset, with no data written into it
     ///
     /// Dimensions are identified using the name of the dimension, and will recurse upwards
-    /// if not found in the current group.
-    pub fn add_variable<'g, T>(
+    /// if not found in the current group. If the name is shadowed one can get an
+    /// [`DimensionIdentifier`](crate::DimensionIdentifier) to ensure the right dimension
+    /// is used
+    ///
+    /// See [`AsNcDimensions`] for how to specify dimensions.
+    pub fn add_variable<'g, T, D>(
         &'g mut self,
         name: &str,
-        dims: &[&str],
+        dims: D,
     ) -> error::Result<VariableMut<'g>>
     where
         T: NcPutGet,
         'f: 'g,
+        D: AsNcDimensions,
     {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
-        VariableMut::add_from_str(ncid, T::NCTYPE, name, dims)
+        VariableMut::add_from_dimids(ncid, T::NCTYPE, name, dims.get_dimensions(ncid)?)
     }
     /// Adds a variable with a basic type of string
     pub fn add_string_variable<'g>(
@@ -265,19 +270,6 @@ impl<'f> GroupMut<'f> {
     ) -> error::Result<VariableMut<'g>> {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         VariableMut::add_from_str(ncid, NC_STRING, name, dims)
-    }
-    /// Adds a variable from a set of unique identifiers, recursing upwards
-    /// from the current group if necessary.
-    pub fn add_variable_from_identifiers<'g, T>(
-        &'g mut self,
-        name: &str,
-        dims: &[super::dimension::DimensionIdentifier],
-    ) -> error::Result<VariableMut<'g>>
-    where
-        T: NcPutGet,
-    {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
-        super::variable::add_variable_from_identifiers(ncid, name, dims, T::NCTYPE)
     }
 
     /// Create a variable with the specified type

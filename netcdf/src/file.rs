@@ -7,7 +7,7 @@ use std::path;
 use netcdf_sys::*;
 
 use super::attribute::{Attribute, AttributeValue};
-use super::dimension::{self, Dimension};
+use super::dimension::{AsNcDimensions, Dimension};
 use super::error;
 use super::group::{Group, GroupMut};
 use super::variable::{NcPutGet, Variable, VariableMut};
@@ -338,20 +338,50 @@ impl FileMut {
         ))
     }
 
-    /// Create a Variable into the dataset, with no data written into it
+    /// Create a variable in the dataset, with no data written into it
     ///
-    /// Dimensions are identified using the name of the dimension, and will recurse upwards
-    /// if not found in the current group.
-    pub fn add_variable<'f, T>(
+    /// # Examples
+    /// ## Adding variables with different types
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut file = netcdf::create("file.nc")?;
+    /// file.add_dimension("x", 10)?;
+    /// file.add_dimension("y", 11)?;
+    /// file.add_variable::<u8, _>("var_u8", &["y", "x"])?;
+    /// file.add_variable::<i8, _>("var_i8", &["y", "x"])?;
+    /// file.add_variable::<u64, _>("var_u64", &["y", "x"])?;
+    /// file.add_variable::<f64, _>("var_f64", &["y", "x"])?;
+    /// # Ok(())}
+    /// ```
+    /// ## Adding a scalar variable
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut file = netcdf::create("scalar.nc")?;
+    /// file.add_variable::<u8, _>("var2", ())?;
+    /// # Ok(())}
+    /// ```
+    /// ## Using dimension identifiers in place of names
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut file = netcdf::create("dimids.nc")?;
+    /// let dimx = file.dimension("x").unwrap().identifier();
+    /// let dimy = file.dimension("y").unwrap().identifier();
+    /// file.add_variable::<u8, _>("var2", &[dimy, dimx])?;
+    /// # Ok(())}
+    ///```
+    ///
+    /// See [`AsNcDimensions`] for how to specify dimensions.
+    pub fn add_variable<'f, T, D>(
         &'f mut self,
         name: &str,
-        dims: &[&str],
+        dims: D,
     ) -> error::Result<VariableMut<'f>>
     where
         T: NcPutGet,
+        D: AsNcDimensions,
     {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
-        VariableMut::add_from_str(ncid, T::NCTYPE, name, dims)
+        VariableMut::add_from_dimids(ncid, T::NCTYPE, name, dims.get_dimensions(ncid)?)
     }
 
     /// Create a variable with the specified type
@@ -409,19 +439,6 @@ impl FileMut {
     ) -> error::Result<VariableMut<'f>> {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         VariableMut::add_from_str(ncid, NC_STRING, name, dims)
-    }
-    /// Adds a variable from a set of unique identifiers, recursing upwards
-    /// from the current group if necessary.
-    pub fn add_variable_from_identifiers<'f, T>(
-        &'f mut self,
-        name: &str,
-        dims: &[dimension::DimensionIdentifier],
-    ) -> error::Result<VariableMut<'f>>
-    where
-        T: NcPutGet,
-    {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
-        super::variable::add_variable_from_identifiers(ncid, name, dims, T::NCTYPE)
     }
 }
 

@@ -44,10 +44,10 @@ fn find_variable() {
     let mut file = netcdf::create(path).unwrap();
     let mut group = file.add_group("group").unwrap();
 
-    group.add_variable::<u8>("v", &[]).unwrap();
-    group.add_variable::<u8>("w", &[]).unwrap();
+    group.add_variable::<u8, _>("v", ()).unwrap();
+    group.add_variable::<u8, _>("w", ()).unwrap();
     group.add_dimension("d", 3).unwrap();
-    group.add_variable::<u8>("z", &["d"]).unwrap();
+    group.add_variable::<u8, _>("z", &["d"]).unwrap();
 
     assert_eq!(group.variables_mut().count(), 3);
     assert_eq!(group.variables().count(), 3);
@@ -83,8 +83,8 @@ fn add_and_get_from_path() {
         file.add_group("a/b").unwrap();
         file.add_dimension("a/b/dim", 1).unwrap();
         assert!(file.add_dimension("a/c/dim", 1).is_err());
-        file.add_variable::<f64>("a/b/var", &["dim"]).unwrap();
-        assert!(file.add_variable::<f64>("a/c/var", &["dim"]).is_err());
+        file.add_variable::<f64, _>("a/b/var", &["dim"]).unwrap();
+        assert!(file.add_variable::<f64, _>("a/c/var", &["dim"]).is_err());
         file.add_attribute("a/b/attr", "test").unwrap();
         assert!(file.add_attribute("a/c/test", "test").is_err());
     }

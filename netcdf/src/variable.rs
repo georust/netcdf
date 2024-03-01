@@ -1434,6 +1434,42 @@ impl<'g> VariableMut<'g> {
 }
 
 impl<'g> VariableMut<'g> {
+    pub(crate) fn add_from_dimids<'d>(
+        ncid: nc_type,
+        xtype: nc_type,
+        name: &str,
+        dimensions: Vec<Dimension<'d>>,
+    ) -> error::Result<Self>
+    where
+        'd: 'g,
+    {
+        let cname = super::utils::short_name_to_bytes(name)?;
+        let mut varid = 0;
+        unsafe {
+            let dims = dimensions.iter().map(|x| x.id.dimid).collect::<Vec<_>>();
+            let dimlen = dims.len().try_into()?;
+            error::checked(super::with_lock(|| {
+                nc_def_var(
+                    ncid,
+                    cname.as_ptr().cast(),
+                    xtype,
+                    dimlen,
+                    dims.as_ptr(),
+                    &mut varid,
+                )
+            }))?;
+        }
+        Ok(VariableMut(
+            Variable {
+                ncid,
+                varid,
+                vartype: xtype,
+                dimensions,
+                _group: PhantomData,
+            },
+            PhantomData,
+        ))
+    }
     pub(crate) fn add_from_str(
         ncid: nc_type,
         xtype: nc_type,
@@ -1519,63 +1555,4 @@ pub(crate) fn variables_at_ncid<'g>(
             _group: PhantomData,
         })
     }))
-}
-
-pub(crate) fn add_variable_from_identifiers<'g>(
-    ncid: nc_type,
-    name: &str,
-    dims: &[super::dimension::DimensionIdentifier],
-    xtype: nc_type,
-) -> error::Result<VariableMut<'g>> {
-    let cname = super::utils::short_name_to_bytes(name)?;
-
-    let dimensions = dims
-        .iter()
-        .map(move |&id| {
-            // Internal netcdf detail, the top 16 bits gives the corresponding
-            // file handle. This to ensure dimensions are not added from another
-            // file which is unrelated to self
-            if id.ncid >> 16 != ncid >> 16 {
-                return Err(error::Error::WrongDataset);
-            }
-            let mut dimlen = 0;
-            unsafe {
-                error::checked(super::with_lock(|| {
-                    nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen)
-                }))?;
-            }
-            Ok(Dimension {
-                len: core::num::NonZeroUsize::new(dimlen),
-                id,
-                _group: PhantomData,
-            })
-        })
-        .collect::<error::Result<Vec<_>>>()?;
-    let dims = dims.iter().map(|x| x.dimid).collect::<Vec<_>>();
-
-    let mut varid = 0;
-    unsafe {
-        let dimlen = dims.len().try_into()?;
-        error::checked(super::with_lock(|| {
-            nc_def_var(
-                ncid,
-                cname.as_ptr().cast(),
-                xtype,
-                dimlen,
-                dims.as_ptr(),
-                &mut varid,
-            )
-        }))?;
-    }
-
-    Ok(VariableMut(
-        Variable {
-            ncid,
-            dimensions,
-            varid,
-            vartype: xtype,
-            _group: PhantomData,
-        },
-        PhantomData,
-    ))
 }
