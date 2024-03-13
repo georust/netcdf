@@ -22,8 +22,8 @@ rust-version = "1.70"
 [dependencies]
 libz-sys = { version = "1.0.25" }
 curl-sys = { version = "0.4.51", optional = true }
-hdf5-sys = { version = "0.8.0" }
-netcdf-src = { path = "../netcdf-src", version = "0.3.0", optional = true }
+hdf5-sys = { workspace = true }
+netcdf-src = { workspace = true, optional = true }
 
 [dev-dependencies]
 
