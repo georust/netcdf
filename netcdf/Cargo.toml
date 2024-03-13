@@ -22,11 +22,11 @@ static = ["netcdf-sys/static"]
 [dependencies]
 ndarray = { version = "0.15", optional = true }
 netcdf-sys = { path = "../netcdf-sys", version = "0.6.0" }
-bitflags = "1.2.1"
+bitflags = "2.4.2"
 
 [dev-dependencies]
+clap = { version = "4.5.1", features = ["derive"] }
 tempfile = "3.1.0"
-structopt = "0.3.3"
 
 [package.metadata.docs.rs]
 features = ["static"]
