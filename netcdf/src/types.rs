@@ -1,816 +1,900 @@
-//! Contains functions and enums describing variable types
+//! Types found in `netCDF` files
+use netcdf_sys::{
+    nc_type, NC_BYTE, NC_CHAR, NC_COMPOUND, NC_DOUBLE, NC_ENUM, NC_FLOAT, NC_INT, NC_INT64,
+    NC_MAX_NAME, NC_OPAQUE, NC_SHORT, NC_STRING, NC_UBYTE, NC_UINT, NC_UINT64, NC_USHORT, NC_VLEN,
+};
 
-use netcdf_sys::*;
+use crate::{error::Result, utils::checked_with_lock};
 
-use super::error;
-use crate::with_lock;
+/// This trait allows reading and writing basic and user defined types.
+///
+/// Supports basic types ([`i8`], [`u8`], [`i16`], ..., [`f32`], [`f64`]) and user-defined types.
+///
+/// Prefer deriving using [`NcType`][crate::NcType] when working with
+/// user defined types. With the `derive` feature enabled for this crate one can
+/// easily define types for reading and writing to and from `netCDF` files.
+/// # Example (derive macro)
+/// ```rust,no_run
+/// # #[cfg(feature = "derive")]
+/// #[repr(C)]
+/// #[derive(netcdf::NcType, Debug, Copy, Clone)]
+/// struct Foo {
+///     a: i32,
+///     b: u32,
+/// }
+/// # #[cfg(feature = "derive")]
+/// #[repr(u32)]
+/// #[derive(netcdf::NcType, Debug, Copy, Clone)]
+/// enum Bar {
+///     Egg = 3,
+///     Milk,
+/// }
+/// # #[cfg(feature = "derive")]
+/// #[repr(C)]
+/// #[derive(netcdf::NcType, Debug, Copy, Clone)]
+/// struct FooBar {
+///     foo: Foo,
+///     bar: Bar,
+/// }
+/// # #[cfg(feature = "derive")]
+/// #[repr(C)]
+/// #[derive(netcdf::NcType, Debug, Copy, Clone)]
+/// struct Arrayed {
+///     a: [[u8; 3]; 5],
+///     b: i8,
+/// }
+/// # #[cfg(feature = "derive")]
+/// #[repr(C)]
+/// #[derive(netcdf::NcType, Debug, Copy, Clone)]
+/// #[netcdf(rename = "myname")]
+/// struct Renamed {
+///     #[netcdf(rename = "orange")]
+///     a: u64,
+///     #[netcdf(rename = "apple")]
+///     b: i64,
+/// }
+/// ```
+/// # Examples (advanced)
+/// The following examples illustrates how to implement more advanced types.
+/// They are not included in this crate since they either have difficulties
+/// interacting with `Drop` (vlen, string) or they include design choices
+/// such as naming (char) or type name (opaque, enum).
+///
+/// ## Char type
+/// Reading of an `netcdf_sys::NC_CHAR` can not be done by using `i8` or `u8` as
+/// such types are not considered text. The below snippet can be used to define
+/// a type which will read this type.
+/// ```rust,no_run
+/// # use netcdf::types::*;
+/// #[repr(transparent)]
+/// #[derive(Copy, Clone)]
+/// struct NcChar(i8);
+/// unsafe impl NcTypeDescriptor for NcChar {
+///     fn type_descriptor() -> NcVariableType {
+///         NcVariableType::Char
+///     }
+/// }
+/// ```
+/// ## Opaque type
+/// ```rust,no_run
+/// # use netcdf::types::*;
+/// #[repr(transparent)]
+/// #[derive(Copy, Clone)]
+/// struct Opaque([u8; 16]);
+/// unsafe impl NcTypeDescriptor for Opaque {
+///     fn type_descriptor() -> NcVariableType {
+///         NcVariableType::Opaque(OpaqueType {
+///             name: "Opaque".to_owned(),
+///             size: std::mem::size_of::<Opaque>()
+///         })
+///     }
+/// }
+/// ```
+/// ## Vlen type
+/// This type *must* match [`netcdf_sys::nc_vlen_t`]. Be aware that reading using this
+/// type means the memory is backed by `netCDF` and should be
+/// freed using [`netcdf_sys::nc_free_vlen`] or [`netcdf_sys::nc_free_vlens`]
+/// to avoid memory leaks.
+/// ```rust,no_run
+/// # use netcdf::types::*;
+/// #[repr(C)]
+/// struct Vlen {
+///     len: usize,
+///     p: *const u8,
+/// }
+/// unsafe impl NcTypeDescriptor for Vlen {
+///     fn type_descriptor() -> NcVariableType {
+///         NcVariableType::Vlen(VlenType {
+///             name: "Vlen".to_owned(),
+///             basetype: Box::new(NcVariableType::Int(IntType::U8)),
+///         })
+///     }
+/// }
+/// ```
+/// ## String type
+/// String types must be freed using [`netcdf_sys::nc_free_string`].
+/// ```rust,no_run
+/// # use netcdf::types::*;
+/// #[repr(transparent)]
+/// struct NcString(*mut std::ffi::c_char);
+/// unsafe impl NcTypeDescriptor for NcString {
+///     fn type_descriptor() -> NcVariableType {
+///         NcVariableType::String
+///     }
+/// }
+/// ```
+///
+/// # Safety
+/// Below is a list of things to keep in mind when implementing:
+/// * `Drop` interaction when types are instantiated (reading)
+/// * Padding bytes in the struct
+/// * Alignment of members in a struct
+/// * Endianness (for opaque structs)
+/// * Overlapping compound members
+/// * Duplicate enum/compound names
+/// * Duplicate enum values
+pub unsafe trait NcTypeDescriptor {
+    /// Description of the type
+    fn type_descriptor() -> NcVariableType;
+    #[doc(hidden)]
+    /// This is here to allow e.g. [u8; 4] in compounds and should
+    /// be considered a hack.
+    /// This item is ignored in non-compounds and will lead to confusing
+    /// error messages if used in non-compound types.
+    const ARRAY_ELEMENTS: ArrayElements = ArrayElements::None;
+}
 
-/// Basic numeric types
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum BasicType {
-    /// Signed 1 byte integer
-    Byte,
-    /// ISO/ASCII character
+#[derive(Clone, PartialEq, Eq, Debug)]
+/// A `netCDF` type
+///
+/// This enum contains all variants of types allowed by `netCDF`.
+pub enum NcVariableType {
+    /// A compound struct
+    Compound(CompoundType),
+    /// A bag of bytes
+    Opaque(OpaqueType),
+    /// An enumeration of names/values
+    Enum(EnumType),
+    /// Ragged array
+    Vlen(VlenType),
+    /// String type
+    String,
+    /// Integer type
+    Int(IntType),
+    /// Floating type
+    Float(FloatType),
+    /// Char type
     Char,
-    /// Unsigned 1 byte integer
-    Ubyte,
-    /// Signed 2 byte integer
-    Short,
-    /// Unsigned 2 byte integer
-    Ushort,
-    /// Signed 4 byte integer
-    Int,
-    /// Unsigned 4 byte integer
-    Uint,
-    /// Signed 8 byte integer
-    Int64,
-    /// Unsigned 8 byte integer
-    Uint64,
-    /// Single precision floating point number
-    Float,
-    /// Double precision floating point number
-    Double,
 }
 
-impl BasicType {
-    /// Size of the type in bytes
-    fn size(self) -> usize {
+impl NcVariableType {
+    /// Size (in bytes) of the type in memory
+    pub fn size(&self) -> usize {
         match self {
-            Self::Byte | Self::Ubyte | Self::Char => 1,
-            Self::Short | Self::Ushort => 2,
-            Self::Int | Self::Uint | Self::Float => 4,
-            Self::Int64 | Self::Uint64 | Self::Double => 8,
-        }
-    }
-    /// `nc_type` of the type
-    pub(crate) fn id(self) -> nc_type {
-        use super::NcPutGet;
-        match self {
-            Self::Byte => i8::NCTYPE,
-            Self::Char => NC_CHAR,
-            Self::Ubyte => u8::NCTYPE,
-            Self::Short => i16::NCTYPE,
-            Self::Ushort => u16::NCTYPE,
-            Self::Int => i32::NCTYPE,
-            Self::Uint => u32::NCTYPE,
-            Self::Int64 => i64::NCTYPE,
-            Self::Uint64 => u64::NCTYPE,
-            Self::Float => f32::NCTYPE,
-            Self::Double => f64::NCTYPE,
-        }
-    }
-
-    /// `rusty` name of the type
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Byte => "i8",
-            Self::Char => "char",
-            Self::Ubyte => "u8",
-            Self::Short => "i16",
-            Self::Ushort => "u16",
-            Self::Int => "i32",
-            Self::Uint => "u32",
-            Self::Int64 => "i64",
-            Self::Uint64 => "u64",
-            Self::Float => "f32",
-            Self::Double => "f64",
+            Self::Compound(x) => x.size(),
+            Self::Opaque(x) => x.size(),
+            Self::Enum(x) => x.size(),
+            Self::Vlen(x) => x.size(),
+            Self::Int(x) => x.size(),
+            Self::Float(x) => x.size(),
+            Self::String => std::mem::size_of::<*const std::ffi::c_char>(),
+            Self::Char => 1,
         }
     }
 }
 
+/// Opaque blob of bytes with a name
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct OpaqueType {
+    /// Name of type
+    pub name: String,
+    /// Size of type in bytes
+    pub size: usize,
+}
+impl OpaqueType {
+    fn size(&self) -> usize {
+        self.size
+    }
+}
+
+/// Integer type used in `netCDF`
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[allow(missing_docs)]
-impl BasicType {
-    pub fn is_i8(self) -> bool {
-        self == Self::Byte
+pub enum IntType {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+}
+impl IntType {
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    fn size(&self) -> usize {
+        match self {
+            Self::U8 | Self::I8 => 1,
+            Self::U16 | Self::I16 => 2,
+            Self::U32 | Self::I32 => 4,
+            Self::U64 | Self::I64 => 8,
+        }
     }
-    pub fn is_char(self) -> bool {
-        self == Self::Char
+}
+
+/// Floating type used in `netCDF`
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[allow(missing_docs)]
+pub enum FloatType {
+    F32,
+    F64,
+}
+impl FloatType {
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    fn size(&self) -> usize {
+        match self {
+            Self::F32 => 4,
+            Self::F64 => 8,
+        }
     }
-    pub fn is_u8(self) -> bool {
-        self == Self::Ubyte
-    }
-    pub fn is_i16(self) -> bool {
-        self == Self::Short
-    }
-    pub fn is_u16(self) -> bool {
-        self == Self::Ushort
-    }
-    pub fn is_i32(self) -> bool {
-        self == Self::Int
-    }
-    pub fn is_u32(self) -> bool {
-        self == Self::Uint
-    }
-    pub fn is_i64(self) -> bool {
-        self == Self::Int64
-    }
-    pub fn is_u64(self) -> bool {
-        self == Self::Uint64
-    }
-    pub fn is_f32(self) -> bool {
-        self == Self::Float
-    }
-    pub fn is_f64(self) -> bool {
-        self == Self::Double
-    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+/// Field of a compound struct
+pub struct CompoundTypeField {
+    /// Name of the compound field
+    pub name: String,
+    /// Type of the compound field
+    pub basetype: NcVariableType,
+    /// Dimensionality of the compound field (if any)
+    pub arraydims: Option<Vec<usize>>,
+    /// Offset of this field (in bytes) relative to the start
+    /// of the compound
+    pub offset: usize,
 }
 
 #[derive(Clone, Debug)]
-/// A set of bytes which with unspecified endianess
-pub struct OpaqueType {
-    ncid: nc_type,
-    id: nc_type,
-}
-
-impl OpaqueType {
-    /// Get the name of this opaque type
-    pub fn name(&self) -> String {
-        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_opaque(
-                self.ncid,
-                self.id,
-                name.as_mut_ptr().cast(),
-                std::ptr::null_mut(),
-            )
-        }))
-        .unwrap();
-
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
-        String::from_utf8(name[..pos].to_vec()).unwrap()
-    }
-    /// Number of bytes this type occupies
-    pub fn size(&self) -> usize {
-        let mut numbytes = 0;
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_opaque(self.ncid, self.id, std::ptr::null_mut(), &mut numbytes)
-        }))
-        .unwrap();
-        numbytes
-    }
-    pub(crate) fn add(location: nc_type, name: &str, size: usize) -> error::Result<Self> {
-        let name = super::utils::short_name_to_bytes(name)?;
-        let mut id = 0;
-        error::checked(super::with_lock(|| unsafe {
-            nc_def_opaque(location, size, name.as_ptr().cast(), &mut id)
-        }))?;
-
-        Ok(Self { ncid: location, id })
-    }
-}
-
-/// Type of variable length
-#[derive(Debug, Clone)]
-pub struct VlenType {
-    ncid: nc_type,
-    id: nc_type,
-}
-
-impl VlenType {
-    /// Name of the type
-    pub fn name(&self) -> String {
-        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_vlen(
-                self.ncid,
-                self.id,
-                name.as_mut_ptr().cast(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            )
-        }))
-        .unwrap();
-
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
-        String::from_utf8(name[..pos].to_vec()).unwrap()
-    }
-
-    pub(crate) fn add<T>(location: nc_type, name: &str) -> error::Result<Self>
-    where
-        T: super::NcPutGet,
-    {
-        let name = super::utils::short_name_to_bytes(name)?;
-        let mut id = 0;
-        error::checked(super::with_lock(|| unsafe {
-            nc_def_vlen(location, name.as_ptr().cast(), T::NCTYPE, &mut id)
-        }))?;
-
-        Ok(Self { ncid: location, id })
-    }
-
-    /// Internal type
-    pub fn typ(&self) -> BasicType {
-        let mut bastyp = 0;
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_vlen(
-                self.ncid,
-                self.id,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                &mut bastyp,
-            )
-        }))
-        .unwrap();
-
-        match bastyp {
-            NC_BYTE => BasicType::Byte,
-            NC_UBYTE => BasicType::Ubyte,
-            NC_SHORT => BasicType::Short,
-            NC_USHORT => BasicType::Ushort,
-            NC_INT => BasicType::Int,
-            NC_UINT => BasicType::Uint,
-            NC_INT64 => BasicType::Int64,
-            NC_UINT64 => BasicType::Uint64,
-            NC_FLOAT => BasicType::Float,
-            NC_DOUBLE => BasicType::Double,
-            _ => panic!("Did not expect typeid {bastyp} in this context"),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-/// Multiple string values stored as integer type
-pub struct EnumType {
-    ncid: nc_type,
-    id: nc_type,
-}
-
-impl EnumType {
-    pub(crate) fn add<T: super::NcPutGet>(
-        ncid: nc_type,
-        name: &str,
-        mappings: &[(&str, T)],
-    ) -> error::Result<Self> {
-        let name = super::utils::short_name_to_bytes(name)?;
-        let mut id = 0;
-        error::checked(super::with_lock(|| unsafe {
-            nc_def_enum(ncid, T::NCTYPE, name.as_ptr().cast(), &mut id)
-        }))?;
-
-        for (name, val) in mappings {
-            let name = super::utils::short_name_to_bytes(name)?;
-            error::checked(super::with_lock(|| unsafe {
-                nc_insert_enum(ncid, id, name.as_ptr().cast(), (val as *const T).cast())
-            }))?;
-        }
-
-        Ok(Self { ncid, id })
-    }
-
-    /// Get the base type of the enum
-    pub fn typ(&self) -> BasicType {
-        let mut typ = 0;
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_enum(
-                self.ncid,
-                self.id,
-                std::ptr::null_mut(),
-                &mut typ,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            )
-        }))
-        .unwrap();
-        match typ {
-            NC_BYTE => BasicType::Byte,
-            NC_UBYTE => BasicType::Ubyte,
-            NC_SHORT => BasicType::Short,
-            NC_USHORT => BasicType::Ushort,
-            NC_INT => BasicType::Int,
-            NC_UINT => BasicType::Uint,
-            NC_INT64 => BasicType::Int64,
-            NC_UINT64 => BasicType::Uint64,
-            NC_FLOAT => BasicType::Float,
-            NC_DOUBLE => BasicType::Double,
-            _ => panic!("Did not expect typeid {typ} in this context"),
-        }
-    }
-
-    /// Get a single member from an index
-    ///
-    /// # Safety
-    /// Does not check type of enum
-    unsafe fn member_at<T: super::NcPutGet>(&self, idx: usize) -> error::Result<(String, T)> {
-        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
-        let mut t = std::mem::MaybeUninit::<T>::uninit();
-        let idx = idx.try_into()?;
-        super::with_lock(|| {
-            nc_inq_enum_member(
-                self.ncid,
-                self.id,
-                idx,
-                name.as_mut_ptr().cast(),
-                t.as_mut_ptr().cast(),
-            )
-        });
-
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
-        let name = String::from_utf8(name[..pos].to_vec()).unwrap();
-        Ok((name, t.assume_init()))
-    }
-
-    /// Get all members of the enum
-    pub fn members<T: super::NcPutGet>(
-        &self,
-    ) -> error::Result<impl Iterator<Item = (String, T)> + '_> {
-        let mut typ = 0;
-        let mut nummembers = 0;
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_enum(
-                self.ncid,
-                self.id,
-                std::ptr::null_mut(),
-                &mut typ,
-                std::ptr::null_mut(),
-                &mut nummembers,
-            )
-        }))
-        .unwrap();
-        if typ != T::NCTYPE {
-            return Err(error::Error::TypeMismatch);
-        }
-
-        Ok((0..nummembers).map(move |idx| unsafe { self.member_at::<T>(idx) }.unwrap()))
-    }
-
-    /// Name of the type
-    pub fn name(&self) -> String {
-        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_enum(
-                self.ncid,
-                self.id,
-                name.as_mut_ptr().cast(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            )
-        }))
-        .unwrap();
-
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
-        String::from_utf8(name[..pos].to_vec()).unwrap()
-    }
-
-    /// Get the name from the enum value
-    pub fn name_from_value(&self, value: i64) -> Option<String> {
-        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
-        let e = super::with_lock(|| unsafe {
-            nc_inq_enum_ident(self.ncid, self.id, value, name.as_mut_ptr().cast())
-        });
-        if e == NC_EINVAL {
-            return None;
-        }
-
-        error::checked(e).unwrap();
-
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
-        Some(String::from_utf8(name[..pos].to_vec()).unwrap())
-    }
-
-    /// Size in bytes of this type
-    fn size(&self) -> usize {
-        self.typ().size()
-    }
-}
-
-/// A type consisting of other types
-#[derive(Debug, Clone)]
+/// Compound/record type
 pub struct CompoundType {
-    ncid: nc_type,
-    id: nc_type,
+    /// Name of the compound
+    pub name: String,
+    /// Size in bytes of the compound
+    pub size: usize,
+    /// Fields of the compound
+    pub fields: Vec<CompoundTypeField>,
 }
-
 impl CompoundType {
-    pub(crate) fn add(ncid: nc_type, name: &str) -> error::Result<CompoundBuilder> {
-        let name = super::utils::short_name_to_bytes(name)?;
-
-        Ok(CompoundBuilder {
-            ncid,
-            name,
-            size: 0,
-            comp: Vec::new(),
-        })
-    }
-
-    /// Size in bytes of this type
     fn size(&self) -> usize {
-        let mut size = 0;
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound(
-                self.ncid,
-                self.id,
-                std::ptr::null_mut(),
-                &mut size,
-                std::ptr::null_mut(),
-            )
-        }))
-        .unwrap();
-        size
-    }
-
-    /// Get the name of this type
-    pub fn name(&self) -> String {
-        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound(
-                self.ncid,
-                self.id,
-                name.as_mut_ptr().cast(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            )
-        }))
-        .unwrap();
-
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
-        String::from_utf8(name[..pos].to_vec()).unwrap()
-    }
-
-    /// Get the fields of the compound
-    pub fn fields(&self) -> impl Iterator<Item = CompoundField> {
-        let ncid = self.ncid;
-        let parent_id = self.id;
-
-        let mut nfields = 0;
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_nfields(ncid, parent_id, &mut nfields)
-        }))
-        .unwrap();
-
-        (0..nfields).map(move |x| CompoundField {
-            ncid,
-            parent: parent_id,
-            id: x,
-        })
+        self.size
     }
 }
 
-/// Subfield of a compound
-pub struct CompoundField {
-    ncid: nc_type,
-    parent: nc_type,
-    id: usize,
-}
-
-impl CompoundField {
-    /// Name of the compound field
-    pub fn name(&self) -> String {
-        let mut name = [0_u8; NC_MAX_NAME as usize + 1];
-        let idx = self.id.try_into().unwrap();
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_fieldname(self.ncid, self.parent, idx, name.as_mut_ptr().cast())
-        }))
-        .unwrap();
-
-        let pos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
-        String::from_utf8(name[..pos].to_vec()).unwrap()
-    }
-
-    /// type of the field
-    pub fn typ(&self) -> VariableType {
-        let mut typ = 0;
-        let id = self.id.try_into().unwrap();
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_fieldtype(self.ncid, self.parent, id, &mut typ)
-        }))
-        .unwrap();
-
-        VariableType::from_id(self.ncid, typ).unwrap()
-    }
-
-    /// Offset in bytes of this field in the compound type
-    pub fn offset(&self) -> usize {
-        let mut offset = 0;
-        let id = self.id.try_into().unwrap();
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_field(
-                self.ncid,
-                self.parent,
-                id,
-                std::ptr::null_mut(),
-                &mut offset,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            )
-        }))
-        .unwrap();
-
-        offset
-    }
-
-    /// Get dimensionality of this compound field
-    pub fn dimensions(&self) -> Option<Vec<usize>> {
-        let mut num_dims = 0;
-        let id = self.id.try_into().unwrap();
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_fieldndims(self.ncid, self.parent, id, &mut num_dims)
-        }))
-        .unwrap();
-
-        if num_dims == 0 {
-            return None;
+impl PartialEq for CompoundType {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name != other.name {
+            return false;
         }
-
-        let mut dims = vec![0; num_dims.try_into().unwrap()];
-        error::checked(super::with_lock(|| unsafe {
-            nc_inq_compound_fielddim_sizes(self.ncid, self.parent, id, dims.as_mut_ptr())
-        }))
-        .unwrap();
-
-        Some(dims.iter().map(|&x| x.try_into().unwrap()).collect())
+        if self.fields.len() != other.fields.len() {
+            return false;
+        }
+        if self.size() != other.size() {
+            return false;
+        }
+        if self.fields.is_empty() {
+            return true;
+        }
+        if self.fields == other.fields {
+            return true;
+        }
+        // Check if fields are equal if ordered differently
+        // by checking each element against the other,
+        // done both ways to ensure each element has a match
+        if !self
+            .fields
+            .iter()
+            .all(|x| other.fields.iter().any(|y| x == y))
+        {
+            return false;
+        }
+        other
+            .fields
+            .iter()
+            .all(|x| self.fields.iter().any(|y| x == y))
     }
 }
 
-/// A builder for a compound type
-#[must_use]
-pub struct CompoundBuilder {
-    ncid: nc_type,
-    name: [u8; NC_MAX_NAME as usize + 1],
-    size: usize,
-    comp: Vec<(
-        VariableType,
-        [u8; NC_MAX_NAME as usize + 1],
-        Option<Vec<i32>>,
-    )>,
+impl Eq for CompoundType {}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+/// Inner values of the enum type
+///
+/// `netCDF` only supports integer types
+#[allow(missing_docs)]
+pub enum EnumTypeValues {
+    U8(Vec<u8>),
+    U16(Vec<u16>),
+    U32(Vec<u32>),
+    U64(Vec<u64>),
+    I8(Vec<i8>),
+    I16(Vec<i16>),
+    I32(Vec<i32>),
+    I64(Vec<i64>),
 }
-
-impl CompoundBuilder {
-    /// Add a type to the compound
-    pub fn add_type(&mut self, name: &str, var: &VariableType) -> error::Result<&mut Self> {
-        self.comp
-            .push((var.clone(), super::utils::short_name_to_bytes(name)?, None));
-
-        self.size += var.size();
-        Ok(self)
+impl EnumTypeValues {
+    /// Inner type of the enum
+    fn nc_type(&self) -> netcdf_sys::nc_type {
+        use netcdf_sys::*;
+        match self {
+            Self::U8(_) => NC_UBYTE,
+            Self::I8(_) => NC_BYTE,
+            Self::U16(_) => NC_USHORT,
+            Self::I16(_) => NC_SHORT,
+            Self::U32(_) => NC_UINT,
+            Self::I32(_) => NC_INT,
+            Self::U64(_) => NC_UINT64,
+            Self::I64(_) => NC_INT64,
+        }
     }
-
-    /// Add a basic numeric type
-    pub fn add<T: super::NcPutGet>(&mut self, name: &str) -> error::Result<&mut Self> {
-        let var = VariableType::from_id(self.ncid, T::NCTYPE)?;
-        self.add_type(name, &var)
-    }
-
-    /// Add an array of a basic type
-    pub fn add_array<T: super::NcPutGet>(
-        &mut self,
-        name: &str,
-        dims: &[usize],
-    ) -> error::Result<&mut Self> {
-        let var = VariableType::from_id(self.ncid, T::NCTYPE)?;
-        self.add_array_type(name, &var, dims)
-    }
-
-    /// Add a type as an array
-    pub fn add_array_type(
-        &mut self,
-        name: &str,
-        var: &VariableType,
-        dims: &[usize],
-    ) -> error::Result<&mut Self> {
-        self.comp.push((
-            var.clone(),
-            super::utils::short_name_to_bytes(name)?,
-            Some(dims.iter().map(|&x| x.try_into().unwrap()).collect()),
-        ));
-
-        self.size += var.size() * dims.iter().product::<usize>();
-        Ok(self)
-    }
-
-    /// Finalize the compound type
-    pub fn build(self) -> error::Result<CompoundType> {
-        let mut id = 0;
-        error::checked(super::with_lock(|| unsafe {
-            nc_def_compound(self.ncid, self.size, self.name.as_ptr().cast(), &mut id)
-        }))?;
-
-        let mut offset = 0;
-        for (typ, name, dims) in &self.comp {
-            match dims {
-                None => {
-                    error::checked(super::with_lock(|| unsafe {
-                        nc_insert_compound(self.ncid, id, name.as_ptr().cast(), offset, typ.id())
-                    }))?;
-                    offset += typ.size();
-                }
-                Some(dims) => {
-                    let dimlen = dims.len().try_into().unwrap();
-                    error::checked(super::with_lock(|| unsafe {
-                        nc_insert_array_compound(
-                            self.ncid,
-                            id,
-                            name.as_ptr().cast(),
-                            offset,
-                            typ.id(),
-                            dimlen,
-                            dims.as_ptr(),
-                        )
-                    }))?;
-                    offset += typ.size()
-                        * dims
-                            .iter()
-                            .map(|x: &i32| -> usize { (*x).try_into().unwrap() })
-                            .product::<usize>();
-                }
+}
+macro_rules! from_vec {
+    ($ty: ty, $item: expr) => {
+        impl From<Vec<$ty>> for EnumTypeValues {
+            fn from(v: Vec<$ty>) -> Self {
+                $item(v)
             }
         }
-
-        Ok(CompoundType {
-            ncid: self.ncid,
-            id,
-        })
-    }
+    };
 }
+from_vec!(u8, Self::U8);
+from_vec!(u16, Self::U16);
+from_vec!(u32, Self::U32);
+from_vec!(u64, Self::U64);
+from_vec!(i8, Self::I8);
+from_vec!(i16, Self::I16);
+from_vec!(i32, Self::I32);
+from_vec!(i64, Self::I64);
 
-/// Description of the variable
-#[derive(Debug, Clone)]
-pub enum VariableType {
-    /// A basic numeric type
-    Basic(BasicType),
-    /// A string type
-    String,
-    /// Some bytes
-    Opaque(OpaqueType),
-    /// Variable length array
-    Vlen(VlenType),
-    /// Enum type
-    Enum(EnumType),
-    /// Compound type
-    Compound(CompoundType),
+#[derive(Clone, Debug)]
+/// Enum type
+pub struct EnumType {
+    /// Name of enum
+    pub name: String,
+    /// Name of enumeration fields
+    pub fieldnames: Vec<String>,
+    /// Values of enumeration fields
+    pub fieldvalues: EnumTypeValues,
 }
-
-impl VariableType {
-    /// Get the basic type, if this type is a simple numeric type
-    pub fn as_basic(&self) -> Option<BasicType> {
-        match self {
-            Self::Basic(x) => Some(*x),
-            _ => None,
-        }
-    }
-
-    /// Size in bytes of the type
-    pub(crate) fn size(&self) -> usize {
-        match self {
-            Self::Basic(b) => b.size(),
-            Self::String => panic!("A string does not have a defined size"),
-            Self::Enum(e) => e.size(),
-            Self::Opaque(o) => o.size(),
-            Self::Vlen(_) => panic!("A variable length array does not have a defined size"),
-            Self::Compound(c) => c.size(),
-        }
-    }
-
-    /// Id of this type
-    pub(crate) fn id(&self) -> nc_type {
-        match self {
-            Self::Basic(b) => b.id(),
-            Self::String => NC_STRING,
-            Self::Enum(e) => e.id,
-            Self::Opaque(o) => o.id,
-            Self::Vlen(v) => v.id,
-            Self::Compound(c) => c.id,
-        }
-    }
-
-    /// Get the name of the type. The basic numeric types will
-    /// have `rusty` names (u8/i32/f64/string)
-    pub fn name(&self) -> String {
-        match self {
-            Self::Basic(b) => b.name().into(),
-            Self::String => "string".into(),
-            Self::Enum(e) => e.name(),
-            Self::Opaque(o) => o.name(),
-            Self::Vlen(v) => v.name(),
-            Self::Compound(c) => c.name(),
+impl EnumType {
+    /// Size of enum in bytes
+    fn size(&self) -> usize {
+        match self.fieldvalues {
+            EnumTypeValues::U8(_) | EnumTypeValues::I8(_) => 1,
+            EnumTypeValues::U16(_) | EnumTypeValues::I16(_) => 2,
+            EnumTypeValues::U32(_) | EnumTypeValues::I32(_) => 4,
+            EnumTypeValues::U64(_) | EnumTypeValues::I64(_) => 8,
         }
     }
 }
 
+impl PartialEq for EnumType {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name != other.name {
+            return false;
+        }
+        if self.fieldnames.len() != other.fieldnames.len() {
+            return false;
+        }
+        if self.fieldnames.is_empty() {
+            return true;
+        }
+        if self.fieldnames == other.fieldnames && self.fieldvalues == other.fieldvalues {
+            return true;
+        }
+
+        // Check for enum fields ordered differently
+        macro_rules! enumtype {
+            ($x: expr, $y: expr) => {{
+                if !self.fieldnames.iter().zip($x).all(|(x, sname)| {
+                    other
+                        .fieldnames
+                        .iter()
+                        .zip($y)
+                        .any(|(y, oname)| sname == oname && x == y)
+                }) {
+                    return false;
+                }
+                other.fieldnames.iter().zip($y).all(|(y, oname)| {
+                    self.fieldnames
+                        .iter()
+                        .zip($x)
+                        .any(|(x, sname)| sname == oname && x == y)
+                })
+            }};
+        }
+        match (&self.fieldvalues, &other.fieldvalues) {
+            (EnumTypeValues::U8(x), EnumTypeValues::U8(y)) => enumtype!(x, y),
+            (EnumTypeValues::U16(x), EnumTypeValues::U16(y)) => enumtype!(x, y),
+            (EnumTypeValues::U32(x), EnumTypeValues::U32(y)) => enumtype!(x, y),
+            (EnumTypeValues::U64(x), EnumTypeValues::U64(y)) => enumtype!(x, y),
+            (EnumTypeValues::I8(x), EnumTypeValues::I8(y)) => enumtype!(x, y),
+            (EnumTypeValues::I16(x), EnumTypeValues::I16(y)) => enumtype!(x, y),
+            (EnumTypeValues::I32(x), EnumTypeValues::I32(y)) => enumtype!(x, y),
+            (EnumTypeValues::I64(x), EnumTypeValues::I64(y)) => enumtype!(x, y),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for EnumType {}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+/// Ragged array
+pub struct VlenType {
+    /// Name of type
+    pub name: String,
+    /// Inner type of array
+    pub basetype: Box<NcVariableType>,
+}
+impl VlenType {
+    #[allow(clippy::unused_self)]
+    /// Size in bytes
+    fn size(&self) -> usize {
+        std::mem::size_of::<netcdf_sys::nc_vlen_t>()
+    }
+}
+
+macro_rules! impl_basic {
+    ($ty: ty, $item: expr) => {
+        unsafe impl NcTypeDescriptor for $ty {
+            fn type_descriptor() -> NcVariableType {
+                $item
+            }
+        }
+    };
+}
+
+#[rustfmt::skip]
+impl_basic!(u8, NcVariableType::Int(IntType::U8));
+#[rustfmt::skip]
+impl_basic!(u16, NcVariableType::Int(IntType::U16));
+#[rustfmt::skip]
+impl_basic!(u32, NcVariableType::Int(IntType::U32));
+#[rustfmt::skip]
+impl_basic!(u64, NcVariableType::Int(IntType::U64));
+#[rustfmt::skip]
+impl_basic!(i8, NcVariableType::Int(IntType::I8));
+#[rustfmt::skip]
+impl_basic!(i16, NcVariableType::Int(IntType::I16));
+#[rustfmt::skip]
+impl_basic!(i32, NcVariableType::Int(IntType::I32));
+#[rustfmt::skip]
+impl_basic!(i64, NcVariableType::Int(IntType::I64));
+#[rustfmt::skip]
+impl_basic!(f32, NcVariableType::Float(FloatType::F32));
+#[rustfmt::skip]
+impl_basic!(f64, NcVariableType::Float(FloatType::F64));
+
+#[doc(hidden)]
 #[allow(missing_docs)]
-impl VariableType {
-    pub fn is_string(&self) -> bool {
-        matches!(self, Self::String)
-    }
-    pub fn is_i8(&self) -> bool {
-        self.as_basic().map_or(false, BasicType::is_i8)
-    }
-    pub fn is_u8(&self) -> bool {
-        self.as_basic().map_or(false, BasicType::is_u8)
-    }
-    pub fn is_i16(&self) -> bool {
-        self.as_basic().map_or(false, BasicType::is_i16)
-    }
-    pub fn is_u16(&self) -> bool {
-        self.as_basic().map_or(false, BasicType::is_u16)
-    }
-    pub fn is_i32(&self) -> bool {
-        self.as_basic().map_or(false, BasicType::is_i32)
-    }
-    pub fn is_u32(&self) -> bool {
-        self.as_basic().map_or(false, BasicType::is_u32)
-    }
-    pub fn is_i64(&self) -> bool {
-        self.as_basic().map_or(false, BasicType::is_i64)
-    }
-    pub fn is_u64(&self) -> bool {
-        self.as_basic().map_or(false, BasicType::is_u64)
-    }
-    pub fn is_f32(&self) -> bool {
-        self.as_basic().map_or(false, BasicType::is_f32)
-    }
-    pub fn is_f64(&self) -> bool {
-        self.as_basic().map_or(false, BasicType::is_f64)
+#[derive(Copy, Clone, Debug)]
+pub enum ArrayElements {
+    None,
+    One([usize; 1]),
+    Two([usize; 2]),
+    Three([usize; 3]),
+}
+
+impl ArrayElements {
+    pub fn as_dims(&self) -> Option<&[usize]> {
+        match self {
+            Self::None => None,
+            Self::One(x) => Some(x.as_slice()),
+            Self::Two(x) => Some(x.as_slice()),
+            Self::Three(x) => Some(x.as_slice()),
+        }
     }
 }
 
-impl VariableType {
-    /// Get the variable type from the id
-    pub(crate) fn from_id(ncid: nc_type, xtype: nc_type) -> error::Result<Self> {
-        match xtype {
-            NC_CHAR => Ok(Self::Basic(BasicType::Char)),
-            NC_BYTE => Ok(Self::Basic(BasicType::Byte)),
-            NC_UBYTE => Ok(Self::Basic(BasicType::Ubyte)),
-            NC_SHORT => Ok(Self::Basic(BasicType::Short)),
-            NC_USHORT => Ok(Self::Basic(BasicType::Ushort)),
-            NC_INT => Ok(Self::Basic(BasicType::Int)),
-            NC_UINT => Ok(Self::Basic(BasicType::Uint)),
-            NC_INT64 => Ok(Self::Basic(BasicType::Int64)),
-            NC_UINT64 => Ok(Self::Basic(BasicType::Uint64)),
-            NC_FLOAT => Ok(Self::Basic(BasicType::Float)),
-            NC_DOUBLE => Ok(Self::Basic(BasicType::Double)),
-            NC_STRING => Ok(Self::String),
-            xtype => {
-                let mut base_xtype = 0;
-                error::checked(super::with_lock(|| unsafe {
-                    nc_inq_user_type(
+macro_rules! impl_arrayed {
+    ($typ: ty) => {
+        #[doc(hidden)]
+        unsafe impl<const N: usize> NcTypeDescriptor for [$typ; N] {
+            fn type_descriptor() -> NcVariableType {
+                <$typ as NcTypeDescriptor>::type_descriptor()
+            }
+            const ARRAY_ELEMENTS: ArrayElements = ArrayElements::One([N]);
+        }
+        #[doc(hidden)]
+        unsafe impl<const N: usize, const M: usize> NcTypeDescriptor for [[$typ; N]; M] {
+            fn type_descriptor() -> NcVariableType {
+                <$typ as NcTypeDescriptor>::type_descriptor()
+            }
+            const ARRAY_ELEMENTS: ArrayElements = ArrayElements::Two([N, M]);
+        }
+        #[doc(hidden)]
+        unsafe impl<const N: usize, const M: usize, const L: usize> NcTypeDescriptor
+            for [[[$typ; N]; M]; L]
+        {
+            fn type_descriptor() -> NcVariableType {
+                <$typ as NcTypeDescriptor>::type_descriptor()
+            }
+            const ARRAY_ELEMENTS: ArrayElements = ArrayElements::Three([N, M, L]);
+        }
+    };
+}
+
+impl_arrayed!(u8);
+impl_arrayed!(u16);
+impl_arrayed!(u32);
+impl_arrayed!(u64);
+impl_arrayed!(i8);
+impl_arrayed!(i16);
+impl_arrayed!(i32);
+impl_arrayed!(i64);
+impl_arrayed!(f32);
+impl_arrayed!(f64);
+
+/// Find a type from a given descriptor
+pub(crate) fn find_type(ncid: nc_type, typ: &NcVariableType) -> Result<Option<nc_type>> {
+    match *typ {
+        NcVariableType::Int(IntType::U8) => return Ok(Some(NC_UBYTE)),
+        NcVariableType::Int(IntType::I8) => return Ok(Some(NC_BYTE)),
+        NcVariableType::Int(IntType::U16) => return Ok(Some(NC_USHORT)),
+        NcVariableType::Int(IntType::I16) => return Ok(Some(NC_SHORT)),
+        NcVariableType::Int(IntType::U32) => return Ok(Some(NC_UINT)),
+        NcVariableType::Int(IntType::I32) => return Ok(Some(NC_INT)),
+        NcVariableType::Int(IntType::U64) => return Ok(Some(NC_UINT64)),
+        NcVariableType::Int(IntType::I64) => return Ok(Some(NC_INT64)),
+        NcVariableType::Float(FloatType::F32) => return Ok(Some(NC_FLOAT)),
+        NcVariableType::Float(FloatType::F64) => return Ok(Some(NC_DOUBLE)),
+        NcVariableType::String => return Ok(Some(NC_STRING)),
+        NcVariableType::Char => return Ok(Some(NC_CHAR)),
+        _ => {}
+    }
+
+    let name = match &typ {
+        NcVariableType::Compound(x) => &x.name,
+        NcVariableType::Opaque(x) => &x.name,
+        NcVariableType::Enum(x) => &x.name,
+        NcVariableType::Vlen(x) => &x.name,
+        _ => unreachable!(),
+    };
+
+    let mut typid = 0;
+    let name = crate::utils::short_name_to_bytes(name)?;
+    let e = checked_with_lock(|| unsafe {
+        netcdf_sys::nc_inq_typeid(ncid, name.as_ptr().cast(), &mut typid)
+    });
+    if matches!(e, Err(crate::Error::Netcdf(netcdf_sys::NC_EBADTYPE))) {
+        return Ok(None);
+    }
+    let candidate = read_type(ncid, typid)?;
+    if &candidate != typ {
+        return Err("Found type with that name, but it was not the correct type definition".into());
+    }
+    Ok(Some(typid))
+}
+
+/// Add a type from the given descriptor
+pub(crate) fn add_type(ncid: nc_type, typ: NcVariableType, recursive: bool) -> Result<nc_type> {
+    match typ {
+        NcVariableType::Int(_)
+        | NcVariableType::Float(_)
+        | NcVariableType::String
+        | NcVariableType::Char => Err("basic type can not be added".into()),
+        NcVariableType::Opaque(x) => {
+            let name = crate::utils::short_name_to_bytes(&x.name)?;
+            let mut id = 0;
+            checked_with_lock(|| unsafe {
+                netcdf_sys::nc_def_opaque(ncid, x.size, name.as_ptr().cast(), &mut id)
+            })?;
+            Ok(id)
+        }
+        NcVariableType::Vlen(x) => {
+            let mut id = 0;
+            let name = crate::utils::short_name_to_bytes(&x.name)?;
+
+            let othertype = find_type(ncid, &x.basetype)?;
+            let othertype = if let Some(x) = othertype {
+                x
+            } else if recursive {
+                add_type(ncid, *(x.basetype), recursive)?
+            } else {
+                return Err("Type not found".into());
+            };
+            // let basetype = find_type(ncid, &*x.name)?.expect("No type found");
+            // let othertyp = read_type(ncid, x.basetype)?;
+
+            checked_with_lock(|| unsafe {
+                netcdf_sys::nc_def_vlen(ncid, name.as_ptr().cast(), othertype, &mut id)
+            })?;
+            Ok(id)
+        }
+        NcVariableType::Enum(EnumType {
+            name,
+            fieldnames,
+            fieldvalues,
+        }) => {
+            let mut id = 0;
+            let name = crate::utils::short_name_to_bytes(&name)?;
+            let basetyp = fieldvalues.nc_type();
+            checked_with_lock(|| unsafe {
+                netcdf_sys::nc_def_enum(ncid, basetyp, name.as_ptr().cast(), &mut id)
+            })?;
+
+            macro_rules! write_fieldvalues {
+                ($ty: ty, $x: expr) => {{
+                    for (name, value) in fieldnames.iter().zip(&$x) {
+                        let name = crate::utils::short_name_to_bytes(&name)?;
+                        checked_with_lock(|| unsafe {
+                            netcdf_sys::nc_insert_enum(
+                                ncid,
+                                id,
+                                name.as_ptr().cast(),
+                                (value as *const $ty).cast(),
+                            )
+                        })?;
+                    }
+                }};
+            }
+
+            match fieldvalues {
+                EnumTypeValues::U8(x) => write_fieldvalues!(u8, x),
+                EnumTypeValues::I8(x) => write_fieldvalues!(i8, x),
+                EnumTypeValues::U16(x) => write_fieldvalues!(u16, x),
+                EnumTypeValues::I16(x) => write_fieldvalues!(i16, x),
+                EnumTypeValues::U32(x) => write_fieldvalues!(u32, x),
+                EnumTypeValues::I32(x) => write_fieldvalues!(i32, x),
+                EnumTypeValues::U64(x) => write_fieldvalues!(u64, x),
+                EnumTypeValues::I64(x) => write_fieldvalues!(i64, x),
+            }
+
+            Ok(id)
+        }
+        NcVariableType::Compound(x) => {
+            let mut xtypes = Vec::with_capacity(x.fields.len());
+            for f in &x.fields {
+                let xtype = find_type(ncid, &f.basetype)?;
+                let xtype = match (recursive, xtype) {
+                    (_, Some(xtype)) => xtype,
+                    (true, None) => add_type(ncid, f.basetype.clone(), recursive)?,
+                    (false, None) => return Err("Could not find subtype".into()),
+                };
+                xtypes.push(xtype);
+            }
+            let mut id = 0;
+            let name = crate::utils::short_name_to_bytes(&x.name)?;
+            checked_with_lock(|| unsafe {
+                netcdf_sys::nc_def_compound(ncid, x.size(), name.as_ptr().cast(), &mut id)
+            })?;
+
+            // Find all subtypes, check if compatible, add if necessary
+            for (f, xtype) in x.fields.iter().zip(xtypes) {
+                let fieldname = crate::utils::short_name_to_bytes(&f.name)?;
+                match f.arraydims {
+                    None => checked_with_lock(|| unsafe {
+                        netcdf_sys::nc_insert_compound(
+                            ncid,
+                            id,
+                            fieldname.as_ptr().cast(),
+                            f.offset,
+                            xtype,
+                        )
+                    })?,
+                    Some(ref x) => {
+                        let ndims = x.len() as _;
+                        let dims = x.iter().map(|&x| x as _).collect::<Vec<_>>();
+                        checked_with_lock(|| unsafe {
+                            netcdf_sys::nc_insert_array_compound(
+                                ncid,
+                                id,
+                                fieldname.as_ptr().cast(),
+                                f.offset,
+                                xtype,
+                                ndims,
+                                dims.as_ptr(),
+                            )
+                        })?
+                    }
+                }
+            }
+            Ok(id)
+        }
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+/// Read a type and return the descriptor belonging to the id of the type
+pub(crate) fn read_type(ncid: nc_type, xtype: nc_type) -> Result<NcVariableType> {
+    match xtype {
+        NC_UBYTE => return Ok(NcVariableType::Int(IntType::U8)),
+        NC_BYTE => return Ok(NcVariableType::Int(IntType::I8)),
+        NC_USHORT => return Ok(NcVariableType::Int(IntType::U16)),
+        NC_SHORT => return Ok(NcVariableType::Int(IntType::I16)),
+        NC_UINT => return Ok(NcVariableType::Int(IntType::U32)),
+        NC_INT => return Ok(NcVariableType::Int(IntType::I32)),
+        NC_UINT64 => return Ok(NcVariableType::Int(IntType::U64)),
+        NC_INT64 => return Ok(NcVariableType::Int(IntType::I64)),
+        NC_FLOAT => return Ok(NcVariableType::Float(FloatType::F32)),
+        NC_DOUBLE => return Ok(NcVariableType::Float(FloatType::F64)),
+        NC_STRING => return Ok(NcVariableType::String),
+        NC_CHAR => return Ok(NcVariableType::Char),
+        _ => {}
+    }
+    let mut base_xtype = 0;
+    let mut name = [0_u8; NC_MAX_NAME as usize + 1];
+    let mut size = 0;
+    let mut base_enum_type = 0;
+    let mut fieldmembers = 0;
+    checked_with_lock(|| unsafe {
+        netcdf_sys::nc_inq_user_type(
+            ncid,
+            xtype,
+            name.as_mut_ptr().cast(),
+            &mut size,
+            &mut base_enum_type,
+            &mut fieldmembers,
+            &mut base_xtype,
+        )
+    })?;
+    let name = std::ffi::CStr::from_bytes_until_nul(name.as_ref())
+        .unwrap()
+        .to_str()
+        .unwrap();
+    match base_xtype {
+        NC_VLEN => {
+            let basetype = read_type(ncid, base_enum_type)?;
+            Ok(NcVariableType::Vlen(VlenType {
+                name: name.to_owned(),
+                basetype: Box::new(basetype),
+            }))
+        }
+        NC_OPAQUE => Ok(NcVariableType::Opaque(OpaqueType {
+            name: name.to_owned(),
+            size,
+        })),
+        NC_ENUM => {
+            let mut fieldnames = vec![];
+            for idx in 0..fieldmembers {
+                let mut cname = [0_u8; NC_MAX_NAME as usize + 1];
+                let idx = idx.try_into().unwrap();
+                checked_with_lock(|| unsafe {
+                    netcdf_sys::nc_inq_enum_member(
                         ncid,
                         xtype,
+                        idx,
+                        cname.as_mut_ptr().cast(),
                         std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                        &mut base_xtype,
                     )
-                }))?;
-                match base_xtype {
-                    NC_VLEN => Ok(VlenType { ncid, id: xtype }.into()),
-                    NC_OPAQUE => Ok(OpaqueType { ncid, id: xtype }.into()),
-                    NC_ENUM => Ok(EnumType { ncid, id: xtype }.into()),
-                    NC_COMPOUND => Ok(CompoundType { ncid, id: xtype }.into()),
-                    _ => panic!("Unexpected base type: {base_xtype}"),
-                }
+                })?;
+                let cstr = std::ffi::CStr::from_bytes_until_nul(cname.as_slice()).unwrap();
+                fieldnames.push(cstr.to_str().unwrap().to_owned());
             }
+            macro_rules! read_fieldvalues {
+                ($ty: ty) => {{
+                    let mut values = vec![0 as $ty; fieldmembers];
+                    for (idx, value) in values.iter_mut().enumerate() {
+                        checked_with_lock(|| unsafe {
+                            netcdf_sys::nc_inq_enum_member(
+                                ncid,
+                                xtype,
+                                idx as _,
+                                std::ptr::null_mut(),
+                                (value as *mut $ty).cast(),
+                            )
+                        })?;
+                    }
+                    values.into()
+                }};
+            }
+            let fieldvalues = match base_enum_type {
+                NC_BYTE => {
+                    read_fieldvalues!(i8)
+                }
+                NC_UBYTE => {
+                    read_fieldvalues!(u8)
+                }
+                NC_SHORT => {
+                    read_fieldvalues!(i16)
+                }
+                NC_USHORT => {
+                    read_fieldvalues!(u16)
+                }
+                NC_INT => {
+                    read_fieldvalues!(i32)
+                }
+                NC_UINT => {
+                    read_fieldvalues!(u32)
+                }
+                NC_INT64 => {
+                    read_fieldvalues!(i64)
+                }
+                NC_UINT64 => {
+                    read_fieldvalues!(u64)
+                }
+                _ => unreachable!("netCDF does not support {base_enum_type} as type in enum"),
+            };
+            Ok(NcVariableType::Enum(EnumType {
+                name: name.to_owned(),
+                fieldnames,
+                fieldvalues,
+            }))
         }
+        NC_COMPOUND => {
+            let mut fields = vec![];
+            for fieldid in 0..fieldmembers {
+                let mut fieldname = [0; NC_MAX_NAME as usize + 1];
+                let mut fieldtype = 0;
+                let mut ndims = 0;
+                let mut arraydims = None;
+                let mut offset = 0;
+                let fieldid = fieldid.try_into().unwrap();
+                checked_with_lock(|| unsafe {
+                    netcdf_sys::nc_inq_compound_field(
+                        ncid,
+                        xtype,
+                        fieldid,
+                        fieldname.as_mut_ptr().cast(),
+                        &mut offset,
+                        &mut fieldtype,
+                        &mut ndims,
+                        std::ptr::null_mut(),
+                    )
+                })?;
+                if ndims != 0 {
+                    let mut dimsizes = vec![0; ndims.try_into().unwrap()];
+                    checked_with_lock(|| unsafe {
+                        netcdf_sys::nc_inq_compound_fielddim_sizes(
+                            ncid,
+                            xtype,
+                            fieldid,
+                            dimsizes.as_mut_ptr(),
+                        )
+                    })?;
+                    arraydims = Some(dimsizes.iter().map(|&x| x.try_into().unwrap()).collect());
+                }
+                let fieldname = std::ffi::CStr::from_bytes_until_nul(fieldname.as_slice()).unwrap();
+
+                fields.push(CompoundTypeField {
+                    name: fieldname.to_str().unwrap().to_owned(),
+                    basetype: read_type(ncid, fieldtype)?,
+                    arraydims,
+                    offset,
+                });
+            }
+            Ok(NcVariableType::Compound(CompoundType {
+                name: name.to_owned(),
+                size,
+                fields,
+            }))
+        }
+        _ => panic!("Unexcepted base type {base_xtype}"),
     }
 }
 
+/// Find all user-defined types at the location
 pub(crate) fn all_at_location(
     ncid: nc_type,
-) -> error::Result<impl Iterator<Item = error::Result<VariableType>>> {
+) -> Result<impl Iterator<Item = Result<NcVariableType>>> {
     let typeids = {
         let mut num_typeids = 0;
-        error::checked(with_lock(|| unsafe {
-            nc_inq_typeids(ncid, &mut num_typeids, std::ptr::null_mut())
-        }))?;
+        checked_with_lock(|| unsafe {
+            netcdf_sys::nc_inq_typeids(ncid, &mut num_typeids, std::ptr::null_mut())
+        })?;
         let mut typeids = vec![0; num_typeids.try_into()?];
-        error::checked(with_lock(|| unsafe {
-            nc_inq_typeids(ncid, std::ptr::null_mut(), typeids.as_mut_ptr())
-        }))?;
+        checked_with_lock(|| unsafe {
+            netcdf_sys::nc_inq_typeids(ncid, std::ptr::null_mut(), typeids.as_mut_ptr())
+        })?;
         typeids
     };
-    Ok(typeids
-        .into_iter()
-        .map(move |x| VariableType::from_id(ncid, x)))
+    Ok(typeids.into_iter().map(move |x| read_type(ncid, x)))
 }
 
-impl From<CompoundType> for VariableType {
-    fn from(v: CompoundType) -> Self {
-        Self::Compound(v)
-    }
-}
-
-impl From<BasicType> for VariableType {
-    fn from(v: BasicType) -> Self {
-        Self::Basic(v)
-    }
-}
-
-impl From<EnumType> for VariableType {
-    fn from(v: EnumType) -> Self {
-        Self::Enum(v)
-    }
-}
-
-impl From<VlenType> for VariableType {
-    fn from(v: VlenType) -> Self {
-        Self::Vlen(v)
-    }
-}
-
-impl From<OpaqueType> for VariableType {
-    fn from(v: OpaqueType) -> Self {
-        Self::Opaque(v)
+#[repr(transparent)]
+/// `NC_STRING` compatible struct, no drop implementation, use with caution
+pub(crate) struct NcString(pub(crate) *mut std::ffi::c_char);
+unsafe impl NcTypeDescriptor for NcString {
+    fn type_descriptor() -> NcVariableType {
+        NcVariableType::String
     }
 }

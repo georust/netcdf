@@ -7,6 +7,7 @@ on:
       - "netcdf-v*"
       - "netcdf-sys-v*"
       - "netcdf-src-v*"
+      - "netcdf-derive-v*"
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,6 +33,9 @@ jobs:
     - name: Publish netcdf-sys
       if: "${{ startsWith(github.ref_name, 'netcdf-sys-v') }}"
       run: cargo publish --package netcdf-sys --token "${{ secrets.CRATES_IO_TOKEN }}"
+    - name: Publish netcdf-derive
+      if: "${{ startsWith(github.ref_name, 'netcdf-derive-v') }}"
+      run: cargo publish --package netcdf --token "${{ secrets.CRATES_IO_TOKEN }}"
     - name: Publish netcdf
       if: "${{ startsWith(github.ref_name, 'netcdf-v') }}"
       run: cargo publish --package netcdf --token "${{ secrets.CRATES_IO_TOKEN }}"

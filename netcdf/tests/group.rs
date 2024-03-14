@@ -57,7 +57,10 @@ fn find_variable() {
     assert_eq!(v.len(), 1);
     let z = group.variable_mut("z").unwrap();
     assert_eq!(z.dimensions()[0].len(), 3);
-    assert!(z.vartype().as_basic().unwrap().is_u8());
+    assert_eq!(
+        z.vartype(),
+        netcdf::types::NcVariableType::Int(netcdf::types::IntType::U8)
+    );
     assert_eq!(z.name(), "z");
 
     assert!(group.variable("vvvvv").is_none());
