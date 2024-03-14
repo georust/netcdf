@@ -13,7 +13,7 @@ edition = "2021"
 links = "netcdf"
 build = "build.rs"
 readme = "README.md"
-categories = ["ffi", "filesystem", "science"]
+categories = ["external-ffi-bindings", "filesystem", "science"]
 exclude = [
     "testdata/**",
 ]
@@ -22,15 +22,15 @@ rust-version = "1.70"
 [dependencies]
 libz-sys = { version = "1.0.25" }
 curl-sys = { version = "0.4.51", optional = true }
-hdf5-sys = { version = "0.8.0" }
-netcdf-src = { path = "../netcdf-src", version = "0.3.0", optional = true }
+hdf5-sys = { workspace = true }
+netcdf-src = { workspace = true, optional = true }
 
 [dev-dependencies]
 
 [features]
 default = []
 memio = []
-static = ["libz-sys/static", "hdf5-sys/static", "hdf5-sys/hl", "hdf5-sys/deprecated", "hdf5-sys/zlib", "netcdf-src", "curl-sys?/static-curl", "curl-sys?/static-ssl"]
+static = ["libz-sys/static", "hdf5-sys/static", "hdf5-sys/hl", "hdf5-sys/deprecated", "hdf5-sys/zlib", "dep:netcdf-src", "curl-sys?/static-curl", "curl-sys?/static-ssl"]
 dap = ["dep:curl-sys"]
 
 [build-dependencies]

@@ -8,7 +8,7 @@ build = "build.rs"
 repository = "https://github.com/georust/netcdf"
 license-file = "source/COPYRIGHT"
 links = "netcdfsrc"
-categories = ["ffi"]
+categories = ["filesystem"]
 keywords = ["netcdf"]
 readme = "README.md"
 exclude = [
@@ -31,7 +31,7 @@ exclude = [
 dap = []
 
 [dependencies]
-hdf5-sys = { version = "0.8.0", features = ["hl", "deprecated", "zlib"] }
+hdf5-sys = { workspace = true, features = ["hl", "deprecated", "zlib"] }
 libz-sys = { version = "1.0.25" }
 
 [build-dependencies]
