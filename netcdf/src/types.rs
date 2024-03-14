@@ -14,7 +14,7 @@ use crate::{error::Result, utils::checked_with_lock};
 /// user defined types. With the `derive` feature enabled for this crate one can
 /// easily define types for reading and writing to and from `netCDF` files.
 /// # Example (derive macro)
-/// ```rust
+/// ```rust,no_run
 /// # #[cfg(feature = "derive")]
 /// #[repr(C)]
 /// #[derive(netcdf::NcType, Debug, Copy, Clone)]
@@ -64,7 +64,7 @@ use crate::{error::Result, utils::checked_with_lock};
 /// Reading of an `netcdf_sys::NC_CHAR` can not be done by using `i8` or `u8` as
 /// such types are not considered text. The below snippet can be used to define
 /// a type which will read this type.
-/// ```rust
+/// ```rust,no_run
 /// # use netcdf::types::*;
 /// #[repr(transparent)]
 /// #[derive(Copy, Clone)]
@@ -76,7 +76,7 @@ use crate::{error::Result, utils::checked_with_lock};
 /// }
 /// ```
 /// ## Opaque type
-/// ```rust
+/// ```rust,no_run
 /// # use netcdf::types::*;
 /// #[repr(transparent)]
 /// #[derive(Copy, Clone)]
@@ -95,7 +95,7 @@ use crate::{error::Result, utils::checked_with_lock};
 /// type means the memory is backed by `netCDF` and should be
 /// freed using [`netcdf_sys::nc_free_vlen`] or [`netcdf_sys::nc_free_vlens`]
 /// to avoid memory leaks.
-/// ```rust
+/// ```rust,no_run
 /// # use netcdf::types::*;
 /// #[repr(C)]
 /// struct Vlen {
@@ -113,7 +113,7 @@ use crate::{error::Result, utils::checked_with_lock};
 /// ```
 /// ## String type
 /// String types must be freed using [`netcdf_sys::nc_free_string`].
-/// ```rust
+/// ```rust,no_run
 /// # use netcdf::types::*;
 /// #[repr(transparent)]
 /// struct NcString(*mut std::ffi::c_char);
