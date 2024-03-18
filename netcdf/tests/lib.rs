@@ -134,10 +134,10 @@ fn variable_not_replacing() {
     let p = d.path().join("variable_not_replacing.nc");
     let mut f = netcdf::create(p).unwrap();
 
-    f.add_variable::<u16>("a", &[]).unwrap();
-    f.add_variable::<i16>("b", &[]).unwrap();
-    f.add_variable::<u8>("a", &[]).unwrap_err();
-    f.add_variable_from_identifiers::<i8>("b", &[]).unwrap_err();
+    f.add_variable::<u16, _>("a", ()).unwrap();
+    f.add_variable::<i16, _>("b", ()).unwrap();
+    f.add_variable::<u8, _>("a", ()).unwrap_err();
+    f.add_variable::<i8, _>("b", ()).unwrap_err();
 }
 
 #[test]
@@ -179,10 +179,10 @@ fn netcdf_error() {
     let path = d.path().join("netcdf_error.nc");
     let mut file = netcdf::create(path).expect("Could not create file");
 
-    file.add_variable::<i8>("var", &["v"]).unwrap_err();
+    file.add_variable::<i8, _>("var", &["v"]).unwrap_err();
     file.add_dimension("v", 3).expect("Could not add dimension");
-    file.add_variable::<i8>("var", &["v"]).unwrap();
-    file.add_variable::<i8>("var", &["v"]).unwrap_err();
+    file.add_variable::<i8, _>("var", &["v"]).unwrap();
+    file.add_variable::<i8, _>("var", &["v"]).unwrap_err();
 
     file.add_dimension("v", 2).unwrap_err();
     file.add_unlimited_dimension("v").unwrap_err();
@@ -258,13 +258,13 @@ fn create_group_dimensions() {
     let g = &mut f.add_group("gp1").unwrap();
 
     g.add_dimension("x", 100).unwrap();
-    g.add_variable::<u8>("y", &["x"]).unwrap();
+    g.add_variable::<u8, _>("y", &["x"]).unwrap();
 
     let gg = &mut g.add_group("gp2").unwrap();
-    gg.add_variable::<i8>("y", &["x"]).unwrap();
+    gg.add_variable::<i8, _>("y", &["x"]).unwrap();
 
     gg.add_dimension("x", 30).unwrap();
-    gg.add_variable::<i8>("z", &["x"]).unwrap();
+    gg.add_variable::<i8, _>("z", &["x"]).unwrap();
 
     assert_eq!(
         f.group("gp1")
@@ -342,7 +342,7 @@ fn def_dims_vars_attrs() {
         let var_name = "varstuff_int";
         let data: Vec<i32> = vec![42; 10 * 20];
         let var = &mut file
-            .add_variable::<i32>(var_name, &[dim1_name, dim2_name])
+            .add_variable::<i32, _>(var_name, &[dim1_name, dim2_name])
             .unwrap();
         var.put_values(data.as_slice(), ..).unwrap();
         assert_eq!(var.dimensions()[0].len(), 10);
@@ -350,7 +350,7 @@ fn def_dims_vars_attrs() {
 
         let var_name = "varstuff_float";
         let data: Vec<f32> = vec![42.2; 10];
-        let mut var = file.add_variable::<f32>(var_name, &[dim1_name]).unwrap();
+        let mut var = file.add_variable::<f32, _>(var_name, &[dim1_name]).unwrap();
         var.put_values(data.as_slice(), ..).unwrap();
         assert_eq!(var.dimensions()[0].len(), 10);
 
@@ -456,60 +456,60 @@ fn all_var_types() {
         // byte
         let data = vec![42i8; 10];
         let var_name = "var_byte";
-        let mut var = root.add_variable::<i8>(var_name, &[dim_name]).unwrap();
+        let mut var = root.add_variable::<i8, _>(var_name, &[dim_name]).unwrap();
         var.put_values(&data, ..).unwrap();
 
         let data = vec![42u8; 10];
         let var_name = "var_char";
-        let mut var = root.add_variable::<u8>(var_name, &[dim_name]).unwrap();
+        let mut var = root.add_variable::<u8, _>(var_name, &[dim_name]).unwrap();
         var.put_values(&data, ..).unwrap();
 
         // short
         let data = vec![42i16; 10];
         let var_name = "var_short";
-        let mut var = root.add_variable::<i16>(var_name, &[dim_name]).unwrap();
+        let mut var = root.add_variable::<i16, _>(var_name, &[dim_name]).unwrap();
         var.put_values(&data, ..).unwrap();
 
         // ushort
         let data = vec![42u16; 10];
         let var_name = "var_ushort";
-        let mut var = root.add_variable::<u16>(var_name, &[dim_name]).unwrap();
+        let mut var = root.add_variable::<u16, _>(var_name, &[dim_name]).unwrap();
         var.put_values(&data, ..).unwrap();
 
         // int
         let data = vec![42i32; 10];
         let var_name = "var_int";
-        let mut var = root.add_variable::<i32>(var_name, &[dim_name]).unwrap();
+        let mut var = root.add_variable::<i32, _>(var_name, &[dim_name]).unwrap();
         var.put_values(&data, ..).unwrap();
 
         // uint
         let data = vec![42u32; 10];
         let var_name = "var_uint";
-        let mut var = root.add_variable::<u32>(var_name, &[dim_name]).unwrap();
+        let mut var = root.add_variable::<u32, _>(var_name, &[dim_name]).unwrap();
         var.put_values(&data, ..).unwrap();
 
         // int64
         let data = vec![42i64; 10];
         let var_name = "var_int64";
-        let mut var = root.add_variable::<i64>(var_name, &[dim_name]).unwrap();
+        let mut var = root.add_variable::<i64, _>(var_name, &[dim_name]).unwrap();
         var.put_values(&data, ..).unwrap();
 
         // uint64
         let data = vec![42u64; 10];
         let var_name = "var_uint64";
-        let mut var = root.add_variable::<u64>(var_name, &[dim_name]).unwrap();
+        let mut var = root.add_variable::<u64, _>(var_name, &[dim_name]).unwrap();
         var.put_values(&data, ..).unwrap();
 
         // float
         let data = vec![42.2f32; 10];
         let var_name = "var_float";
-        let mut var = root.add_variable::<f32>(var_name, &[dim_name]).unwrap();
+        let mut var = root.add_variable::<f32, _>(var_name, &[dim_name]).unwrap();
         var.put_values(&data, ..).unwrap();
 
         // double
         let data = vec![42.2f64; 10];
         let var_name = "var_double";
-        let mut var = root.add_variable::<f64>(var_name, &[dim_name]).unwrap();
+        let mut var = root.add_variable::<f64, _>(var_name, &[dim_name]).unwrap();
         var.put_values(&data, ..).unwrap();
     }
 
@@ -625,7 +625,7 @@ fn append() {
         let mut file_w = netcdf::create(&f).unwrap();
         file_w.add_dimension(dim_name, 3).unwrap();
         let var = &mut file_w
-            .add_variable::<i32>("some_variable", &[dim_name])
+            .add_variable::<i32, _>("some_variable", &[dim_name])
             .unwrap();
         var.put_values::<i32, _>(&[1, 2, 3], ..).unwrap();
         // close it (done when `file_w` goes out of scope)
@@ -635,7 +635,7 @@ fn append() {
         // and create a variable called "some_other_variable"
         let mut file_a = netcdf::append(&f).unwrap();
         let var = &mut file_a
-            .add_variable::<i32>("some_other_variable", &[dim_name])
+            .add_variable::<i32, _>("some_other_variable", &[dim_name])
             .unwrap();
         var.put_values::<i32, _>(&[4, 5, 6], ..).unwrap();
         // close it (done when `file_a` goes out of scope)
@@ -659,7 +659,9 @@ fn put_single_value() {
         // and create a variable called "some_variable" in it
         let mut file_w = netcdf::create(&f).unwrap();
         file_w.add_dimension(dim_name, 3).unwrap();
-        let var = &mut file_w.add_variable::<f32>(var_name, &[dim_name]).unwrap();
+        let var = &mut file_w
+            .add_variable::<f32, _>(var_name, &[dim_name])
+            .unwrap();
         var.put_values(&[1., 2., 3.], ..).unwrap();
     }
     let indices: [usize; 1] = [0];
@@ -689,7 +691,9 @@ fn put_values() {
         // and create a variable called "some_variable" in it
         let mut file_w = netcdf::create(&f).unwrap();
         file_w.add_dimension(dim_name, 3).unwrap();
-        let var = &mut file_w.add_variable::<i32>(var_name, &[dim_name]).unwrap();
+        let var = &mut file_w
+            .add_variable::<i32, _>(var_name, &[dim_name])
+            .unwrap();
         var.put_values(&[1i32, 2, 3], ..).unwrap();
         // close it (done when `file_w` goes out of scope)
     }
@@ -724,7 +728,9 @@ fn set_fill_value() {
 
     let mut file_w = netcdf::create(f).unwrap();
     file_w.add_dimension(dim_name, 3).unwrap();
-    let var = &mut file_w.add_variable::<i32>(var_name, &[dim_name]).unwrap();
+    let var = &mut file_w
+        .add_variable::<i32, _>(var_name, &[dim_name])
+        .unwrap();
     var.set_fill_value(fill_value).unwrap();
 
     var.put_values(&[2, 3], &[1..]).unwrap();
@@ -758,7 +764,7 @@ fn more_fill_values() {
     let mut file = netcdf::create(path).expect("Could not open file");
 
     file.add_dimension("x", 2).unwrap();
-    let var = &mut file.add_variable::<i32>("v0", &["x"]).unwrap();
+    let var = &mut file.add_variable::<i32, _>("v0", &["x"]).unwrap();
     var.set_fill_value(1_i32).unwrap();
 
     var.put_value(6, [1]).unwrap();
@@ -767,7 +773,7 @@ fn more_fill_values() {
     assert_eq!(var.get_value::<i32, _>([0]).unwrap(), 1_i32);
     assert_eq!(var.get_value::<i32, _>([1]).unwrap(), 6_i32);
 
-    let var = &mut file.add_variable::<i32>("v1", &["x"]).unwrap();
+    let var = &mut file.add_variable::<i32, _>("v1", &["x"]).unwrap();
     unsafe {
         var.set_nofill().unwrap();
     }
@@ -778,7 +784,7 @@ fn more_fill_values() {
     assert_eq!(var.get_value::<i32, _>([1]).unwrap(), 6_i32);
     assert!(var.attribute("_FillValue").is_none());
 
-    let var = &mut file.add_variable::<i32>("v2", &["x"]).unwrap();
+    let var = &mut file.add_variable::<i32, _>("v2", &["x"]).unwrap();
     var.set_fill_value(2_i32).unwrap();
     assert_eq!(
         var.attribute("_FillValue").unwrap().value().unwrap(),
@@ -842,7 +848,7 @@ fn use_compression_chunking() {
 
     file.add_dimension("x", 10).unwrap();
 
-    let var = &mut file.add_variable::<i32>("compressed", &["x"]).unwrap();
+    let var = &mut file.add_variable::<i32, _>("compressed", &["x"]).unwrap();
     var.set_compression(5, false).unwrap();
     var.set_chunking(&[5]).unwrap();
 
@@ -850,21 +856,21 @@ fn use_compression_chunking() {
     var.put_values(&v, ..).unwrap();
 
     let var = &mut file
-        .add_variable::<i32>("compressed2", &["x", "x"])
+        .add_variable::<i32, _>("compressed2", &["x", "x"])
         .unwrap();
     var.set_compression(9, true).unwrap();
     var.set_chunking(&[5, 5]).unwrap();
     var.put_values(&[1i32, 2, 3, 4, 5, 6, 7, 8, 9, 10], (..10, ..1))
         .unwrap();
 
-    let var = &mut file.add_variable::<i32>("chunked3", &["x"]).unwrap();
+    let var = &mut file.add_variable::<i32, _>("chunked3", &["x"]).unwrap();
     assert!(matches!(
         var.set_chunking(&[2, 2]).unwrap_err(),
         netcdf::Error::SliceLen
     ));
 
     file.add_dimension("y", 0).unwrap();
-    let var = &mut file.add_variable::<u8>("chunked4", &["y", "x"]).unwrap();
+    let var = &mut file.add_variable::<u8, _>("chunked4", &["y", "x"]).unwrap();
 
     var.set_chunking(&[100, 2]).unwrap();
 }
@@ -879,13 +885,13 @@ fn set_compression_all_variables_in_a_group() {
         .expect("Could not create dimension");
     file.add_dimension("y", 15)
         .expect("Could not create dimension");
-    file.add_variable::<u8>("var0", &["x", "y"])
+    file.add_variable::<u8, _>("var0", &["x", "y"])
         .expect("Could not create variable");
-    file.add_variable::<u8>("var1", &["x", "y"])
+    file.add_variable::<u8, _>("var1", &["x", "y"])
         .expect("Could not create variable");
-    file.add_variable::<u8>("var2", &["x", "y"])
+    file.add_variable::<u8, _>("var2", &["x", "y"])
         .expect("Could not create variable");
-    file.add_variable::<u8>("var3", &["x", "y"])
+    file.add_variable::<u8, _>("var3", &["x", "y"])
         .expect("Could not create variable");
 
     for mut var in file.variables_mut() {
@@ -939,9 +945,9 @@ fn add_conflicting_variables() {
     file.add_dimension("x", 10).unwrap();
     file.add_dimension("y", 20).unwrap();
 
-    file.add_variable::<i32>("x", &["x"]).unwrap();
+    file.add_variable::<i32, _>("x", &["x"]).unwrap();
 
-    let e = file.add_variable::<f32>("x", &["y"]).unwrap_err();
+    let e = file.add_variable::<f32, _>("x", &["y"]).unwrap_err();
     assert!(match e {
         netcdf::Error::AlreadyExists => {
             true
@@ -961,7 +967,7 @@ fn unlimited_dimension_single_putting() {
     file.add_unlimited_dimension("x").unwrap();
     file.add_unlimited_dimension("y").unwrap();
 
-    let var = &mut file.add_variable::<u8>("var", &["x", "y"]).unwrap();
+    let var = &mut file.add_variable::<u8, _>("var", &["x", "y"]).unwrap();
     var.set_fill_value(0u8).unwrap();
 
     var.put_value(1, (0, 0)).unwrap();
@@ -1005,7 +1011,9 @@ fn unlimited_dimension_multi_putting() {
     file.add_unlimited_dimension("x3").unwrap();
     file.add_unlimited_dimension("x4").unwrap();
 
-    let var = &mut file.add_variable::<u8>("one_unlim", &["x", "z"]).unwrap();
+    let var = &mut file
+        .add_variable::<u8, _>("one_unlim", &["x", "z"])
+        .unwrap();
     var.put_values(&[0u8, 1, 2, 3], ..).unwrap_err();
     var.put_values(&[0u8, 1, 2, 3], (..2, ..2)).unwrap();
     check_equal(var, &[0u8, 1, 2, 3]);
@@ -1014,7 +1022,7 @@ fn unlimited_dimension_multi_putting() {
     check_equal(var, &[0u8, 1, 2, 3, 4, 5, 6, 7]);
 
     let var = &mut file
-        .add_variable::<u8>("unlim_first", &["z", "x2"])
+        .add_variable::<u8, _>("unlim_first", &["z", "x2"])
         .unwrap();
     var.put_values(&[0u8, 1, 2, 3], (.., ..2)).unwrap();
     check_equal(var, &[0u8, 1, 2, 3]);
@@ -1022,7 +1030,9 @@ fn unlimited_dimension_multi_putting() {
         .unwrap();
     check_equal(var, &[0u8, 1, 2, 3, 4, 5, 6, 7]);
 
-    let var = &mut file.add_variable::<u8>("two_unlim", &["x3", "x4"]).unwrap();
+    let var = &mut file
+        .add_variable::<u8, _>("two_unlim", &["x3", "x4"])
+        .unwrap();
     var.set_fill_value(0u8).unwrap();
     var.put_values(&[0u8, 1, 2, 3], (.., ..)).unwrap_err();
     var.put_values(&[0u8, 1, 2, 3], [..1, ..4]).unwrap();
@@ -1046,10 +1056,10 @@ fn length_of_variable() {
     file.add_dimension("y", 6).unwrap();
     file.add_unlimited_dimension("z").unwrap();
 
-    let var = &mut file.add_variable::<f32>("x", &["x", "y"]).unwrap();
+    let var = &mut file.add_variable::<f32, _>("x", &["x", "y"]).unwrap();
     assert_eq!(var.len(), 4 * 6);
 
-    let var = &mut file.add_variable::<f64>("z", &["x", "z"]).unwrap();
+    let var = &mut file.add_variable::<f64, _>("z", &["x", "z"]).unwrap();
     var.put_value(1u8, [2, 8]).unwrap();
     assert_eq!(var.len(), 4 * 9);
 }
@@ -1060,7 +1070,7 @@ fn single_length_variable() {
     let path = d.path().join("single_length_variable.nc");
     let mut file = netcdf::create(&path).unwrap();
 
-    let var = &mut file.add_variable::<u8>("x", &[]).unwrap();
+    let var = &mut file.add_variable::<u8, _>("x", ()).unwrap();
 
     var.put_value(3u8, ..).unwrap();
     assert_eq!(var.get_value::<u8, _>(..).unwrap(), 3_u8);
@@ -1098,10 +1108,10 @@ fn put_then_def() {
     let path = d.path().join("put_then_def.nc");
     let mut file = netcdf::create(path).unwrap();
 
-    let var = &mut file.add_variable::<i8>("x", &[]).unwrap();
+    let var = &mut file.add_variable::<i8, _>("x", ()).unwrap();
     var.put_value(3i8, ..).unwrap();
 
-    let var2 = &mut file.add_variable::<i8>("y", &[]).unwrap();
+    let var2 = &mut file.add_variable::<i8, _>("y", ()).unwrap();
     var2.put_value(4i8, ..).unwrap();
 }
 
@@ -1126,7 +1136,7 @@ fn string_variables() {
         // Some weird interaction between unlimited dimensions, put_str,
         // and the name of this variable leads to crash. This
         // can be observed by changing this     \ /    to "x"
-        let var = &mut file.add_variable::<i32>("y", &[]).unwrap();
+        let var = &mut file.add_variable::<i32, &[&str]>("y", &[]).unwrap();
         var.put_value(42i32, ()).unwrap();
     }
     let file = netcdf::open(path).unwrap();
@@ -1164,8 +1174,8 @@ fn unlimited_in_parents() {
     let mut file = netcdf::append(&path).unwrap();
 
     let g = &mut file.group_mut("g").unwrap().unwrap();
-    g.add_variable::<i16>("w", &["z1"]).unwrap();
-    g.add_variable::<u16>("v", &["x"]).unwrap();
+    g.add_variable::<i16, _>("w", &["z1"]).unwrap();
+    g.add_variable::<u16, _>("v", &["x"]).unwrap();
 }
 
 #[test]
@@ -1189,21 +1199,15 @@ fn dimension_identifiers() {
         };
 
         // Create variables
-        file.add_variable_from_identifiers::<i8>("v_self_id", &[vrootid])
-            .unwrap();
+        file.add_variable::<i8, _>("v_self_id", &[vrootid]).unwrap();
         let mut g = file.group_mut("g").unwrap().unwrap();
-        g.add_variable_from_identifiers::<i8>("v_root_id", &[vrootid])
-            .unwrap();
-        g.add_variable_from_identifiers::<i8>("v_self_id", &[vgid])
-            .unwrap();
+        g.add_variable::<i8, _>("v_root_id", &[vrootid]).unwrap();
+        g.add_variable::<i8, _>("v_self_id", &[vgid]).unwrap();
 
         let gg = &mut g.group_mut("g").unwrap();
-        gg.add_variable_from_identifiers::<i8>("v_root_id", &[vrootid])
-            .unwrap();
-        gg.add_variable_from_identifiers::<i8>("v_up_id", &[vgid])
-            .unwrap();
-        gg.add_variable_from_identifiers::<i8>("v_self_id", &[vggid])
-            .unwrap();
+        gg.add_variable::<i8, _>("v_root_id", &[vrootid]).unwrap();
+        gg.add_variable::<i8, _>("v_up_id", &[vgid]).unwrap();
+        gg.add_variable::<i8, _>("v_self_id", &[vggid]).unwrap();
     }
 
     let file = &netcdf::open(path).unwrap();
@@ -1276,7 +1280,7 @@ fn set_get_endian() {
             let mut file_w = netcdf::create(&f).unwrap();
             file_w.add_dimension(dim_name, 3).unwrap();
             let var = &mut file_w
-                .add_variable::<i32>("some_variable", &[dim_name])
+                .add_variable::<i32, _>("some_variable", &[dim_name])
                 .unwrap();
             var.set_endianness(*i).unwrap();
             assert_eq!(var.endianness().unwrap(), *i);
@@ -1304,7 +1308,9 @@ mod strided {
             file.add_dimension("z", 3).unwrap();
             file.add_dimension("y", 5).unwrap();
             file.add_dimension("x", 9).unwrap();
-            let mut var = file.add_variable::<i32>("data", &["z", "y", "x"]).unwrap();
+            let mut var = file
+                .add_variable::<i32, _>("data", &["z", "y", "x"])
+                .unwrap();
             let buffer = (0..3 * 5 * 9).collect::<Vec<_>>();
             var.put_values(&buffer, ..).unwrap();
         }
@@ -1427,7 +1433,7 @@ mod strided {
         file.add_dimension("d0", 7).unwrap();
         file.add_dimension("d1", 9).unwrap();
 
-        let mut var = file.add_variable::<i32>("var", &["d0", "d1"]).unwrap();
+        let mut var = file.add_variable::<i32, _>("var", &["d0", "d1"]).unwrap();
 
         let values = (0..7 * 9).collect::<Vec<i32>>();
         let zeros = [0; 7 * 9];
@@ -1506,7 +1512,7 @@ fn dimension_identifiers_from_different_ncids() {
     let d1 = g1.add_dimension("d", 11).unwrap();
 
     match file0
-        .add_variable_from_identifiers::<u8>("var", &[d1.identifier()])
+        .add_variable::<u8, _>("var", &[d1.identifier()])
         .unwrap_err()
     {
         netcdf::Error::WrongDataset => (),
@@ -1515,16 +1521,13 @@ fn dimension_identifiers_from_different_ncids() {
 
     let d0 = file0.add_dimension("f", 20).unwrap();
     let id = d0.identifier();
-    file0
-        .add_variable_from_identifiers::<u8>("var2", &[id])
-        .unwrap();
+    file0.add_variable::<u8, _>("var2", &[id]).unwrap();
 
     let mut g0 = file0.add_group("g").unwrap();
     let dg = g0.add_dimension("h", 17).unwrap();
     let idg = dg.identifier();
 
-    g0.add_variable_from_identifiers::<u8>("var3", &[id, idg])
-        .unwrap();
+    g0.add_variable::<u8, _>("var3", &[id, idg]).unwrap();
 }
 
 #[test]
@@ -1550,7 +1553,7 @@ fn open_to_find_unlim_dim() {
         let mut file = netcdf::create(&path).unwrap();
         file.add_unlimited_dimension("a").unwrap();
 
-        let mut var = file.add_variable::<i32>("b", &["a"]).unwrap();
+        let mut var = file.add_variable::<i32, _>("b", &["a"]).unwrap();
         var.put_values(&[0, 1, 2, 3, 4, 5], ..).unwrap();
     }
 
@@ -1600,7 +1603,7 @@ fn drop_dim_on_simple_indices() {
     f.add_dimension("d4", 13).unwrap();
 
     let var = f
-        .add_variable::<i8>("v", &["d1", "d2", "d3", "d4"])
+        .add_variable::<i8, _>("v", &["d1", "d2", "d3", "d4"])
         .unwrap();
 
     let values = var.get::<i8, _>(..).unwrap();
@@ -1639,7 +1642,7 @@ fn ndarray_put() {
     let values = ndarray::Array::<u8, _>::zeros((10, 11, 12, 13));
 
     let mut var = f
-        .add_variable::<u8>("var", &["d1", "d2", "d3", "d4"])
+        .add_variable::<u8, _>("var", &["d1", "d2", "d3", "d4"])
         .unwrap();
 
     macro_rules! put_values {
@@ -1672,7 +1675,9 @@ fn ndarray_put() {
     put_values!(var, (.., .., .., 1), values, s![.., .., .., ..], Failure);
 
     std::mem::drop(var);
-    let mut var = f.add_variable::<u8>("grow", &["grow", "d2", "d3"]).unwrap();
+    let mut var = f
+        .add_variable::<u8, _>("grow", &["grow", "d2", "d3"])
+        .unwrap();
 
     // let values = ndarray::Array::<u8, _>::zeros((10, 11, 12, 13));
     put_values!(var, .., values, s![.., .., .., ..], Failure);
@@ -1715,7 +1720,9 @@ fn ndarray_get_into() {
         (100 * k + 10 * j + i).try_into().unwrap()
     });
 
-    let mut var = f.add_variable::<u64>("var", &["d1", "d2", "d3"]).unwrap();
+    let mut var = f
+        .add_variable::<u64, _>("var", &["d1", "d2", "d3"])
+        .unwrap();
 
     var.put(.., values.view()).unwrap();
 

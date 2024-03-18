@@ -23,7 +23,7 @@ fn attributes_read() {
     let mut file = netcdf::create(path).expect("Could not create file");
 
     let var = &mut file
-        .add_variable::<f32>("var", &[])
+        .add_variable::<f32, _>("var", ())
         .expect("Could not add variable");
     var.put_attribute("att", "some attribute")
         .expect("Could not add attribute");

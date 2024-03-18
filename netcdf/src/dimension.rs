@@ -7,6 +7,118 @@ use netcdf_sys::*;
 
 use super::error;
 
+mod sealed {
+    pub trait Sealed {}
+}
+
+/// Types which can be used to distinguish dimensions
+/// in a netCDF file. This can be `&str` (the normal use case)
+/// or a special identifier when using nested groups.
+///
+/// This trait is not expected to be implemented elsewhere and is therefore sealed.
+///
+/// # Examples
+/// (helper function to show consumption of type)
+/// ```rust,no_run
+/// # use netcdf::AsNcDimensions;
+/// fn take(d: impl AsNcDimensions) {}
+/// ```
+/// Normally one uses the name of the dimension to specify the dimension
+/// ```rust,no_run
+/// # use netcdf::AsNcDimensions;
+/// # fn take(d: impl AsNcDimensions) {}
+/// take(()); // scalar
+/// take("x"); // single dimension
+/// take(["x", "y"]); // multiple dimensions
+/// ```
+/// When working with dimensions across groups, it might be necessary
+/// to use dimension identifiers to get the correct group dimension
+/// ```rust,no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # use netcdf::AsNcDimensions;
+/// # fn take(d: impl AsNcDimensions) {}
+/// let file = netcdf::open("test.nc")?;
+/// let dim = file.dimension("x").expect("File does not contain dimension");
+/// let dimid = dim.identifier();
+///
+/// take(dimid); // from a dimension identifier
+/// take([dimid, dimid]); // from multiple identifiers
+/// # Ok(()) }
+/// ```
+pub trait AsNcDimensions: sealed::Sealed {
+    /// Convert from a slice of [`&str`]/[`DimensionIdentifier`] to concrete dimensions
+    /// which are guaranteed to exist in this file
+    fn get_dimensions<'g>(&self, ncid: nc_type) -> error::Result<Vec<Dimension<'g>>>;
+}
+
+impl sealed::Sealed for &[&str] {}
+impl AsNcDimensions for &[&str] {
+    fn get_dimensions<'g>(&self, ncid: nc_type) -> error::Result<Vec<Dimension<'g>>> {
+        self.iter()
+            .map(|&name| match dimension_from_name(ncid, name) {
+                Ok(Some(x)) => Ok(x),
+                Ok(None) => Err(format!("Dimension {name} not found").into()),
+                Err(e) => Err(e),
+            })
+            .collect()
+    }
+}
+impl<const N: usize> sealed::Sealed for [&str; N] {}
+impl<const N: usize> AsNcDimensions for [&str; N] {
+    fn get_dimensions<'g>(&self, ncid: nc_type) -> error::Result<Vec<Dimension<'g>>> {
+        self.as_slice().get_dimensions(ncid)
+    }
+}
+impl<const N: usize> sealed::Sealed for &[&str; N] {}
+impl<const N: usize> AsNcDimensions for &[&str; N] {
+    fn get_dimensions<'g>(&self, ncid: nc_type) -> error::Result<Vec<Dimension<'g>>> {
+        self.as_slice().get_dimensions(ncid)
+    }
+}
+
+impl sealed::Sealed for &[DimensionIdentifier] {}
+impl AsNcDimensions for &[DimensionIdentifier] {
+    fn get_dimensions<'g>(&self, ncid: nc_type) -> error::Result<Vec<Dimension<'g>>> {
+        self.iter()
+            .map(|dimid| match dimension_from_identifier(ncid, *dimid) {
+                Ok(Some(x)) => Ok(x),
+                Ok(None) => Err("Dimension id does not exist".into()),
+                Err(e) => Err(e),
+            })
+            .collect()
+    }
+}
+impl<const N: usize> sealed::Sealed for [DimensionIdentifier; N] {}
+impl<const N: usize> AsNcDimensions for [DimensionIdentifier; N] {
+    fn get_dimensions<'g>(&self, ncid: nc_type) -> error::Result<Vec<Dimension<'g>>> {
+        self.as_slice().get_dimensions(ncid)
+    }
+}
+impl<const N: usize> sealed::Sealed for &[DimensionIdentifier; N] {}
+impl<const N: usize> AsNcDimensions for &[DimensionIdentifier; N] {
+    fn get_dimensions<'g>(&self, ncid: nc_type) -> error::Result<Vec<Dimension<'g>>> {
+        self.as_slice().get_dimensions(ncid)
+    }
+}
+impl sealed::Sealed for () {}
+impl AsNcDimensions for () {
+    fn get_dimensions<'g>(&self, _ncid: nc_type) -> error::Result<Vec<Dimension<'g>>> {
+        Ok(Vec::new())
+    }
+}
+impl sealed::Sealed for &str {}
+impl AsNcDimensions for &str {
+    fn get_dimensions<'g>(&self, ncid: nc_type) -> error::Result<Vec<Dimension<'g>>> {
+        ([*self]).get_dimensions(ncid)
+    }
+}
+impl sealed::Sealed for DimensionIdentifier {}
+impl AsNcDimensions for DimensionIdentifier {
+    fn get_dimensions<'g>(&self, ncid: nc_type) -> error::Result<Vec<Dimension<'g>>> {
+        ([*self]).get_dimensions(ncid)
+    }
+}
+
 /// Represents a netcdf dimension
 #[derive(Debug, Clone)]
 pub struct Dimension<'g> {
@@ -25,9 +137,23 @@ pub struct DimensionIdentifier {
     pub(crate) dimid: nc_type,
 }
 
+impl DimensionIdentifier {
+    // Internal netcdf detail, the top 16 bits gives the corresponding
+    // file handle. This to ensure dimensions are not added from another
+    // file which is unrelated to self
+    pub(crate) fn belongs_to(&self, ncid: nc_type) -> bool {
+        self.ncid >> 16 == ncid >> 16
+    }
+}
+
 #[allow(clippy::len_without_is_empty)]
 impl<'g> Dimension<'g> {
     /// Get current length of this dimension
+    ///
+    /// ## Note
+    /// A dimension can be unlimited (growable) and changes size
+    /// if putting values to a variable which uses this
+    /// dimension
     pub fn len(&self) -> usize {
         if let Some(x) = self.len {
             x.get()
@@ -66,7 +192,10 @@ impl<'g> Dimension<'g> {
     }
 
     /// Grabs the unique identifier for this dimension, which
-    /// can be used in `add_variable_from_identifiers`
+    /// can be used in [`add_variable`](crate::FileMut::add_variable).
+    ///
+    /// This is useful when working with nested groups and need
+    /// to distinguish between names at different levels.
     pub fn identifier(&self) -> DimensionIdentifier {
         self.id
     }
@@ -239,6 +368,47 @@ pub(crate) fn dimension_from_name<'f>(
         return Ok(None);
     }
     error::checked(e)?;
+
+    let mut dimlen = 0;
+    unsafe {
+        error::checked(super::with_lock(|| nc_inq_dimlen(ncid, dimid, &mut dimlen))).unwrap();
+    }
+    if dimlen != 0 {
+        // Have to check if this dimension is unlimited
+        let mut nunlim = 0;
+        unsafe {
+            error::checked(super::with_lock(|| {
+                nc_inq_unlimdims(ncid, &mut nunlim, std::ptr::null_mut())
+            }))?;
+        }
+        if nunlim != 0 {
+            let mut unlimdims = Vec::with_capacity(nunlim.try_into()?);
+            unsafe {
+                error::checked(super::with_lock(|| {
+                    nc_inq_unlimdims(ncid, std::ptr::null_mut(), unlimdims.as_mut_ptr())
+                }))?;
+            }
+            unsafe { unlimdims.set_len(nunlim.try_into()?) }
+            if unlimdims.contains(&dimid) {
+                dimlen = 0;
+            }
+        }
+    }
+    Ok(Some(Dimension {
+        len: core::num::NonZeroUsize::new(dimlen),
+        id: super::dimension::DimensionIdentifier { ncid, dimid },
+        _group: PhantomData,
+    }))
+}
+
+pub(crate) fn dimension_from_identifier<'f>(
+    ncid: nc_type,
+    dimid: DimensionIdentifier,
+) -> error::Result<Option<Dimension<'f>>> {
+    if !dimid.belongs_to(ncid) {
+        return Err(error::Error::WrongDataset);
+    }
+    let dimid = dimid.dimid;
 
     let mut dimlen = 0;
     unsafe {
