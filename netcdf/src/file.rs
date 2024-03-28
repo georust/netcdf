@@ -423,6 +423,17 @@ impl FileMut {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         super::variable::add_variable_from_identifiers(ncid, name, dims, T::NCTYPE)
     }
+
+    /// Flush pending buffers to disk to minimise data loss in case of termination.
+    ///
+    /// Note: When writing and reading from the same file from multiple processes
+    /// it is recommended to instead open the file in both the reader and
+    /// writer process with the [`Options::SHARE`] flag.
+    pub fn sync(&self) -> error::Result<()> {
+        error::checked(super::with_lock(|| unsafe {
+            netcdf_sys::nc_sync(self.ncid())
+        }))
+    }
 }
 
 #[cfg(feature = "has-mmap")]

@@ -1743,3 +1743,14 @@ fn ndarray_get_into() {
         .unwrap();
     assert_eq!(values, outarray.slice(s![0, .., .., ..]));
 }
+
+#[test]
+fn sync_file() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("sync_file.nc");
+
+    let mut f = netcdf::create(path).unwrap();
+
+    f.add_unlimited_dimension("t").unwrap();
+    f.sync().unwrap();
+}
