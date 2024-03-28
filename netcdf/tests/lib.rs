@@ -1754,3 +1754,17 @@ fn sync_file() {
     f.add_unlimited_dimension("t").unwrap();
     f.sync().unwrap();
 }
+
+#[test]
+fn close_file() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("close_file.nc");
+
+    let mut f = netcdf::create(&path).unwrap();
+
+    f.add_unlimited_dimension("t").unwrap();
+    f.close().unwrap();
+
+    let f = netcdf::open(path).unwrap();
+    f.close().unwrap();
+}

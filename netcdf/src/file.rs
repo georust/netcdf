@@ -19,12 +19,18 @@ pub(crate) struct RawFile {
     ncid: nc_type,
 }
 
+impl RawFile {
+    fn close(self) -> error::Result<()> {
+        let Self { ncid } = self;
+        error::checked(super::with_lock(|| unsafe { nc_close(ncid) }))
+    }
+}
+
 impl Drop for RawFile {
     fn drop(&mut self) {
-        unsafe {
-            // Can't really do much with an error here
-            let _err = error::checked(super::with_lock(|| nc_close(self.ncid)));
-        }
+        // Can't really do much with an error here
+        let ncid = self.ncid;
+        let _err = error::checked(super::with_lock(|| unsafe { nc_close(ncid) }));
     }
 }
 
@@ -245,6 +251,15 @@ impl File {
     pub fn types(&self) -> error::Result<impl Iterator<Item = super::types::VariableType>> {
         super::types::all_at_location(self.ncid()).map(|x| x.map(Result::unwrap))
     }
+
+    /// Close the file
+    ///
+    /// Note: This is called automatically by `Drop`, but can be useful
+    /// if flushing data or closing the file would result in an error.
+    pub fn close(self) -> error::Result<()> {
+        let Self(file) = self;
+        file.close()
+    }
 }
 
 /// Mutable access to file.
@@ -433,6 +448,15 @@ impl FileMut {
         error::checked(super::with_lock(|| unsafe {
             netcdf_sys::nc_sync(self.ncid())
         }))
+    }
+
+    /// Close the file
+    ///
+    /// Note: This is called automatically by `Drop`, but can be useful
+    /// if flushing data or closing the file would result in an error.
+    pub fn close(self) -> error::Result<()> {
+        let Self(File(file)) = self;
+        file.close()
     }
 }
 
