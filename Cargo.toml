@@ -8,7 +8,7 @@ default-members = ["netcdf", "netcdf-sys"]
 resolver = "2"
 
 [workspace.dependencies]
-netcdf = { path = "netcdf", version = "0.9.0" }
+netcdf = { path = "netcdf", version = "0.9.1" }
 netcdf-sys = { path = "netcdf-sys", version = "0.6.0" }
 netcdf-src = { path = "netcdf-src", version = "0.3.0" }
 hdf5-sys = { version = "0.8.0" }
