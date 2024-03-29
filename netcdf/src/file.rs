@@ -86,6 +86,29 @@ impl RawFile {
         Ok(File(Self { ncid }))
     }
 
+    /// Open a `netCDF` file in read only mode in parallel mode.
+    pub(crate) fn open_par_with(
+        path: &path::Path,
+        communicator: mpi_sys::MPI_Comm,
+        info: mpi_sys::MPI_Info,
+        options: Options,
+    ) -> error::Result<File> {
+        let f = get_ffi_from_path(path);
+        let mut ncid: nc_type = 0;
+        unsafe {
+            error::checked(super::with_lock(|| {
+                netcdf_sys::par::nc_open_par(
+                    f.as_ptr().cast(),
+                    options.bits(),
+                    communicator,
+                    info,
+                    &mut ncid,
+                )
+            }))?;
+        }
+        Ok(File(Self { ncid }))
+    }
+
     /// Open a `netCDF` file in append mode (read/write).
     pub(crate) fn append_with(path: &path::Path, options: Options) -> error::Result<FileMut> {
         let file = Self::open_with(path, options | Options::WRITE)?;
@@ -99,6 +122,30 @@ impl RawFile {
         unsafe {
             error::checked(with_lock(|| {
                 nc_create(f.as_ptr().cast(), options.bits(), &mut ncid)
+            }))?;
+        }
+
+        Ok(FileMut(File(Self { ncid })))
+    }
+
+    /// Create a new `netCDF` file in parallel mode
+    pub(crate) fn create_par_with(
+        path: &path::Path,
+        communicator: mpi_sys::MPI_Comm,
+        info: mpi_sys::MPI_Info,
+        options: Options,
+    ) -> error::Result<FileMut> {
+        let f = get_ffi_from_path(path);
+        let mut ncid: nc_type = -1;
+        unsafe {
+            error::checked(super::with_lock(|| {
+                netcdf_sys::par::nc_create_par(
+                    f.as_ptr().cast(),
+                    options.bits(),
+                    communicator,
+                    info,
+                    &mut ncid,
+                )
             }))?;
         }
 
@@ -225,6 +272,14 @@ impl File {
             .unwrap()
             .map(Result::unwrap)
     }
+    /// Get the length of a dimension
+    pub fn dimension_len<'f>(&self, name: &str) -> Option<usize> {
+        let (ncid, name) =
+            super::group::try_get_parent_ncid_and_stem(self.ncid(), name).unwrap()?;
+        super::dimension::dimension_from_name(ncid, name)
+            .unwrap()
+            .map(|x| x.len())
+    }
 
     /// Get a group
     ///
@@ -261,6 +316,31 @@ impl File {
     pub fn close(self) -> error::Result<()> {
         let Self(file) = self;
         file.close()
+    }
+
+    /// Access all variable in independent mode
+    /// for parallell reading using MPI.
+    /// File must have been opened using `open_par`
+    ///
+    /// This is the default access mode
+    pub fn access_independent(&self) -> error::Result<()> {
+        let ncid = self.ncid();
+        crate::par::set_access_mode(
+            ncid,
+            netcdf_sys::NC_GLOBAL,
+            crate::par::AccessMode::Independent,
+        )
+    }
+    /// Access all variable in collective mode
+    /// for parallell reading using MPI.
+    /// File must have been opened using `open_par`
+    pub fn access_collective(&self) -> error::Result<()> {
+        let ncid = self.ncid();
+        crate::par::set_access_mode(
+            ncid,
+            netcdf_sys::NC_GLOBAL,
+            crate::par::AccessMode::Collective,
+        )
     }
 }
 
@@ -439,6 +519,13 @@ impl FileMut {
     pub fn close(self) -> error::Result<()> {
         let Self(File(file)) = self;
         file.close()
+    }
+
+    /// Close the file for new definitions
+    pub fn enddef(&mut self) -> error::Result<()> {
+        error::checked(super::with_lock(|| unsafe {
+            netcdf_sys::nc_enddef(self.ncid())
+        }))
     }
 }
 

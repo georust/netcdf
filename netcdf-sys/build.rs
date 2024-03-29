@@ -146,6 +146,9 @@ impl NcMetaHeader {
                 "MEMIO requested but not found in this installation of netCDF"
             );
         }
+        if self.has_parallel {
+            println!("cargo:rustc-cfg=feature=\"has-par\"");
+        }
     }
 }
 

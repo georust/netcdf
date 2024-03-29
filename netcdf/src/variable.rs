@@ -191,6 +191,31 @@ impl<'g> Variable<'g> {
             _ => Err(NC_EVARMETA.into()),
         }
     }
+
+    fn access_mode(&self, mode: crate::par::AccessMode) -> error::Result<()> {
+        error::checked(super::with_lock(|| unsafe {
+            netcdf_sys::par::nc_var_par_access(
+                self.ncid,
+                self.varid,
+                mode as i32 as std::ffi::c_int,
+            )
+        }))
+    }
+
+    /// Access the variable in independent mode
+    /// for parallell reading using MPI.
+    /// File must have been opened using `open_par`
+    ///
+    /// This is the default access mode
+    pub fn access_independent(&self) -> error::Result<()> {
+        crate::par::set_access_mode(self.ncid, self.varid, crate::par::AccessMode::Independent)
+    }
+    /// Access the variable in collective mode
+    /// for parallell reading using MPI.
+    /// File must have been opened using `open_par`
+    pub fn access_collective(&self) -> error::Result<()> {
+        crate::par::set_access_mode(self.ncid, self.varid, crate::par::AccessMode::Collective)
+    }
 }
 impl<'g> VariableMut<'g> {
     /// Sets compression on the variable. Must be set before filling in data.

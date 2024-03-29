@@ -24,6 +24,7 @@ libz-sys = { version = "1.0.25" }
 curl-sys = { version = "0.4.51", optional = true }
 hdf5-sys = { workspace = true }
 netcdf-src = { workspace = true, optional = true }
+mpi-sys = "0.2.1"
 
 [dev-dependencies]
 
