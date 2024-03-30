@@ -208,13 +208,13 @@ impl<'g> Variable<'g> {
     ///
     /// This is the default access mode
     pub fn access_independent(&self) -> error::Result<()> {
-        crate::par::set_access_mode(self.ncid, self.varid, crate::par::AccessMode::Independent)
+        self.access_mode(crate::par::AccessMode::Independent)
     }
     /// Access the variable in collective mode
     /// for parallell reading using MPI.
     /// File must have been opened using `open_par`
     pub fn access_collective(&self) -> error::Result<()> {
-        crate::par::set_access_mode(self.ncid, self.varid, crate::par::AccessMode::Collective)
+        self.access_mode(crate::par::AccessMode::Collective)
     }
 }
 impl<'g> VariableMut<'g> {

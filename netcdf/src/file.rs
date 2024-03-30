@@ -521,6 +521,13 @@ impl FileMut {
         file.close()
     }
 
+    /// Open the file for new definitions
+    pub fn redef(&mut self) -> error::Result<()> {
+        error::checked(super::with_lock(|| unsafe {
+            netcdf_sys::nc_redef(self.ncid())
+        }))
+    }
+
     /// Close the file for new definitions
     pub fn enddef(&mut self) -> error::Result<()> {
         error::checked(super::with_lock(|| unsafe {
