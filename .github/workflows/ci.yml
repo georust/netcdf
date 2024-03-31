@@ -158,7 +158,7 @@ jobs:
       with: {submodules: false}
 
     - name: Install netcdf
-      run: sudo apt-get update && sudo apt-get install libnetcdf-mpi-dev
+      run: sudo apt-get update && sudo apt-get install libnetcdf-mpi-dev libhdf5-openmpi-dev
 
     - name: Install rust
       uses: dtolnay/rust-toolchain@stable
