@@ -30,7 +30,7 @@ mod filter;
 #[cfg(feature = "4.8.0")]
 pub use filter::*;
 
-#[cfg(feature = "has-par")]
+#[cfg(feature = "mpi")]
 pub mod par;
 
 use std::sync::Mutex;
