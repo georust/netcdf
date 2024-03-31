@@ -152,6 +152,8 @@ jobs:
   mpi:
     name: mpi-runner
     runs-on: ubuntu-latest
+    env:
+      NETCDF_DIR: /usr/lib/x86_64-linux-gnu/netcdf/mpi/
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
