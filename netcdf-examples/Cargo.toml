@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 
 [features]
-mpi = ["dep:mpi", "netcdf/mpi"]
+mpi = ["dep:mpi", "netcdf/mpi", "dep:mpi-sys"]
 
 [dependencies]
 netcdf = { workspace = true }
