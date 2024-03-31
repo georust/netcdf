@@ -4,6 +4,7 @@ members = [
     "netcdf-sys",
     "netcdf-src",
     "netcdf-derive",
+    "netcdf-examples",
 ]
 default-members = ["netcdf", "netcdf-sys"]
 resolver = "2"
