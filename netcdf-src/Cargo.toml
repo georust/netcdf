@@ -29,6 +29,7 @@ exclude = [
 
 [features]
 dap = ["dep:link-cplusplus"]
+mpi = []
 
 [dependencies]
 hdf5-sys = { workspace = true, features = ["hl", "deprecated", "zlib"] }

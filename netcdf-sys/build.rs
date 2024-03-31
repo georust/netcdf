@@ -148,6 +148,11 @@ impl NcMetaHeader {
         }
         if self.has_parallel {
             println!("cargo:rustc-cfg=feature=\"has-par\"");
+        } else {
+            assert!(
+                feature!("MPI").is_err(),
+                "MPI requested but not found in this installation of netCDF"
+            );
         }
     }
 }

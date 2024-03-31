@@ -83,6 +83,10 @@ fn main() {
         netcdf_config.define("ENABLE_BYTERANGE", "ON");
     }
 
+    if feature!("MPI").is_ok() {
+        panic!("MPI feature was requested but the static build of netcdf does not support this");
+    }
+
     let netcdf = netcdf_config.build();
 
     println!("cargo:lib=netcdf");

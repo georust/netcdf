@@ -87,6 +87,7 @@ impl RawFile {
     }
 
     /// Open a `netCDF` file in read only mode in parallel mode.
+    #[cfg(feature = "mpi")]
     pub(crate) fn open_par_with(
         path: &path::Path,
         communicator: mpi_sys::MPI_Comm,
@@ -129,6 +130,7 @@ impl RawFile {
     }
 
     /// Create a new `netCDF` file in parallel mode
+    #[cfg(feature = "mpi")]
     pub(crate) fn create_par_with(
         path: &path::Path,
         communicator: mpi_sys::MPI_Comm,
@@ -323,6 +325,7 @@ impl File {
     /// File must have been opened using `open_par`
     ///
     /// This is the default access mode
+    #[cfg(feature = "mpi")]
     pub fn access_independent(&self) -> error::Result<()> {
         let ncid = self.ncid();
         crate::par::set_access_mode(
@@ -334,6 +337,7 @@ impl File {
     /// Access all variable in collective mode
     /// for parallell reading using MPI.
     /// File must have been opened using `open_par`
+    #[cfg(feature = "mpi")]
     pub fn access_collective(&self) -> error::Result<()> {
         let ncid = self.ncid();
         crate::par::set_access_mode(

@@ -14,3 +14,4 @@ netcdf-sys = { path = "netcdf-sys", version = "0.6.2" }
 netcdf-src = { path = "netcdf-src", version = "0.3.6" }
 netcdf-derive = { path = "netcdf-derive", version = "0.1.0" }
 hdf5-sys = { version = "0.8.0" }
+mpi-sys = { version = "0.2.1" }

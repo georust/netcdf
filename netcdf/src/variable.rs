@@ -192,6 +192,7 @@ impl<'g> Variable<'g> {
         }
     }
 
+    #[cfg(feature = "mpi")]
     fn access_mode(&self, mode: crate::par::AccessMode) -> error::Result<()> {
         error::checked(super::with_lock(|| unsafe {
             netcdf_sys::par::nc_var_par_access(
@@ -207,12 +208,14 @@ impl<'g> Variable<'g> {
     /// File must have been opened using `open_par`
     ///
     /// This is the default access mode
+    #[cfg(feature = "mpi")]
     pub fn access_independent(&self) -> error::Result<()> {
         self.access_mode(crate::par::AccessMode::Independent)
     }
     /// Access the variable in collective mode
     /// for parallell reading using MPI.
     /// File must have been opened using `open_par`
+    #[cfg(feature = "mpi")]
     pub fn access_collective(&self) -> error::Result<()> {
         self.access_mode(crate::par::AccessMode::Collective)
     }

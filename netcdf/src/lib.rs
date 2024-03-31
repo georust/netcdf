@@ -131,6 +131,7 @@ pub(crate) mod error;
 pub(crate) mod extent;
 pub(crate) mod file;
 pub(crate) mod group;
+#[cfg(feature = "mpi")]
 pub(crate) mod par;
 pub(crate) mod putget;
 #[cfg(feature = "4.9.2")]
@@ -172,6 +173,7 @@ where
 }
 
 /// Open a `netCDF` file in create and parallel mode with the given options
+#[cfg(feature = "mpi")]
 pub fn create_par_with<P>(
     name: P,
     communicator: mpi_sys::MPI_Comm,
@@ -209,6 +211,7 @@ where
 }
 
 /// Open in parallel mode
+#[cfg(feature = "mpi")]
 pub fn open_par_with<P>(
     name: P,
     communicator: mpi_sys::MPI_Comm,
