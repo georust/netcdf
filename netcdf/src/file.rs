@@ -275,7 +275,7 @@ impl File {
             .map(Result::unwrap)
     }
     /// Get the length of a dimension
-    pub fn dimension_len<'f>(&self, name: &str) -> Option<usize> {
+    pub fn dimension_len(&self, name: &str) -> Option<usize> {
         let (ncid, name) =
             super::group::try_get_parent_ncid_and_stem(self.ncid(), name).unwrap()?;
         super::dimension::dimension_from_name(ncid, name)
