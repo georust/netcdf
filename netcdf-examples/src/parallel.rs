@@ -18,7 +18,7 @@ fn create(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let info = mpi_null_info();
     let mut file =
-        netcdf::create_par_with(path, communicator.as_raw(), info, netcdf::Options::empty())?;
+        netcdf::create_par_with(path, communicator.as_raw(), info, netcdf::Options::NETCDF4)?;
 
     let size = communicator.size() as usize;
     let rank = communicator.rank();
@@ -45,10 +45,10 @@ fn read(
     let info = mpi_null_info();
 
     let file = netcdf::open_par_with(path, communicator.as_raw(), info, netcdf::Options::empty())?;
-    file.access_collective()?;
 
     let rank = communicator.rank();
     let var = file.variable("output").unwrap();
+    var.access_collective()?;
     let values = var.get::<i32, _>((.., rank as usize))?;
 
     for (t, &v) in values.iter().enumerate() {

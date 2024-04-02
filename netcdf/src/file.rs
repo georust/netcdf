@@ -319,33 +319,6 @@ impl File {
         let Self(file) = self;
         file.close()
     }
-
-    /// Access all variable in independent mode
-    /// for parallell reading using MPI.
-    /// File must have been opened using `open_par`
-    ///
-    /// This is the default access mode
-    #[cfg(feature = "mpi")]
-    pub fn access_independent(&self) -> error::Result<()> {
-        let ncid = self.ncid();
-        crate::par::set_access_mode(
-            ncid,
-            netcdf_sys::NC_GLOBAL,
-            crate::par::AccessMode::Independent,
-        )
-    }
-    /// Access all variable in collective mode
-    /// for parallell reading using MPI.
-    /// File must have been opened using `open_par`
-    #[cfg(feature = "mpi")]
-    pub fn access_collective(&self) -> error::Result<()> {
-        let ncid = self.ncid();
-        crate::par::set_access_mode(
-            ncid,
-            netcdf_sys::NC_GLOBAL,
-            crate::par::AccessMode::Collective,
-        )
-    }
 }
 
 /// Mutable access to file.
