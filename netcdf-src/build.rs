@@ -89,14 +89,14 @@ fn main() {
 
     let netcdf = netcdf_config.build();
 
+    // Only forward link options to netcdf-sys, so netcdf-sys can
+    // optionally choose not to use this build
     println!("cargo::metadata=lib=netcdf");
     let search_path = format!("{}/lib", netcdf.display());
     if std::path::Path::new(&search_path).exists() {
         println!("cargo::metadata=search={search_path}");
-        println!("cargo::rustc-link-search={}", search_path);
     } else {
         let search_path = format!("{}/lib64", netcdf.display());
         println!("cargo::metadata=search={search_path}");
-        println!("cargo::rustc-link-search={}", search_path);
     }
 }
