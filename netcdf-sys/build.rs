@@ -295,6 +295,12 @@ fn main() {
         Version::new(4, 9, 2),
     ];
 
+    for version in &versions {
+        // println!("cargo::rustc-check-cfg={version}");
+        println!("cargo::rustc-check-cfg=cfg(feature, values(\"{version}\"))");
+    }
+    println!("cargo::rustc-check-cfg=cfg(feature, values(\"has-mmap\"))");
+
     if !versions.contains(&metaheader.version) {
         if versions
             .iter()

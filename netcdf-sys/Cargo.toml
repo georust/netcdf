@@ -17,7 +17,7 @@ categories = ["external-ffi-bindings", "filesystem", "science"]
 exclude = [
     "testdata/**",
 ]
-rust-version = "1.70"
+rust-version = "1.77"
 
 [dependencies]
 libz-sys = { version = "1.0.25" }
