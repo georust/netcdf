@@ -306,6 +306,10 @@ fn main() {
                 "cargo:rustc-cfg=feature=\"{}.{}.{}\"",
                 version.major, version.minor, version.patch
             );
+            println!(
+                "cargo:version_\"{}.{}.{}\"=1",
+                version.major, version.minor, version.patch
+            );
         }
     }
     metaheader.emit_feature_flags();
