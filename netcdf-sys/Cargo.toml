@@ -31,7 +31,7 @@ netcdf-src = { workspace = true, optional = true }
 default = []
 memio = []
 static = ["libz-sys/static", "hdf5-sys/static", "hdf5-sys/hl", "hdf5-sys/deprecated", "hdf5-sys/zlib", "dep:netcdf-src", "curl-sys?/static-curl", "curl-sys?/static-ssl"]
-dap = ["dep:curl-sys"]
+dap = ["dep:curl-sys", "netcdf-src?/dap"]
 
 [build-dependencies]
 semver = "1.0.9"
