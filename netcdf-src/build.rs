@@ -52,6 +52,8 @@ fn main() {
         .define("HDF5_HL_LIBRARY", &hdf5_hl_lib)
         .define("HDF5_INCLUDE_DIR", hdf5_incdir)
         //
+        .define("ENABLE_LIBXML2", "OFF") // Use bundled xml2
+        //
         .define("ENABLE_PARALLEL4", "OFF") // TODO: Enable mpi support
         //
         .define("ENABLE_NCZARR", "OFF") // TODO: requires a bunch of deps

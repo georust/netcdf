@@ -28,11 +28,12 @@ exclude = [
 ]
 
 [features]
-dap = []
+dap = ["dep:link-cplusplus"]
 
 [dependencies]
 hdf5-sys = { workspace = true, features = ["hl", "deprecated", "zlib"] }
 libz-sys = { version = "1.0.25" }
+link-cplusplus = { version = "1.0.9", optional = true }
 
 [build-dependencies]
 cmake = "0.1.44"
