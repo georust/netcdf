@@ -4,3 +4,6 @@
 
 #[cfg(feature = "dap")]
 extern crate link_cplusplus;
+
+extern crate hdf5_sys;
+extern crate libz_sys;
