@@ -1728,6 +1728,11 @@ mod netcdf_2 {
         #[cfg(feature = "4.6.2")]
         pub fn nc_initialize() -> c_int;
         pub fn nc_finalize() -> c_int;
+
+        #[cfg(feature = "4.9.2")]
+        pub fn nc_rc_get(key: *const c_char) -> *mut c_char;
+        #[cfg(feature = "4.9.2")]
+        pub fn nc_rc_set(key: *const c_char, value: *const c_char) -> c_int;
     }
 }
 pub use netcdf_2::*;

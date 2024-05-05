@@ -284,6 +284,7 @@ fn main() {
         Version::new(4, 8, 1),
         Version::new(4, 9, 0),
         Version::new(4, 9, 1),
+        Version::new(4, 9, 2),
     ];
 
     if !versions.contains(&metaheader.version) {
@@ -303,6 +304,10 @@ fn main() {
         if metaheader.version >= version {
             println!(
                 "cargo:rustc-cfg=feature=\"{}.{}.{}\"",
+                version.major, version.minor, version.patch
+            );
+            println!(
+                "cargo:version_\"{}.{}.{}\"=1",
                 version.major, version.minor, version.patch
             );
         }

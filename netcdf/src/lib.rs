@@ -110,6 +110,8 @@ pub(crate) mod error;
 pub(crate) mod extent;
 pub(crate) mod file;
 pub(crate) mod group;
+#[cfg(feature = "4.9.2")]
+pub mod rc;
 pub mod types;
 pub(crate) mod variable;
 

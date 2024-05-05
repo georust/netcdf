@@ -23,6 +23,7 @@ static = ["netcdf-sys/static"]
 ndarray = { version = "0.15", optional = true }
 netcdf-sys = { workspace = true }
 bitflags = "2.4.2"
+libc = "0.2.154"
 
 [dev-dependencies]
 clap = { version = "4.5.1", features = ["derive"] }
