@@ -284,6 +284,7 @@ fn main() {
         Version::new(4, 8, 1),
         Version::new(4, 9, 0),
         Version::new(4, 9, 1),
+        Version::new(4, 9, 2),
     ];
 
     if !versions.contains(&metaheader.version) {
