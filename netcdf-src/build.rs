@@ -27,8 +27,19 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     let hdf5_incdir = std::env::var("DEP_HDF5_INCLUDE").unwrap();
-    let hdf5_lib = std::env::var("DEP_HDF5_LIBRARY").unwrap();
-    let hdf5_hl_lib = std::env::var("DEP_HDF5_HL_LIBRARY").unwrap();
+    let mut hdf5_lib = std::env::var("DEP_HDF5_LIBRARY").unwrap();
+    let mut hdf5_hl_lib = std::env::var("DEP_HDF5_HL_LIBRARY").unwrap();
+
+    #[cfg(unix)]
+    {
+        let hdf5_root = format!("{hdf5_incdir}/../");
+        let mut hdf5_libdir = format!("{hdf5_root}/lib/");
+        if !std::path::Path::new(&hdf5_libdir).exists() {
+            hdf5_libdir = format!("{hdf5_root}/lib64/");
+        }
+        hdf5_lib = format!("{hdf5_libdir}/{hdf5_lib}.a");
+        hdf5_hl_lib = format!("{hdf5_libdir}/{hdf5_hl_lib}.a");
+    }
 
     let hdf5_version = get_hdf5_version();
 
