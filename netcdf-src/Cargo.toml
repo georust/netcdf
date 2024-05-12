@@ -26,7 +26,7 @@ exclude = [
     "source/nctest/**",
     "source/ncdap_test/**",
 ]
-rust-version = "1.77"
+rust-version = "1.77.0"
 
 [features]
 dap = ["dep:link-cplusplus"]
