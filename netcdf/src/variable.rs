@@ -244,7 +244,7 @@ impl<'g> VariableMut<'g> {
             .iter()
             .copied()
             .fold(1_usize, usize::saturating_mul);
-        if len == usize::max_value() {
+        if len == usize::MAX {
             return Err(error::Error::Overflow);
         }
         unsafe {
