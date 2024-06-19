@@ -22,7 +22,7 @@ Supported:
 * Open/Append/Create modes
 * Reading from memory
 * Unlimited dimensions
-* User defined types (enum, compound, other types requires additional work)
+* User defined types, using the feature `derive` (enum, compound, other types requires additional work)
 
 Not (yet) supported (PRs welcome):
 * Writing using memory-mapped file

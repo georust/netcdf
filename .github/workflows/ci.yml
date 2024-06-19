@@ -37,9 +37,9 @@ jobs:
     - name: Check formatting
       run: cargo fmt -- --check
     - name: Documentation
-      run: cargo doc --workspace
+      run: cargo doc --workspace --features netcdf/derive
     - name: Clippy
-      run: cargo clippy --workspace -- -D warnings
+      run: cargo clippy --features netcdf/derive --workspace -- -D warnings
 
   test_apt:
     name: test apt
@@ -71,10 +71,10 @@ jobs:
         toolchain: ${{ matrix.rust }}
 
     - name: Build
-      run: cargo build --verbose --workspace --exclude netcdf-src
+      run: cargo build --verbose --features netcdf/derive --workspace --exclude netcdf-src
 
     - name: Test
-      run: cargo test --verbose --workspace --exclude netcdf-src --exclude netcdf-derive
+      run: cargo test --verbose --features netcdf/derive --workspace --exclude netcdf-src --exclude netcdf-derive
 
   conda:
     name: conda
@@ -106,7 +106,7 @@ jobs:
           export HDF5_DIR="$CONDA_PREFIX"
           export NETCDF_DIR="$CONDA_PREFIX"
           [ "${{runner.os}}" != "Windows" ] && export RUSTFLAGS="-C link-args=-Wl,-rpath,$CONDA_PREFIX/lib"
-          cargo test -vv --workspace --exclude netcdf-src --exclude netcdf-derive
+          cargo test -vv --workspace --exclude netcdf-src --exclude netcdf-derive --features netcdf/derive
 
   static_builds:
     name: static builds
@@ -131,7 +131,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with: {toolchain: '${{matrix.rust}}'}
       - name: Build and test
-        run: cargo test -vv --features static --workspace --exclude netcdf-derive
+        run: cargo test -vv --features netcdf/derive,static --workspace --exclude netcdf-derive
 
   addr_san:
     name: Address sanitizer
@@ -147,4 +147,4 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
-        run: cargo test --features netcdf-sys/static --target x86_64-unknown-linux-gnu --workspace --exclude netcdf-derive
+        run: cargo test --features netcdf-sys/static,netcdf/derive --target x86_64-unknown-linux-gnu --workspace --exclude netcdf-derive

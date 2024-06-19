@@ -95,6 +95,27 @@
 //! var.put((11.., ..), values.view())?;
 //! # Ok(()) }
 //! ```
+//!
+//! How to derive `NcTypeDescriptor` for a custom type (requires `derive` feature flag).
+//! See [NcTypeDescriptor] for additional examples.
+//!
+//! ```no_run
+//! # #[cfg(not(feature = "derive"))]
+//! # fn main() { /* This test does nothing without derive feature flag */ }
+//! # #[cfg(feature = "derive")]
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #[repr(C)]
+//! #[derive(netcdf::NcType)]
+//! struct Foo {
+//!   bar: f64,
+//!   baz: i64,
+//! }
+//! let mut file = netcdf::create("custom.nc")?;
+//! file.add_type::<Foo>()?;
+//! let mut var = file.add_variable::<Foo>("variable", &[])?;
+//! var.put_value(Foo { bar: 1.0, baz: 2 }, ())?;
+//! # Ok(()) }
+//!
 
 #![warn(missing_docs)]
 #![allow(clippy::must_use_candidate)]

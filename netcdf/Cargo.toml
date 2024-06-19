@@ -16,7 +16,7 @@ exclude = ["examples/**", "tests/**"]
 build = "build.rs"
 
 [features]
-default = ["ndarray", "derive"]
+default = ["ndarray"]
 static = ["netcdf-sys/static"]
 derive = ["dep:netcdf-derive"]
 

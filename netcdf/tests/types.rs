@@ -454,6 +454,7 @@ fn char() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 fn no_subtype() {
     #[derive(netcdf::NcType)]
     #[repr(C)]
