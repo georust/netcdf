@@ -174,7 +174,7 @@ jobs:
       run: cargo test --verbose --workspace --exclude netcdf-src --features netcdf/mpi,derive
 
     - name: Run example
-      run: cargo run --verbose --package netcdf-examples --features mpi,derive
+      run: cargo run --verbose --package netcdf-examples --features mpi
 
     - name: Run example in parallel
       run: mpirun -np 10 --oversubscribe -- target/debug/netcdf-examples

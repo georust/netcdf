@@ -97,7 +97,7 @@ impl RawFile {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = 0;
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(with_lock(|| {
                 netcdf_sys::par::nc_open_par(
                     f.as_ptr().cast(),
                     options.bits(),
@@ -140,7 +140,7 @@ impl RawFile {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = -1;
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(with_lock(|| {
                 netcdf_sys::par::nc_create_par(
                     f.as_ptr().cast(),
                     options.bits(),
@@ -500,16 +500,12 @@ impl FileMut {
 
     /// Open the file for new definitions
     pub fn redef(&mut self) -> error::Result<()> {
-        error::checked(super::with_lock(|| unsafe {
-            netcdf_sys::nc_redef(self.ncid())
-        }))
+        error::checked(with_lock(|| unsafe { netcdf_sys::nc_redef(self.ncid()) }))
     }
 
     /// Close the file for new definitions
     pub fn enddef(&mut self) -> error::Result<()> {
-        error::checked(super::with_lock(|| unsafe {
-            netcdf_sys::nc_enddef(self.ncid())
-        }))
+        error::checked(with_lock(|| unsafe { netcdf_sys::nc_enddef(self.ncid()) }))
     }
 }
 

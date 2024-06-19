@@ -194,7 +194,7 @@ impl<'g> Variable<'g> {
 
     #[cfg(feature = "mpi")]
     fn access_mode(&self, mode: crate::par::AccessMode) -> error::Result<()> {
-        error::checked(super::with_lock(|| unsafe {
+        error::checked(utils::with_lock(|| unsafe {
             netcdf_sys::par::nc_var_par_access(
                 self.ncid,
                 self.varid,

@@ -1,6 +1,6 @@
 use crate::{
     error::{checked, Result},
-    with_lock,
+    utils::with_lock,
 };
 
 use netcdf_sys::nc_type;
