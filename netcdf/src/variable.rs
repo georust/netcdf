@@ -1,9 +1,7 @@
 //! Variables in the netcdf file
 #![allow(clippy::similar_names)]
-use std::ffi::{c_char, CStr};
+
 use std::marker::PhantomData;
-use std::mem::MaybeUninit;
-use std::ptr::addr_of;
 
 #[cfg(feature = "ndarray")]
 use ndarray::ArrayD;
@@ -13,7 +11,8 @@ use super::attribute::{Attribute, AttributeValue};
 use super::dimension::Dimension;
 use super::error;
 use super::extent::Extents;
-use super::types::VariableType;
+use crate::types::{NcTypeDescriptor, NcVariableType};
+use crate::utils;
 
 #[allow(clippy::doc_markdown)]
 /// This struct defines a `netCDF` variable.
@@ -77,7 +76,7 @@ impl<'g> Variable<'g> {
         let cname = super::utils::short_name_to_bytes(name)?;
         let mut varid = 0;
         let e =
-            unsafe { super::with_lock(|| nc_inq_varid(ncid, cname.as_ptr().cast(), &mut varid)) };
+            unsafe { utils::with_lock(|| nc_inq_varid(ncid, cname.as_ptr().cast(), &mut varid)) };
         if e == NC_ENOTVAR {
             return Ok(None);
         }
@@ -86,7 +85,7 @@ impl<'g> Variable<'g> {
         let mut xtype = 0;
         let mut ndims = 0;
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(utils::with_lock(|| {
                 nc_inq_var(
                     ncid,
                     varid,
@@ -100,7 +99,7 @@ impl<'g> Variable<'g> {
         }
         let mut dimids = vec![0; ndims.try_into()?];
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(utils::with_lock(|| {
                 nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr())
             }))?;
         }
@@ -120,7 +119,7 @@ impl<'g> Variable<'g> {
     pub fn name(&self) -> String {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(utils::with_lock(|| {
                 nc_inq_varname(self.ncid, self.varid, name.as_mut_ptr().cast())
             }))
             .unwrap();
@@ -163,8 +162,8 @@ impl<'g> Variable<'g> {
         &self.dimensions
     }
     /// Get the type of this variable
-    pub fn vartype(&self) -> VariableType {
-        VariableType::from_id(self.ncid, self.vartype).unwrap()
+    pub fn vartype(&self) -> NcVariableType {
+        crate::types::read_type(self.ncid, self.vartype).expect("Unknown type encountered")
     }
     /// Get current length of the variable
     pub fn len(&self) -> usize {
@@ -181,7 +180,7 @@ impl<'g> Variable<'g> {
     pub fn endianness(&self) -> error::Result<Endianness> {
         let mut e: nc_type = 0;
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(utils::with_lock(|| {
                 nc_inq_var_endian(self.ncid, self.varid, &mut e)
             }))?;
         }
@@ -208,7 +207,7 @@ impl<'g> VariableMut<'g> {
     /// Not a `netcdf-4` file or `deflate_level` not valid
     pub fn set_compression(&mut self, deflate_level: nc_type, shuffle: bool) -> error::Result<()> {
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(utils::with_lock(|| {
                 nc_def_var_deflate(
                     self.ncid,
                     self.varid,
@@ -248,484 +247,12 @@ impl<'g> VariableMut<'g> {
             return Err(error::Error::Overflow);
         }
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(utils::with_lock(|| {
                 nc_def_var_chunking(self.ncid, self.varid, NC_CHUNKED, chunksize.as_ptr())
             }))?;
         }
 
         Ok(())
-    }
-}
-
-mod sealed {
-    pub trait Sealed {}
-}
-
-#[allow(clippy::doc_markdown)]
-/// This trait allow an implicit cast when fetching
-/// a netCDF variable. These methods are not be called
-/// directly, but used through methods on `Variable`
-///
-/// # Safety
-/// This trait maps directly to netCDF semantics and needs
-/// to upheld invariants therein.
-/// This trait is sealed and can not be implemented for
-/// types outside this crate
-pub trait NcPutGet: sealed::Sealed
-where
-    Self: Sized,
-{
-    /// Constant corresponding to a netcdf type
-    const NCTYPE: nc_type;
-
-    /// Returns a single indexed value of the variable as Self
-    ///
-    /// # Safety
-    ///
-    /// Requires `indices` to be of a valid length
-    unsafe fn get_var1(variable: &Variable, start: &[usize]) -> error::Result<Self>;
-
-    #[allow(clippy::doc_markdown)]
-    /// Put a single value into a netCDF variable
-    ///
-    /// # Safety
-    ///
-    /// Requires `indices` to be of a valid length
-    unsafe fn put_var1(
-        variable: &mut VariableMut,
-        start: &[usize],
-        value: Self,
-    ) -> error::Result<()>;
-
-    /// Get multiple values at once, without checking the validity of
-    /// `indices` or `slice_len`
-    ///
-    /// # Safety
-    ///
-    /// Requires `values` to be of at least size `slice_len.product()`,
-    /// `indices` and `slice_len` to be of a valid length
-    unsafe fn get_vara(
-        variable: &Variable,
-        start: &[usize],
-        count: &[usize],
-        values: *mut Self,
-    ) -> error::Result<()>;
-
-    #[allow(clippy::doc_markdown)]
-    /// put a SLICE of values into a netCDF variable at the given index
-    ///
-    /// # Safety
-    ///
-    /// Requires `indices` and `slice_len` to be of a valid length
-    unsafe fn put_vara(
-        variable: &mut VariableMut,
-        start: &[usize],
-        count: &[usize],
-        values: &[Self],
-    ) -> error::Result<()>;
-
-    /// get a SLICE of values into the variable, with the source
-    /// strided by `stride`
-    ///
-    /// # Safety
-    ///
-    /// `values` must contain space for all the data,
-    /// `indices`, `slice_len`, and `stride` must be of
-    /// at least dimension length size.
-    unsafe fn get_vars(
-        variable: &Variable,
-        start: &[usize],
-        count: &[usize],
-        stride: &[isize],
-        values: *mut Self,
-    ) -> error::Result<()>;
-
-    /// put a SLICE of values into the variable, with the destination
-    /// strided by `stride`
-    ///
-    /// # Safety
-    ///
-    /// `values` must contain space for all the data,
-    /// `indices`, `slice_len`, and `stride` must be of
-    /// at least dimension length size.
-    unsafe fn put_vars(
-        variable: &mut VariableMut,
-        start: &[usize],
-        count: &[usize],
-        stride: &[isize],
-        values: *const Self,
-    ) -> error::Result<()>;
-
-    /// get a SLICE of values into the variable, with the source
-    /// strided by `stride`, mapped by `map`
-    ///
-    /// # Safety
-    ///
-    /// `values` must contain space for all the data,
-    /// `indices`, `slice_len`, and `stride` must be of
-    /// at least dimension length size.
-    unsafe fn get_varm(
-        variable: &Variable,
-        start: &[usize],
-        count: &[usize],
-        stride: &[isize],
-        map: &[isize],
-        values: *mut Self,
-    ) -> error::Result<()>;
-
-    /// put a SLICE of values into the variable, with the destination
-    /// strided by `stride`
-    ///
-    /// # Safety
-    ///
-    /// `values` must contain space for all the data,
-    /// `indices`, `slice_len`, and `stride` must be of
-    /// at least dimension length size.
-    unsafe fn put_varm(
-        variable: &mut VariableMut,
-        start: &[usize],
-        count: &[usize],
-        stride: &[isize],
-        map: &[isize],
-        values: *const Self,
-    ) -> error::Result<()>;
-}
-
-#[allow(clippy::doc_markdown)]
-/// This macro implements the trait NcPutGet for the type `sized_type`.
-///
-/// The use of this macro reduce code duplication for the implementation of NcPutGet
-/// for the common numeric types (i32, f32 ...): they only differs by the name of the
-/// C function used to fetch values from the NetCDF variable (eg: `nc_get_var_ushort`, ...).
-macro_rules! impl_numeric {
-    (
-        $sized_type: ty,
-        $nc_type: ident,
-        $nc_get_var: ident,
-        $nc_get_vara_type: ident,
-        $nc_get_var1_type: ident,
-        $nc_put_var1_type: ident,
-        $nc_put_vara_type: ident,
-        $nc_get_vars_type: ident,
-        $nc_put_vars_type: ident,
-        $nc_get_varm_type: ident,
-        $nc_put_varm_type: ident,
-    ) => {
-        impl sealed::Sealed for $sized_type {}
-        #[allow(clippy::use_self)] // False positives
-        impl NcPutGet for $sized_type {
-            const NCTYPE: nc_type = $nc_type;
-
-            // fetch ONE value from variable using `$nc_get_var1`
-            unsafe fn get_var1(variable: &Variable, start: &[usize]) -> error::Result<Self> {
-                let mut buff: MaybeUninit<Self> = MaybeUninit::uninit();
-                error::checked(super::with_lock(|| {
-                    $nc_get_var1_type(
-                        variable.ncid,
-                        variable.varid,
-                        start.as_ptr(),
-                        buff.as_mut_ptr(),
-                    )
-                }))?;
-                Ok(buff.assume_init())
-            }
-
-            // put a SINGLE value into a netCDF variable at the given index
-            unsafe fn put_var1(
-                variable: &mut VariableMut,
-                start: &[usize],
-                value: Self,
-            ) -> error::Result<()> {
-                error::checked(super::with_lock(|| {
-                    $nc_put_var1_type(
-                        variable.ncid,
-                        variable.varid,
-                        start.as_ptr(),
-                        addr_of!(value),
-                    )
-                }))
-            }
-
-            unsafe fn get_vara(
-                variable: &Variable,
-                start: &[usize],
-                count: &[usize],
-                values: *mut Self,
-            ) -> error::Result<()> {
-                error::checked(super::with_lock(|| {
-                    $nc_get_vara_type(
-                        variable.ncid,
-                        variable.varid,
-                        start.as_ptr(),
-                        count.as_ptr(),
-                        values,
-                    )
-                }))
-            }
-
-            // put a SLICE of values into a netCDF variable at the given index
-            unsafe fn put_vara(
-                variable: &mut VariableMut,
-                start: &[usize],
-                count: &[usize],
-                values: &[Self],
-            ) -> error::Result<()> {
-                error::checked(super::with_lock(|| {
-                    $nc_put_vara_type(
-                        variable.ncid,
-                        variable.varid,
-                        start.as_ptr(),
-                        count.as_ptr(),
-                        values.as_ptr(),
-                    )
-                }))
-            }
-
-            unsafe fn get_vars(
-                variable: &Variable,
-                start: &[usize],
-                count: &[usize],
-                strides: &[isize],
-                values: *mut Self,
-            ) -> error::Result<()> {
-                error::checked(super::with_lock(|| {
-                    $nc_get_vars_type(
-                        variable.ncid,
-                        variable.varid,
-                        start.as_ptr(),
-                        count.as_ptr(),
-                        strides.as_ptr(),
-                        values,
-                    )
-                }))
-            }
-
-            unsafe fn put_vars(
-                variable: &mut VariableMut,
-                start: &[usize],
-                count: &[usize],
-                stride: &[isize],
-                values: *const Self,
-            ) -> error::Result<()> {
-                error::checked(super::with_lock(|| {
-                    $nc_put_vars_type(
-                        variable.ncid,
-                        variable.varid,
-                        start.as_ptr(),
-                        count.as_ptr(),
-                        stride.as_ptr(),
-                        values,
-                    )
-                }))
-            }
-
-            unsafe fn get_varm(
-                variable: &Variable,
-                start: &[usize],
-                count: &[usize],
-                stride: &[isize],
-                map: &[isize],
-                values: *mut Self,
-            ) -> error::Result<()> {
-                error::checked(super::with_lock(|| {
-                    $nc_get_varm_type(
-                        variable.ncid,
-                        variable.varid,
-                        start.as_ptr(),
-                        count.as_ptr(),
-                        stride.as_ptr(),
-                        map.as_ptr(),
-                        values,
-                    )
-                }))
-            }
-
-            unsafe fn put_varm(
-                variable: &mut VariableMut,
-                start: &[usize],
-                count: &[usize],
-                stride: &[isize],
-                map: &[isize],
-                values: *const Self,
-            ) -> error::Result<()> {
-                error::checked(super::with_lock(|| {
-                    $nc_put_varm_type(
-                        variable.ncid,
-                        variable.varid,
-                        start.as_ptr(),
-                        count.as_ptr(),
-                        stride.as_ptr(),
-                        map.as_ptr(),
-                        values,
-                    )
-                }))
-            }
-        }
-    };
-}
-impl_numeric!(
-    u8,
-    NC_UBYTE,
-    nc_get_var_uchar,
-    nc_get_vara_uchar,
-    nc_get_var1_uchar,
-    nc_put_var1_uchar,
-    nc_put_vara_uchar,
-    nc_get_vars_uchar,
-    nc_put_vars_uchar,
-    nc_get_varm_uchar,
-    nc_put_varm_uchar,
-);
-
-impl_numeric!(
-    i8,
-    NC_BYTE,
-    nc_get_var_schar,
-    nc_get_vara_schar,
-    nc_get_var1_schar,
-    nc_put_var1_schar,
-    nc_put_vara_schar,
-    nc_get_vars_schar,
-    nc_put_vars_schar,
-    nc_get_varm_schar,
-    nc_put_varm_schar,
-);
-
-impl_numeric!(
-    i16,
-    NC_SHORT,
-    nc_get_var_short,
-    nc_get_vara_short,
-    nc_get_var1_short,
-    nc_put_var1_short,
-    nc_put_vara_short,
-    nc_get_vars_short,
-    nc_put_vars_short,
-    nc_get_varm_short,
-    nc_put_varm_short,
-);
-
-impl_numeric!(
-    u16,
-    NC_USHORT,
-    nc_get_var_ushort,
-    nc_get_vara_ushort,
-    nc_get_var1_ushort,
-    nc_put_var1_ushort,
-    nc_put_vara_ushort,
-    nc_get_vars_ushort,
-    nc_put_vars_ushort,
-    nc_get_varm_ushort,
-    nc_put_varm_ushort,
-);
-
-impl_numeric!(
-    i32,
-    NC_INT,
-    nc_get_var_int,
-    nc_get_vara_int,
-    nc_get_var1_int,
-    nc_put_var1_int,
-    nc_put_vara_int,
-    nc_get_vars_int,
-    nc_put_vars_int,
-    nc_get_varm_int,
-    nc_put_varm_int,
-);
-
-impl_numeric!(
-    u32,
-    NC_UINT,
-    nc_get_var_uint,
-    nc_get_vara_uint,
-    nc_get_var1_uint,
-    nc_put_var1_uint,
-    nc_put_vara_uint,
-    nc_get_vars_uint,
-    nc_put_vars_uint,
-    nc_get_varm_uint,
-    nc_put_varm_uint,
-);
-
-impl_numeric!(
-    i64,
-    NC_INT64,
-    nc_get_var_longlong,
-    nc_get_vara_longlong,
-    nc_get_var1_longlong,
-    nc_put_var1_longlong,
-    nc_put_vara_longlong,
-    nc_get_vars_longlong,
-    nc_put_vars_longlong,
-    nc_get_varm_longlong,
-    nc_put_varm_longlong,
-);
-
-impl_numeric!(
-    u64,
-    NC_UINT64,
-    nc_get_var_ulonglong,
-    nc_get_vara_ulonglong,
-    nc_get_var1_ulonglong,
-    nc_put_var1_ulonglong,
-    nc_put_vara_ulonglong,
-    nc_get_vars_ulonglong,
-    nc_put_vars_ulonglong,
-    nc_get_varm_ulonglong,
-    nc_put_varm_ulonglong,
-);
-
-impl_numeric!(
-    f32,
-    NC_FLOAT,
-    nc_get_var_float,
-    nc_get_vara_float,
-    nc_get_var1_float,
-    nc_put_var1_float,
-    nc_put_vara_float,
-    nc_get_vars_float,
-    nc_put_vars_float,
-    nc_get_varm_float,
-    nc_put_varm_float,
-);
-
-impl_numeric!(
-    f64,
-    NC_DOUBLE,
-    nc_get_var_double,
-    nc_get_vara_double,
-    nc_get_var1_double,
-    nc_put_var1_double,
-    nc_put_vara_double,
-    nc_get_vars_double,
-    nc_put_vars_double,
-    nc_get_varm_double,
-    nc_put_varm_double,
-);
-
-/// Holds the contents of a netcdf string. Use deref to get a `CStr`
-struct NcString {
-    data: *mut c_char,
-}
-impl NcString {
-    /// Create an `NcString`
-    ///
-    /// TODO: Change signature to c_char or remove
-    unsafe fn from_ptr(ptr: *mut i8) -> Self {
-        Self { data: ptr.cast() }
-    }
-}
-impl Drop for NcString {
-    fn drop(&mut self) {
-        unsafe {
-            error::checked(super::with_lock(|| nc_free_string(1, &mut self.data))).unwrap();
-        }
-    }
-}
-impl std::ops::Deref for NcString {
-    type Target = CStr;
-    fn deref(&self) -> &Self::Target {
-        unsafe { CStr::from_ptr(self.data) }
     }
 }
 
@@ -740,66 +267,7 @@ impl<'g> VariableMut<'g> {
 }
 
 impl<'g> Variable<'g> {
-    fn value_mono<T: NcPutGet>(&self, extent: &Extents) -> error::Result<T> {
-        let dims = self.dimensions();
-        let (start, count, _stride) = extent.get_start_count_stride(dims)?;
-
-        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
-        if number_of_items != 1 {
-            return Err(error::Error::BufferLen {
-                wanted: 1,
-                actual: number_of_items,
-            });
-        }
-
-        unsafe { T::get_var1(self, &start) }
-    }
-
-    ///  Fetches one specific value at specific indices
-    ///  indices must has the same length as self.dimensions.
-    pub fn get_value<T: NcPutGet, E>(&self, indices: E) -> error::Result<T>
-    where
-        E: TryInto<Extents>,
-        E::Error: Into<error::Error>,
-    {
-        let extent = indices.try_into().map_err(Into::into)?;
-        self.value_mono(&extent)
-    }
-
-    fn string_value_mono(&self, extent: &Extents) -> error::Result<String> {
-        let dims = self.dimensions();
-        let (start, count, _stride) = extent.get_start_count_stride(dims)?;
-
-        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
-        if number_of_items != 1 {
-            return Err(error::Error::BufferLen {
-                wanted: 1,
-                actual: number_of_items,
-            });
-        }
-
-        let mut s: *mut std::os::raw::c_char = std::ptr::null_mut();
-        unsafe {
-            error::checked(super::with_lock(|| {
-                nc_get_var1_string(self.ncid, self.varid, start.as_ptr(), &mut s)
-            }))?;
-        }
-        let string = unsafe { NcString::from_ptr(s.cast()) };
-        Ok(string.to_string_lossy().into_owned())
-    }
-
-    /// Reads a string variable. This involves two copies per read, and should
-    /// be avoided in performance critical code
-    pub fn get_string<E>(&self, indices: E) -> error::Result<String>
-    where
-        E: TryInto<Extents>,
-        E::Error: Into<error::Error>,
-    {
-        let extent = indices.try_into().map_err(Into::into)?;
-        self.string_value_mono(&extent)
-    }
-
-    fn values_mono<T: NcPutGet>(&self, extents: &Extents) -> error::Result<Vec<T>> {
+    fn get_values_mono<T: NcTypeDescriptor>(&self, extents: &Extents) -> error::Result<Vec<T>> {
         let dims = self.dimensions();
         let (start, count, stride) = extents.get_start_count_stride(dims)?;
 
@@ -807,7 +275,14 @@ impl<'g> Variable<'g> {
         let mut values = Vec::with_capacity(number_of_elements);
 
         unsafe {
-            T::get_vars(self, &start, &count, &stride, values.as_mut_ptr())?;
+            super::putget::get_vars(
+                self,
+                &T::type_descriptor(),
+                &start,
+                &count,
+                &stride,
+                values.as_mut_ptr(),
+            )?;
             values.set_len(number_of_elements);
         };
         Ok(values)
@@ -831,18 +306,59 @@ impl<'g> Variable<'g> {
     /// # Result::<(), netcdf::Error>::Ok(())
     /// ```
     /// where `Option::transpose` is used to bubble up any read errors
-    pub fn get_values<T: NcPutGet, E>(&self, extents: E) -> error::Result<Vec<T>>
+    pub fn get_values<T: NcTypeDescriptor + Copy, E>(&self, extents: E) -> error::Result<Vec<T>>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
     {
         let extents: Extents = extents.try_into().map_err(Into::into)?;
-        self.values_mono(&extents)
+        self.get_values_mono(&extents)
+    }
+
+    /// Get a single value
+    pub fn get_value<T: NcTypeDescriptor + Copy, E>(&self, extents: E) -> error::Result<T>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let mut elems = self.get_values::<T, _>(extents)?;
+        if elems.is_empty() {
+            return Err("No elements returned".into());
+        }
+        if elems.len() > 1 {
+            return Err("Too many elements returned".into());
+        }
+        Ok(elems.pop().unwrap())
+    }
+
+    /// Get a string from this variable
+    pub fn get_string<E>(&self, extents: E) -> error::Result<String>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents = extents.try_into().map_err(Into::into)?;
+        let mut elems = self.get_values_mono::<super::types::NcString>(&extents)?;
+        if elems.is_empty() {
+            return Err("No elements returned".into());
+        }
+        if elems.len() > 1 {
+            super::utils::checked_with_lock(|| unsafe {
+                netcdf_sys::nc_free_string(elems.len(), elems.as_mut_ptr().cast())
+            })?;
+            return Err("Too many elements returned".into());
+        }
+        let cstr = unsafe { std::ffi::CStr::from_ptr(elems[0].0) };
+        let s = cstr.to_string_lossy().to_string();
+        super::utils::checked_with_lock(|| unsafe {
+            netcdf_sys::nc_free_string(elems.len(), elems.as_mut_ptr().cast())
+        })?;
+        Ok(s)
     }
 
     #[cfg(feature = "ndarray")]
     /// Fetches variable
-    fn values_arr_mono<T: NcPutGet>(&self, extents: &Extents) -> error::Result<ArrayD<T>> {
+    fn values_arr_mono<T: NcTypeDescriptor>(&self, extents: &Extents) -> error::Result<ArrayD<T>> {
         let dims = self.dimensions();
         let mut start = vec![];
         let mut count = vec![];
@@ -860,8 +376,15 @@ impl<'g> Variable<'g> {
 
         let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
         let mut values = Vec::with_capacity(number_of_elements);
+        super::putget::get_vars(
+            self,
+            &T::type_descriptor(),
+            &start,
+            &count,
+            &stride,
+            values.as_mut_ptr(),
+        )?;
         unsafe {
-            T::get_vars(self, &start, &count, &stride, values.as_mut_ptr())?;
             values.set_len(number_of_elements);
         };
 
@@ -870,7 +393,7 @@ impl<'g> Variable<'g> {
 
     #[cfg(feature = "ndarray")]
     /// Get values from a variable
-    pub fn get<T: NcPutGet, E>(&self, extents: E) -> error::Result<ArrayD<T>>
+    pub fn get<T: NcTypeDescriptor + Copy, E>(&self, extents: E) -> error::Result<ArrayD<T>>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -881,7 +404,7 @@ impl<'g> Variable<'g> {
 
     #[cfg(feature = "ndarray")]
     /// Get values from a variable directly into an ndarray
-    pub fn get_into<T: NcPutGet, E, D>(
+    pub fn get_into<T: NcTypeDescriptor + Copy, E, D>(
         &self,
         extents: E,
         mut out: ndarray::ArrayViewMut<T, D>,
@@ -891,7 +414,7 @@ impl<'g> Variable<'g> {
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
     {
-        let extents = extents.try_into().map_err(|e| e.into())?;
+        let extents = extents.try_into().map_err(Into::into)?;
 
         let dims = self.dimensions();
         let mut start = Vec::with_capacity(dims.len());
@@ -920,9 +443,7 @@ impl<'g> Variable<'g> {
             return Err(("Output array dimensionality is larger than extents").into());
         }
 
-        let slice = if let Some(slice) = out.as_slice_mut() {
-            slice
-        } else {
+        let Some(slice) = out.as_slice_mut() else {
             return Err("Output array must be in standard layout".into());
         };
 
@@ -935,22 +456,25 @@ impl<'g> Variable<'g> {
         // Safety:
         // start, count, stride are correct length
         // slice is valid pointer, with enough space to hold all elements
-        unsafe {
-            T::get_vars(self, &start, &count, &stride, slice.as_mut_ptr())?;
-        }
-
-        Ok(())
+        super::putget::get_vars(
+            self,
+            &T::type_descriptor(),
+            &start,
+            &count,
+            &stride,
+            slice.as_mut_ptr(),
+        )
     }
 
     /// Get the fill value of a variable
-    pub fn fill_value<T: NcPutGet>(&self) -> error::Result<Option<T>> {
-        if T::NCTYPE != self.vartype {
+    pub fn fill_value<T: NcTypeDescriptor + Copy>(&self) -> error::Result<Option<T>> {
+        if T::type_descriptor() != super::types::read_type(self.ncid, self.vartype)? {
             return Err(error::Error::TypeMismatch);
         }
         let mut location = std::mem::MaybeUninit::uninit();
         let mut nofill: nc_type = 0;
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(utils::with_lock(|| {
                 nc_inq_var_fill(
                     self.ncid,
                     self.varid,
@@ -966,7 +490,7 @@ impl<'g> Variable<'g> {
         Ok(Some(unsafe { location.assume_init() }))
     }
 
-    fn values_to_mono<T: NcPutGet>(
+    fn values_to_mono<T: NcTypeDescriptor>(
         &self,
         buffer: &mut [T],
         extents: &Extents,
@@ -981,11 +505,22 @@ impl<'g> Variable<'g> {
                 actual: buffer.len(),
             });
         }
-        unsafe { T::get_vars(self, &start, &count, &stride, buffer.as_mut_ptr()) }
+        super::putget::get_vars(
+            self,
+            &T::type_descriptor(),
+            &start,
+            &count,
+            &stride,
+            buffer.as_mut_ptr(),
+        )
     }
     /// Fetches variable into slice
     /// buffer must be able to hold all the requested elements
-    pub fn get_values_into<T: NcPutGet, E>(&self, buffer: &mut [T], extents: E) -> error::Result<()>
+    pub fn get_values_into<T: NcTypeDescriptor + Copy, E>(
+        &self,
+        buffer: &mut [T],
+        extents: E,
+    ) -> error::Result<()>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
@@ -993,171 +528,10 @@ impl<'g> Variable<'g> {
         let extents: Extents = extents.try_into().map_err(Into::into)?;
         self.values_to_mono(buffer, &extents)
     }
-
-    fn raw_values_mono(&self, buf: &mut [u8], extents: &Extents) -> error::Result<()> {
-        let dims = self.dimensions();
-        let (start, count, stride) = extents.get_start_count_stride(dims)?;
-
-        let typ = self.vartype();
-        match typ {
-            super::types::VariableType::String | super::types::VariableType::Vlen(_) => {
-                return Err(error::Error::TypeMismatch)
-            }
-            _ => (),
-        }
-
-        let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
-        let bytes_requested = number_of_elements.saturating_mul(typ.size());
-        if buf.len() != bytes_requested {
-            return Err(error::Error::BufferLen {
-                wanted: buf.len(),
-                actual: bytes_requested,
-            });
-        }
-
-        error::checked(super::with_lock(|| unsafe {
-            nc_get_vars(
-                self.ncid,
-                self.varid,
-                start.as_ptr(),
-                count.as_ptr(),
-                stride.as_ptr(),
-                buf.as_mut_ptr().cast(),
-            )
-        }))
-    }
-    /// Get values of any type as bytes, with no further interpretation
-    /// of the values.
-    ///
-    /// # Note
-    ///
-    /// When working with compound types, variable length arrays and
-    /// strings will be allocated in `buf`, and this library will
-    /// not keep track of the allocations.
-    /// This can lead to memory leaks.
-    pub fn get_raw_values<E>(&self, buf: &mut [u8], extents: E) -> error::Result<()>
-    where
-        E: TryInto<Extents>,
-        E::Error: Into<error::Error>,
-    {
-        let extents: Extents = extents.try_into().map_err(Into::into)?;
-        self.raw_values_mono(buf, &extents)
-    }
-
-    fn vlen_mono<T: NcPutGet>(&self, extent: &Extents) -> error::Result<Vec<T>> {
-        let dims = self.dimensions();
-        let (start, count, _stride) = extent.get_start_count_stride(dims)?;
-
-        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
-        if number_of_items != 1 {
-            return Err(error::Error::BufferLen {
-                wanted: 1,
-                actual: number_of_items,
-            });
-        }
-        if let super::types::VariableType::Vlen(v) = self.vartype() {
-            if v.typ().id() != T::NCTYPE {
-                return Err(error::Error::TypeMismatch);
-            }
-        } else {
-            return Err(error::Error::TypeMismatch);
-        };
-
-        let mut vlen: MaybeUninit<nc_vlen_t> = MaybeUninit::uninit();
-
-        error::checked(super::with_lock(|| unsafe {
-            nc_get_vara(
-                self.ncid,
-                self.varid,
-                start.as_ptr(),
-                count.as_ptr(),
-                vlen.as_mut_ptr().cast(),
-            )
-        }))?;
-
-        let mut vlen = unsafe { vlen.assume_init() };
-
-        let mut v = Vec::<T>::with_capacity(vlen.len);
-
-        unsafe {
-            std::ptr::copy_nonoverlapping(vlen.p as *const T, v.as_mut_ptr(), vlen.len);
-            v.set_len(vlen.len);
-        }
-        error::checked(super::with_lock(|| unsafe { nc_free_vlen(&mut vlen) })).unwrap();
-
-        Ok(v)
-    }
-    /// Get a vlen element
-    pub fn get_vlen<T: NcPutGet, E>(&self, indices: E) -> error::Result<Vec<T>>
-    where
-        E: TryInto<Extents>,
-        E::Error: Into<error::Error>,
-    {
-        let extent = indices.try_into().map_err(Into::into)?;
-        self.vlen_mono(&extent)
-    }
 }
 
 impl<'g> VariableMut<'g> {
-    fn put_value_mono<T: NcPutGet>(&mut self, value: T, extents: &Extents) -> error::Result<()> {
-        let dims = self.dimensions();
-        let (start, count, _stride) = extents.get_start_count_stride(dims)?;
-
-        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
-        if number_of_items != 1 {
-            return Err(error::Error::BufferLen {
-                wanted: 1,
-                actual: number_of_items,
-            });
-        }
-
-        unsafe { T::put_var1(self, &start, value) }
-    }
-    /// Put a single value at `indices`
-    pub fn put_value<T: NcPutGet, E>(&mut self, value: T, extents: E) -> error::Result<()>
-    where
-        E: TryInto<Extents>,
-        E::Error: Into<error::Error>,
-    {
-        let extents: Extents = extents.try_into().map_err(Into::into)?;
-        self.put_value_mono(value, &extents)
-    }
-
-    fn put_string_mono(&mut self, value: &str, extent: &Extents) -> error::Result<()> {
-        let dims = self.dimensions();
-        let (start, count, _stride) = extent.get_start_count_stride(dims)?;
-
-        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
-        if number_of_items != 1 {
-            return Err(error::Error::BufferLen {
-                wanted: 1,
-                actual: number_of_items,
-            });
-        }
-
-        let value = std::ffi::CString::new(value).expect("String contained interior 0");
-        let mut ptr = value.as_ptr();
-
-        unsafe {
-            error::checked(super::with_lock(|| {
-                nc_put_var1_string(self.ncid, self.varid, start.as_ptr(), &mut ptr)
-            }))?;
-        }
-
-        Ok(())
-    }
-    /// Internally converts to a `CString`, avoid using this function when performance
-    /// is important
-    pub fn put_string<E>(&mut self, value: &str, extent: E) -> error::Result<()>
-    where
-        E: TryInto<Extents>,
-        E::Error: Into<error::Error>,
-    {
-        let extents: Extents = extent.try_into().map_err(Into::into)?;
-        self.put_string_mono(value, &extents)
-    }
-
-    fn put_values_mono<T: NcPutGet>(
+    fn put_values_mono<T: NcTypeDescriptor>(
         &mut self,
         values: &[T],
         extents: &Extents,
@@ -1178,19 +552,46 @@ impl<'g> VariableMut<'g> {
             }
         }
 
-        unsafe {
-            T::put_vars(self, &start, &count, &stride, values.as_ptr())?;
-        };
+        crate::putget::put_vars(
+            self,
+            &T::type_descriptor(),
+            &start,
+            &count,
+            &stride,
+            values.as_ptr(),
+        )?;
         Ok(())
     }
     /// Put a slice of values at `indices`
-    pub fn put_values<T: NcPutGet, E>(&mut self, values: &[T], extents: E) -> error::Result<()>
+    pub fn put_values<T: NcTypeDescriptor, E>(
+        &mut self,
+        values: &[T],
+        extents: E,
+    ) -> error::Result<()>
     where
         E: TryInto<Extents>,
         E::Error: Into<error::Error>,
     {
         let extents: Extents = extents.try_into().map_err(Into::into)?;
         self.put_values_mono(values, &extents)
+    }
+    /// Put a value at the specified indices
+    pub fn put_value<T: NcTypeDescriptor, E>(&mut self, value: T, extents: E) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        self.put_values(&[value], extents)
+    }
+    /// Put a string at the specified indices
+    pub fn put_string<E>(&mut self, value: &str, extents: E) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let cstr = std::ffi::CString::new(value)?;
+        let item = super::types::NcString(cstr.as_ptr().cast_mut().cast());
+        self.put_value(item, extents)
     }
 
     /// Set a Fill Value
@@ -1201,13 +602,13 @@ impl<'g> VariableMut<'g> {
     #[allow(clippy::needless_pass_by_value)] // All values will be small
     pub fn set_fill_value<T>(&mut self, fill_value: T) -> error::Result<()>
     where
-        T: NcPutGet,
+        T: NcTypeDescriptor,
     {
-        if T::NCTYPE != self.vartype {
+        if T::type_descriptor() != super::types::read_type(self.ncid, self.vartype)? {
             return Err(error::Error::TypeMismatch);
         }
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(utils::with_lock(|| {
                 nc_def_var_fill(
                     self.ncid,
                     self.varid,
@@ -1232,7 +633,7 @@ impl<'g> VariableMut<'g> {
     /// will read potentially uninitialized data. Normally
     /// one will expect to find some filler value
     pub unsafe fn set_nofill(&mut self) -> error::Result<()> {
-        error::checked(super::with_lock(|| {
+        error::checked(utils::with_lock(|| {
             nc_def_var_fill(self.ncid, self.varid, NC_NOFILL, std::ptr::null_mut())
         }))
     }
@@ -1252,113 +653,17 @@ impl<'g> VariableMut<'g> {
             Endianness::Big => NC_ENDIAN_BIG,
         };
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(utils::with_lock(|| {
                 nc_def_var_endian(self.ncid, self.varid, endianness)
             }))?;
         }
         Ok(())
     }
 
-    unsafe fn put_raw_values_mono(&mut self, buf: &[u8], extents: &Extents) -> error::Result<()> {
-        let dims = self.dimensions();
-        let (start, count, stride) = extents.get_start_count_stride(dims)?;
-
-        let typ = self.vartype();
-        match typ {
-            super::types::VariableType::String | super::types::VariableType::Vlen(_) => {
-                return Err(error::Error::TypeMismatch)
-            }
-            _ => (),
-        }
-
-        let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
-        let bytes_requested = number_of_elements.saturating_mul(typ.size());
-        if buf.len() != bytes_requested {
-            return Err(error::Error::BufferLen {
-                wanted: buf.len(),
-                actual: bytes_requested,
-            });
-        }
-
-        #[allow(unused_unsafe)]
-        error::checked(super::with_lock(|| unsafe {
-            nc_put_vars(
-                self.ncid,
-                self.varid,
-                start.as_ptr(),
-                count.as_ptr(),
-                stride.as_ptr(),
-                buf.as_ptr().cast(),
-            )
-        }))
-    }
-    /// Get values of any type as bytes
-    ///
-    /// # Safety
-    ///
-    /// When working with compound types, variable length arrays and
-    /// strings create pointers from the buffer, and tries to copy
-    /// memory from these locations. Compound types which does not
-    /// have these elements will be safe to access, and can treat
-    /// this function as safe
-    pub unsafe fn put_raw_values<E>(&mut self, buf: &[u8], extents: E) -> error::Result<()>
-    where
-        E: TryInto<Extents>,
-        E::Error: Into<error::Error>,
-    {
-        let extents: Extents = extents.try_into().map_err(Into::into)?;
-        self.put_raw_values_mono(buf, &extents)
-    }
-
-    fn put_vlen_mono<T: NcPutGet>(&mut self, vec: &[T], extent: &Extents) -> error::Result<()> {
-        let dims = self.dimensions();
-        let (start, count, stride) = extent.get_start_count_stride(dims)?;
-
-        let number_of_items = count.iter().copied().fold(1_usize, usize::saturating_mul);
-        if number_of_items != 1 {
-            return Err(error::Error::BufferLen {
-                wanted: 1,
-                actual: number_of_items,
-            });
-        }
-
-        if let super::types::VariableType::Vlen(v) = self.vartype() {
-            if v.typ().id() != T::NCTYPE {
-                return Err(error::Error::TypeMismatch);
-            }
-        } else {
-            return Err(error::Error::TypeMismatch);
-        };
-
-        let vlen = nc_vlen_t {
-            len: vec.len(),
-            p: vec.as_ptr().cast_mut().cast(),
-        };
-
-        error::checked(super::with_lock(|| unsafe {
-            nc_put_vars(
-                self.ncid,
-                self.varid,
-                start.as_ptr(),
-                count.as_ptr(),
-                stride.as_ptr(),
-                std::ptr::addr_of!(vlen).cast(),
-            )
-        }))
-    }
-    /// Get a vlen element
-    pub fn put_vlen<T: NcPutGet, E>(&mut self, vec: &[T], indices: E) -> error::Result<()>
-    where
-        E: TryInto<Extents>,
-        E::Error: Into<error::Error>,
-    {
-        let extent = indices.try_into().map_err(Into::into)?;
-        self.put_vlen_mono(vec, &extent)
-    }
-
     #[cfg(feature = "ndarray")]
     /// Put values in an ndarray into the variable
-    pub fn put<T: NcPutGet, E, D>(
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn put<T: NcTypeDescriptor, E, D>(
         &mut self,
         extent: E,
         arr: ndarray::ArrayView<T, D>,
@@ -1368,11 +673,9 @@ impl<'g> VariableMut<'g> {
         E::Error: Into<error::Error>,
         D: ndarray::Dimension,
     {
-        let extent = extent.try_into().map_err(|e| e.into())?;
+        let extent = extent.try_into().map_err(Into::into)?;
 
-        let slice = if let Some(slice) = arr.as_slice() {
-            slice
-        } else {
+        let Some(slice) = arr.as_slice() else {
             return Err(
                 "Slice is not contiguous or in c-order, you might want to use `as_standard_layout`"
                     .into(),
@@ -1429,14 +732,21 @@ impl<'g> VariableMut<'g> {
         // Dimensionality matches (always pushing in for loop)
         // slice is valid pointer since we assert the size above
         // slice is valid pointer since memory order is standard_layout (C)
-        unsafe { T::put_vars(self, &start, &count, &stride, slice.as_ptr()) }
+        super::putget::put_vars::<T>(
+            self,
+            &self.vartype(),
+            &start,
+            &count,
+            &stride,
+            slice.as_ptr(),
+        )
     }
 }
 
 impl<'g> VariableMut<'g> {
     pub(crate) fn add_from_str(
         ncid: nc_type,
-        xtype: nc_type,
+        xtype: &NcVariableType,
         name: &str,
         dims: &[&str],
     ) -> error::Result<Self> {
@@ -1453,9 +763,10 @@ impl<'g> VariableMut<'g> {
 
         let cname = super::utils::short_name_to_bytes(name)?;
         let mut varid = 0;
+        let xtype = crate::types::find_type(ncid, xtype)?.expect("Type not found");
         unsafe {
             let dimlen = dimensions.len().try_into()?;
-            error::checked(super::with_lock(|| {
+            error::checked(utils::with_lock(|| {
                 nc_def_var(
                     ncid,
                     cname.as_ptr().cast(),
@@ -1494,20 +805,20 @@ pub(crate) fn variables_at_ncid<'g>(
 ) -> error::Result<impl Iterator<Item = error::Result<Variable<'g>>>> {
     let mut nvars = 0;
     unsafe {
-        error::checked(super::with_lock(|| {
+        error::checked(utils::with_lock(|| {
             nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut())
         }))?;
     }
     let mut varids = vec![0; nvars.try_into()?];
     unsafe {
-        error::checked(super::with_lock(|| {
+        error::checked(utils::with_lock(|| {
             nc_inq_varids(ncid, std::ptr::null_mut(), varids.as_mut_ptr())
         }))?;
     }
     Ok(varids.into_iter().map(move |varid| {
         let mut xtype = 0;
         unsafe {
-            error::checked(super::with_lock(|| nc_inq_vartype(ncid, varid, &mut xtype)))?;
+            error::checked(utils::with_lock(|| nc_inq_vartype(ncid, varid, &mut xtype)))?;
         }
         let dimensions = super::dimension::dimensions_from_variable(ncid, varid)?
             .collect::<error::Result<Vec<_>>>()?;
@@ -1540,7 +851,7 @@ pub(crate) fn add_variable_from_identifiers<'g>(
             }
             let mut dimlen = 0;
             unsafe {
-                error::checked(super::with_lock(|| {
+                error::checked(utils::with_lock(|| {
                     nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen)
                 }))?;
             }
@@ -1556,7 +867,7 @@ pub(crate) fn add_variable_from_identifiers<'g>(
     let mut varid = 0;
     unsafe {
         let dimlen = dims.len().try_into()?;
-        error::checked(super::with_lock(|| {
+        error::checked(utils::with_lock(|| {
             nc_def_var(
                 ncid,
                 cname.as_ptr().cast(),

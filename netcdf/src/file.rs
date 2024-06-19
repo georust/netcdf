@@ -10,8 +10,10 @@ use super::attribute::{Attribute, AttributeValue};
 use super::dimension::{self, Dimension};
 use super::error;
 use super::group::{Group, GroupMut};
-use super::variable::{NcPutGet, Variable, VariableMut};
+use super::types::{NcTypeDescriptor, NcVariableType};
+use super::variable::{Variable, VariableMut};
 use crate::group::{get_parent_ncid_and_stem, try_get_ncid, try_get_parent_ncid_and_stem};
+use crate::utils::with_lock;
 
 #[derive(Debug)]
 #[repr(transparent)]
@@ -22,7 +24,7 @@ pub(crate) struct RawFile {
 impl RawFile {
     fn close(self) -> error::Result<()> {
         let Self { ncid } = self;
-        error::checked(super::with_lock(|| unsafe { nc_close(ncid) }))
+        error::checked(with_lock(|| unsafe { nc_close(ncid) }))
     }
 }
 
@@ -30,7 +32,7 @@ impl Drop for RawFile {
     fn drop(&mut self) {
         // Can't really do much with an error here
         let ncid = self.ncid;
-        let _err = error::checked(super::with_lock(|| unsafe { nc_close(ncid) }));
+        let _err = error::checked(with_lock(|| unsafe { nc_close(ncid) }));
     }
 }
 
@@ -77,7 +79,7 @@ impl RawFile {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = 0;
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(with_lock(|| {
                 nc_open(f.as_ptr().cast(), options.bits(), &mut ncid)
             }))?;
         }
@@ -95,7 +97,7 @@ impl RawFile {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = -1;
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(with_lock(|| {
                 nc_create(f.as_ptr().cast(), options.bits(), &mut ncid)
             }))?;
         }
@@ -111,7 +113,7 @@ impl RawFile {
         let cstr = std::ffi::CString::new(name.unwrap_or("/")).unwrap();
         let mut ncid = 0;
         unsafe {
-            error::checked(super::with_lock(|| {
+            error::checked(with_lock(|| {
                 nc_open_mem(
                     cstr.as_ptr(),
                     NC_NOWRITE,
@@ -143,13 +145,13 @@ impl File {
         let name: Vec<u8> = {
             let mut pathlen = 0;
             unsafe {
-                error::checked(super::with_lock(|| {
+                error::checked(with_lock(|| {
                     nc_inq_path(self.0.ncid, &mut pathlen, std::ptr::null_mut())
                 }))?;
             }
             let mut name = vec![0_u8; pathlen + 1];
             unsafe {
-                error::checked(super::with_lock(|| {
+                error::checked(with_lock(|| {
                     nc_inq_path(self.0.ncid, std::ptr::null_mut(), name.as_mut_ptr().cast())
                 }))?;
             }
@@ -172,8 +174,7 @@ impl File {
     /// Main entrypoint for interacting with the netcdf file.
     pub fn root(&self) -> Option<Group> {
         let mut format = 0;
-        unsafe { error::checked(super::with_lock(|| nc_inq_format(self.ncid(), &mut format))) }
-            .unwrap();
+        unsafe { error::checked(with_lock(|| nc_inq_format(self.ncid(), &mut format))) }.unwrap();
 
         match format {
             NC_FORMAT_NETCDF4 | NC_FORMAT_NETCDF4_CLASSIC => Some(Group {
@@ -247,8 +248,9 @@ impl File {
     pub fn groups(&self) -> error::Result<impl Iterator<Item = Group>> {
         super::group::groups_at_ncid(self.ncid())
     }
+
     /// Return all types in the root group
-    pub fn types(&self) -> error::Result<impl Iterator<Item = super::types::VariableType>> {
+    pub fn types(&self) -> error::Result<impl Iterator<Item = NcVariableType>> {
         super::types::all_at_location(self.ncid()).map(|x| x.map(Result::unwrap))
     }
 
@@ -363,10 +365,10 @@ impl FileMut {
         dims: &[&str],
     ) -> error::Result<VariableMut<'f>>
     where
-        T: NcPutGet,
+        T: NcTypeDescriptor,
     {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
-        VariableMut::add_from_str(ncid, T::NCTYPE, name, dims)
+        VariableMut::add_from_str(ncid, &T::type_descriptor(), name, dims)
     }
 
     /// Create a variable with the specified type
@@ -374,57 +376,22 @@ impl FileMut {
         &'f mut self,
         name: &str,
         dims: &[&str],
-        typ: &super::types::VariableType,
+        typ: &NcVariableType,
     ) -> error::Result<VariableMut<'f>> {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
-        VariableMut::add_from_str(ncid, typ.id(), name, dims)
+        VariableMut::add_from_str(ncid, typ, name, dims)
     }
 
-    /// Add an opaque datatype, with `size` bytes
-    pub fn add_opaque_type(
-        &mut self,
-        name: &str,
-        size: usize,
-    ) -> error::Result<super::types::OpaqueType> {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
-        super::types::OpaqueType::add(ncid, name, size)
+    /// Add a type to the file
+    /// Usually the file is `derive`'d using `NcType`
+    pub fn add_type<T: NcTypeDescriptor>(&mut self) -> error::Result<nc_type> {
+        crate::types::add_type(self.ncid(), T::type_descriptor(), false)
     }
-    /// Add a variable length datatype
-    pub fn add_vlen_type<T: NcPutGet>(
-        &mut self,
-        name: &str,
-    ) -> error::Result<super::types::VlenType> {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
-        super::types::VlenType::add::<T>(ncid, name)
-    }
-    /// Add an enum datatype
-    pub fn add_enum_type<T: NcPutGet>(
-        &mut self,
-        name: &str,
-        mappings: &[(&str, T)],
-    ) -> error::Result<super::types::EnumType> {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
-        super::types::EnumType::add::<T>(ncid, name, mappings)
+    /// Add a type using a descriptor
+    pub fn add_type_from_descriptor(&mut self, typ: NcVariableType) -> error::Result<nc_type> {
+        crate::types::add_type(self.ncid(), typ, false)
     }
 
-    /// Build a compound type
-    pub fn add_compound_type(
-        &mut self,
-        name: &str,
-    ) -> error::Result<super::types::CompoundBuilder> {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
-        super::types::CompoundType::add(ncid, name)
-    }
-
-    /// Adds a variable with a basic type of string
-    pub fn add_string_variable<'f>(
-        &'f mut self,
-        name: &str,
-        dims: &[&str],
-    ) -> error::Result<VariableMut<'f>> {
-        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
-        VariableMut::add_from_str(ncid, NC_STRING, name, dims)
-    }
     /// Adds a variable from a set of unique identifiers, recursing upwards
     /// from the current group if necessary.
     pub fn add_variable_from_identifiers<'f, T>(
@@ -433,10 +400,27 @@ impl FileMut {
         dims: &[dimension::DimensionIdentifier],
     ) -> error::Result<VariableMut<'f>>
     where
-        T: NcPutGet,
+        T: NcTypeDescriptor,
     {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
-        super::variable::add_variable_from_identifiers(ncid, name, dims, T::NCTYPE)
+        let Some(xtype) = super::types::find_type(ncid, &T::type_descriptor())? else {
+            return Err("Type not found at this location".into());
+        };
+        super::variable::add_variable_from_identifiers(ncid, name, dims, xtype)
+    }
+    /// Adds a variable from a set of unique identifiers, recursing upwards
+    /// from the current group if necessary.
+    pub fn add_variable_from_identifiers_with_type<'f>(
+        &'f mut self,
+        name: &str,
+        dims: &[dimension::DimensionIdentifier],
+        typ: &NcVariableType,
+    ) -> error::Result<VariableMut<'f>> {
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
+        let Some(xtype) = super::types::find_type(ncid, typ)? else {
+            return Err("Type not found at this location".into());
+        };
+        super::variable::add_variable_from_identifiers(ncid, name, dims, xtype)
     }
 
     /// Flush pending buffers to disk to minimise data loss in case of termination.
@@ -445,9 +429,7 @@ impl FileMut {
     /// it is recommended to instead open the file in both the reader and
     /// writer process with the [`Options::SHARE`] flag.
     pub fn sync(&self) -> error::Result<()> {
-        error::checked(super::with_lock(|| unsafe {
-            netcdf_sys::nc_sync(self.ncid())
-        }))
+        error::checked(with_lock(|| unsafe { netcdf_sys::nc_sync(self.ncid()) }))
     }
 
     /// Close the file
