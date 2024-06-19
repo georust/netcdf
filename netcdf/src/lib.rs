@@ -131,6 +131,8 @@ pub(crate) mod error;
 pub(crate) mod extent;
 pub(crate) mod file;
 pub(crate) mod group;
+#[cfg(feature = "mpi")]
+pub(crate) mod par;
 pub(crate) mod putget;
 #[cfg(feature = "4.9.2")]
 pub mod rc;
@@ -170,6 +172,20 @@ where
     RawFile::create_with(name.as_ref(), options)
 }
 
+/// Open a `netCDF` file in create and parallel mode with the given options
+#[cfg(feature = "mpi")]
+pub fn create_par_with<P>(
+    name: P,
+    communicator: mpi_sys::MPI_Comm,
+    info: mpi_sys::MPI_Info,
+    options: Options,
+) -> error::Result<FileMut>
+where
+    P: AsRef<std::path::Path>,
+{
+    RawFile::create_par_with(name.as_ref(), communicator, info, options)
+}
+
 /// Open a `netCDF` file in append mode
 pub fn append<P>(name: P) -> error::Result<FileMut>
 where
@@ -192,6 +208,20 @@ where
     P: AsRef<std::path::Path>,
 {
     open_with(name, Options::default())
+}
+
+/// Open in parallel mode
+#[cfg(feature = "mpi")]
+pub fn open_par_with<P>(
+    name: P,
+    communicator: mpi_sys::MPI_Comm,
+    info: mpi_sys::MPI_Info,
+    options: Options,
+) -> error::Result<File>
+where
+    P: AsRef<std::path::Path>,
+{
+    RawFile::open_par_with(name.as_ref(), communicator, info, options)
 }
 
 /// Open a `netCDF` file in read mode with the given options

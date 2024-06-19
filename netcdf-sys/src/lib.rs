@@ -30,6 +30,9 @@ mod filter;
 #[cfg(feature = "4.8.0")]
 pub use filter::*;
 
+#[cfg(feature = "mpi")]
+pub mod par;
+
 use std::sync::Mutex;
 
 /// Global netCDF lock for using all functions in the netCDF library

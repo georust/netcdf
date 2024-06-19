@@ -148,3 +148,33 @@ jobs:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
         run: cargo test --features netcdf-sys/static,netcdf/derive --target x86_64-unknown-linux-gnu --workspace --exclude netcdf-derive
+
+  mpi:
+    name: mpi-runner
+    runs-on: ubuntu-latest
+    env:
+      NETCDF_DIR: /usr/lib/x86_64-linux-gnu/netcdf/mpi/
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with: {submodules: false}
+
+    - name: Install netcdf
+      run: sudo apt-get update && sudo apt-get install libnetcdf-mpi-dev libhdf5-openmpi-dev
+
+    - name: Install rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: "nightly"
+
+    - name: Build
+      run: cargo build --verbose --workspace --exclude netcdf-src --features netcdf/mpi,derive
+
+    - name: Test
+      run: cargo test --verbose --workspace --exclude netcdf-src --features netcdf/mpi,derive
+
+    - name: Run example
+      run: cargo run --verbose --package netcdf-examples --features mpi
+
+    - name: Run example in parallel
+      run: mpirun -np 10 --oversubscribe -- target/debug/netcdf-examples
