@@ -128,9 +128,10 @@ impl NcMetaHeader {
     }
 
     fn emit_feature_flags(&self) {
+        println!("cargo::rustc-check-cfg=cfg(feature, values(\"has-mmap\",\"has-dap\"))");
         if self.has_dap2 || self.has_dap4 {
-            println!("cargo:rustc-cfg=feature=\"has-dap\"");
-            println!("cargo:has-dap=1");
+            println!("cargo::rustc-cfg=feature=\"has-dap\"");
+            println!("cargo::metadata=has-dap=1");
         } else {
             assert!(
                 feature!("DAP").is_err(),
@@ -138,8 +139,8 @@ impl NcMetaHeader {
             );
         }
         if self.has_mmap {
-            println!("cargo:rustc-cfg=feature=\"has-mmap\"");
-            println!("cargo:has-mmap=1");
+            println!("cargo::rustc-cfg=feature=\"has-mmap\"");
+            println!("cargo::metadata=has-mmap=1");
         } else {
             assert!(
                 feature!("MEMIO").is_err(),
@@ -232,7 +233,7 @@ fn _check_consistent_version_linked() {
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo::rerun-if-changed=build.rs");
 
     let info;
     if feature!("STATIC").is_ok() {
@@ -242,10 +243,10 @@ fn main() {
         info = NcInfo::gather_from_ncconfig(Some(&netcdf_path.join("..")))
             .unwrap_or_else(|| NcInfo::from_path(&netcdf_path.join("..")));
 
-        println!("cargo:rustc-link-search=native={}", netcdf_path.display());
-        println!("cargo:rustc-link-lib=static={netcdf_lib}");
+        println!("cargo::rustc-link-search=native={}", netcdf_path.display());
+        println!("cargo::rustc-link-lib=static={netcdf_lib}");
     } else {
-        println!("cargo:rerun-if-env-changed=NETCDF_DIR");
+        println!("cargo::rerun-if-env-changed=NETCDF_DIR");
 
         let nc_dir = std::env::var_os("NETCDF_DIR")
             .or_else(|| std::env::var_os("NetCDF_DIR"))
@@ -260,8 +261,8 @@ fn main() {
             NcInfo::gather_from_ncconfig(None).unwrap_or_else(NcInfo::guess)
         };
 
-        println!("cargo:rustc-link-search={}", info.libdir.display());
-        println!("cargo:rustc-link-lib={}", &info.libname);
+        println!("cargo::rustc-link-search={}", info.libdir.display());
+        println!("cargo::rustc-link-lib={}", &info.libname);
     }
 
     let metaheader = NcMetaHeader::gather_from_includeheader(
@@ -273,8 +274,8 @@ fn main() {
 
     // panic!("{:?}", info);
     // Emit nc flags
-    println!("cargo:includedir={}", info.includedir.display());
-    println!("cargo:nc_version={}", metaheader.version);
+    println!("cargo::metadata=includedir={}", info.includedir.display());
+    println!("cargo::metadata=nc_version={}", metaheader.version);
     let versions = [
         Version::new(4, 4, 0),
         Version::new(4, 4, 1),
@@ -294,6 +295,10 @@ fn main() {
         Version::new(4, 9, 1),
         Version::new(4, 9, 2),
     ];
+
+    for version in &versions {
+        println!("cargo::rustc-check-cfg=cfg(feature, values(\"{version}\"))");
+    }
 
     if !versions.contains(&metaheader.version) {
         if versions
