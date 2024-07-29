@@ -24,7 +24,7 @@ fn get_hdf5_version() -> String {
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo::rerun-if-changed=build.rs");
 
     let hdf5_incdir = std::env::var("DEP_HDF5_INCLUDE").unwrap();
     let mut hdf5_lib = std::env::var("DEP_HDF5_LIBRARY").unwrap();
@@ -89,12 +89,14 @@ fn main() {
 
     let netcdf = netcdf_config.build();
 
-    println!("cargo:lib=netcdf");
+    // Only forward link options to netcdf-sys, so netcdf-sys can
+    // optionally choose not to use this build
+    println!("cargo::metadata=lib=netcdf");
     let search_path = format!("{}/lib", netcdf.display());
     if std::path::Path::new(&search_path).exists() {
-        println!("cargo:search={}", search_path);
+        println!("cargo::metadata=search={search_path}");
     } else {
         let search_path = format!("{}/lib64", netcdf.display());
-        println!("cargo:search={}", search_path);
+        println!("cargo::metadata=search={search_path}");
     }
 }
