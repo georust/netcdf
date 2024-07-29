@@ -26,6 +26,7 @@ fn main() {
         .define("PLUGIN_INSTALL_DIR", "OFF")
         //
         .define("HDF5_ROOT", &hdf5_root)
+        .define("HDF5_USE_STATIC_LIBRARIES", "ON")
         //
         .define("NETCDF_ENABLE_LIBXML2", "OFF") // Use bundled xml2
         //
