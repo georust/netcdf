@@ -35,6 +35,9 @@ mpi-sys = { workspace = true, optional = true }
 clap = { version = "4.5.1", features = ["derive"] }
 tempfile = "3.1.0"
 
+[build-dependencies]
+semver = "1.0.23"
+
 [package.metadata.docs.rs]
 features = ["static"]
 rustdoc-args = ["--cfg", "docsrs"]
