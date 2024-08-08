@@ -2,6 +2,8 @@
 name = "netcdf-derive"
 version = "0.1.0"
 edition = "2021"
+description = "Derive macro for custom types in netCDF"
+license = "MIT OR Apache-2.0"
 
 [lib]
 proc-macro = true
