@@ -1,6 +1,6 @@
 [package]
 name = "netcdf-sys"
-version = "0.6.2"
+version = "0.7.0"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -13,7 +13,7 @@ edition = "2021"
 links = "netcdf"
 build = "build.rs"
 readme = "README.md"
-categories = ["external-ffi-bindings", "filesystem", "science"]
+categories = ["development-tools::ffi", "filesystem", "science"]
 exclude = [
     "testdata/**",
 ]

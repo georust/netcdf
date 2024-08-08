@@ -1,6 +1,6 @@
 [package]
 name = "netcdf"
-version = "0.9.3"
+version = "0.10.0"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
