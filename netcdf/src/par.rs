@@ -1,6 +1,6 @@
 use crate::{
     error::{checked, Result},
-    utils::with_lock,
+    utils::checked_with_lock,
 };
 
 use netcdf_sys::nc_type;
@@ -13,7 +13,7 @@ pub(crate) enum AccessMode {
 }
 
 pub(crate) fn set_access_mode(ncid: nc_type, varid: nc_type, mode: AccessMode) -> Result<()> {
-    checked(with_lock(|| unsafe {
+    checked_with_lock(|| unsafe {
         netcdf_sys::par::nc_var_par_access(ncid, varid, mode as i32 as std::ffi::c_int)
-    }))
+    })
 }

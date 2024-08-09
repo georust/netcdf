@@ -12,7 +12,7 @@ use super::dimension::Dimension;
 use super::error;
 use super::extent::Extents;
 use crate::types::{NcTypeDescriptor, NcVariableType};
-use crate::utils;
+use crate::utils::{checked_with_lock, with_lock};
 
 #[allow(clippy::doc_markdown)]
 /// This struct defines a `netCDF` variable.
@@ -75,8 +75,7 @@ impl<'g> Variable<'g> {
     pub(crate) fn find_from_name(ncid: nc_type, name: &str) -> error::Result<Option<Variable<'g>>> {
         let cname = super::utils::short_name_to_bytes(name)?;
         let mut varid = 0;
-        let e =
-            unsafe { utils::with_lock(|| nc_inq_varid(ncid, cname.as_ptr().cast(), &mut varid)) };
+        let e = with_lock(|| unsafe { nc_inq_varid(ncid, cname.as_ptr().cast(), &mut varid) });
         if e == NC_ENOTVAR {
             return Ok(None);
         }
@@ -84,25 +83,19 @@ impl<'g> Variable<'g> {
 
         let mut xtype = 0;
         let mut ndims = 0;
-        unsafe {
-            error::checked(utils::with_lock(|| {
-                nc_inq_var(
-                    ncid,
-                    varid,
-                    std::ptr::null_mut(),
-                    &mut xtype,
-                    &mut ndims,
-                    std::ptr::null_mut(),
-                    std::ptr::null_mut(),
-                )
-            }))?;
-        }
+        checked_with_lock(|| unsafe {
+            nc_inq_var(
+                ncid,
+                varid,
+                std::ptr::null_mut(),
+                &mut xtype,
+                &mut ndims,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        })?;
         let mut dimids = vec![0; ndims.try_into()?];
-        unsafe {
-            error::checked(utils::with_lock(|| {
-                nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr())
-            }))?;
-        }
+        checked_with_lock(|| unsafe { nc_inq_vardimid(ncid, varid, dimids.as_mut_ptr()) })?;
         let dimensions = super::dimension::dimensions_from_variable(ncid, varid)?
             .collect::<error::Result<Vec<_>>>()?;
 
@@ -118,12 +111,10 @@ impl<'g> Variable<'g> {
     /// Get the name of variable
     pub fn name(&self) -> String {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
-        unsafe {
-            error::checked(utils::with_lock(|| {
-                nc_inq_varname(self.ncid, self.varid, name.as_mut_ptr().cast())
-            }))
-            .unwrap();
-        }
+        checked_with_lock(|| unsafe {
+            nc_inq_varname(self.ncid, self.varid, name.as_mut_ptr().cast())
+        })
+        .unwrap();
         let zeropos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         name.resize(zeropos, 0);
 
@@ -179,11 +170,7 @@ impl<'g> Variable<'g> {
     /// Not a `netCDF-4` file
     pub fn endianness(&self) -> error::Result<Endianness> {
         let mut e: nc_type = 0;
-        unsafe {
-            error::checked(utils::with_lock(|| {
-                nc_inq_var_endian(self.ncid, self.varid, &mut e)
-            }))?;
-        }
+        checked_with_lock(|| unsafe { nc_inq_var_endian(self.ncid, self.varid, &mut e) })?;
         match e {
             NC_ENDIAN_NATIVE => Ok(Endianness::Native),
             NC_ENDIAN_LITTLE => Ok(Endianness::Little),
@@ -194,13 +181,13 @@ impl<'g> Variable<'g> {
 
     #[cfg(feature = "mpi")]
     fn access_mode(&self, mode: crate::par::AccessMode) -> error::Result<()> {
-        error::checked(utils::with_lock(|| unsafe {
+        checked_with_lock(|| unsafe {
             netcdf_sys::par::nc_var_par_access(
                 self.ncid,
                 self.varid,
                 mode as i32 as std::ffi::c_int,
             )
-        }))
+        })
     }
 
     /// Access the variable in independent mode
@@ -234,17 +221,15 @@ impl<'g> VariableMut<'g> {
     ///
     /// Not a `netcdf-4` file or `deflate_level` not valid
     pub fn set_compression(&mut self, deflate_level: nc_type, shuffle: bool) -> error::Result<()> {
-        unsafe {
-            error::checked(utils::with_lock(|| {
-                nc_def_var_deflate(
-                    self.ncid,
-                    self.varid,
-                    shuffle.into(),
-                    <_>::from(true),
-                    deflate_level,
-                )
-            }))?;
-        }
+        checked_with_lock(|| unsafe {
+            nc_def_var_deflate(
+                self.ncid,
+                self.varid,
+                shuffle.into(),
+                <_>::from(true),
+                deflate_level,
+            )
+        })?;
 
         Ok(())
     }
@@ -274,11 +259,9 @@ impl<'g> VariableMut<'g> {
         if len == usize::MAX {
             return Err(error::Error::Overflow);
         }
-        unsafe {
-            error::checked(utils::with_lock(|| {
-                nc_def_var_chunking(self.ncid, self.varid, NC_CHUNKED, chunksize.as_ptr())
-            }))?;
-        }
+        checked_with_lock(|| unsafe {
+            nc_def_var_chunking(self.ncid, self.varid, NC_CHUNKED, chunksize.as_ptr())
+        })?;
 
         Ok(())
     }
@@ -371,14 +354,14 @@ impl<'g> Variable<'g> {
             return Err("No elements returned".into());
         }
         if elems.len() > 1 {
-            super::utils::checked_with_lock(|| unsafe {
+            checked_with_lock(|| unsafe {
                 netcdf_sys::nc_free_string(elems.len(), elems.as_mut_ptr().cast())
             })?;
             return Err("Too many elements returned".into());
         }
         let cstr = unsafe { std::ffi::CStr::from_ptr(elems[0].0) };
         let s = cstr.to_string_lossy().to_string();
-        super::utils::checked_with_lock(|| unsafe {
+        checked_with_lock(|| unsafe {
             netcdf_sys::nc_free_string(elems.len(), elems.as_mut_ptr().cast())
         })?;
         Ok(s)
@@ -501,16 +484,14 @@ impl<'g> Variable<'g> {
         }
         let mut location = std::mem::MaybeUninit::uninit();
         let mut nofill: nc_type = 0;
-        unsafe {
-            error::checked(utils::with_lock(|| {
-                nc_inq_var_fill(
-                    self.ncid,
-                    self.varid,
-                    &mut nofill,
-                    std::ptr::addr_of_mut!(location).cast(),
-                )
-            }))?;
-        }
+        checked_with_lock(|| unsafe {
+            nc_inq_var_fill(
+                self.ncid,
+                self.varid,
+                &mut nofill,
+                std::ptr::addr_of_mut!(location).cast(),
+            )
+        })?;
         if nofill == 1 {
             return Ok(None);
         }
@@ -635,16 +616,14 @@ impl<'g> VariableMut<'g> {
         if T::type_descriptor() != super::types::read_type(self.ncid, self.vartype)? {
             return Err(error::Error::TypeMismatch);
         }
-        unsafe {
-            error::checked(utils::with_lock(|| {
-                nc_def_var_fill(
-                    self.ncid,
-                    self.varid,
-                    NC_FILL,
-                    std::ptr::addr_of!(fill_value).cast(),
-                )
-            }))?;
-        }
+        checked_with_lock(|| unsafe {
+            nc_def_var_fill(
+                self.ncid,
+                self.varid,
+                NC_FILL,
+                std::ptr::addr_of!(fill_value).cast(),
+            )
+        })?;
         Ok(())
     }
 
@@ -661,9 +640,9 @@ impl<'g> VariableMut<'g> {
     /// will read potentially uninitialized data. Normally
     /// one will expect to find some filler value
     pub unsafe fn set_nofill(&mut self) -> error::Result<()> {
-        error::checked(utils::with_lock(|| {
+        checked_with_lock(|| unsafe {
             nc_def_var_fill(self.ncid, self.varid, NC_NOFILL, std::ptr::null_mut())
-        }))
+        })
     }
 
     /// Set endianness of the variable. Must be set before inserting data
@@ -680,11 +659,7 @@ impl<'g> VariableMut<'g> {
             Endianness::Little => NC_ENDIAN_LITTLE,
             Endianness::Big => NC_ENDIAN_BIG,
         };
-        unsafe {
-            error::checked(utils::with_lock(|| {
-                nc_def_var_endian(self.ncid, self.varid, endianness)
-            }))?;
-        }
+        checked_with_lock(|| unsafe { nc_def_var_endian(self.ncid, self.varid, endianness) })?;
         Ok(())
     }
 
@@ -792,19 +767,17 @@ impl<'g> VariableMut<'g> {
         let cname = super::utils::short_name_to_bytes(name)?;
         let mut varid = 0;
         let xtype = crate::types::find_type(ncid, xtype)?.expect("Type not found");
-        unsafe {
-            let dimlen = dimensions.len().try_into()?;
-            error::checked(utils::with_lock(|| {
-                nc_def_var(
-                    ncid,
-                    cname.as_ptr().cast(),
-                    xtype,
-                    dimlen,
-                    dimensions.as_ptr(),
-                    &mut varid,
-                )
-            }))?;
-        }
+        let dimlen = dimensions.len().try_into()?;
+        checked_with_lock(|| unsafe {
+            nc_def_var(
+                ncid,
+                cname.as_ptr().cast(),
+                xtype,
+                dimlen,
+                dimensions.as_ptr(),
+                &mut varid,
+            )
+        })?;
 
         let dimensions = dims
             .iter()
@@ -832,22 +805,14 @@ pub(crate) fn variables_at_ncid<'g>(
     ncid: nc_type,
 ) -> error::Result<impl Iterator<Item = error::Result<Variable<'g>>>> {
     let mut nvars = 0;
-    unsafe {
-        error::checked(utils::with_lock(|| {
-            nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut())
-        }))?;
-    }
+    checked_with_lock(|| unsafe { nc_inq_varids(ncid, &mut nvars, std::ptr::null_mut()) })?;
     let mut varids = vec![0; nvars.try_into()?];
-    unsafe {
-        error::checked(utils::with_lock(|| {
-            nc_inq_varids(ncid, std::ptr::null_mut(), varids.as_mut_ptr())
-        }))?;
-    }
+    checked_with_lock(|| unsafe {
+        nc_inq_varids(ncid, std::ptr::null_mut(), varids.as_mut_ptr())
+    })?;
     Ok(varids.into_iter().map(move |varid| {
         let mut xtype = 0;
-        unsafe {
-            error::checked(utils::with_lock(|| nc_inq_vartype(ncid, varid, &mut xtype)))?;
-        }
+        checked_with_lock(|| unsafe { nc_inq_vartype(ncid, varid, &mut xtype) })?;
         let dimensions = super::dimension::dimensions_from_variable(ncid, varid)?
             .collect::<error::Result<Vec<_>>>()?;
         Ok(Variable {
@@ -878,11 +843,7 @@ pub(crate) fn add_variable_from_identifiers<'g>(
                 return Err(error::Error::WrongDataset);
             }
             let mut dimlen = 0;
-            unsafe {
-                error::checked(utils::with_lock(|| {
-                    nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen)
-                }))?;
-            }
+            checked_with_lock(|| unsafe { nc_inq_dimlen(id.ncid, id.dimid, &mut dimlen) })?;
             Ok(Dimension {
                 len: core::num::NonZeroUsize::new(dimlen),
                 id,
@@ -893,19 +854,17 @@ pub(crate) fn add_variable_from_identifiers<'g>(
     let dims = dims.iter().map(|x| x.dimid).collect::<Vec<_>>();
 
     let mut varid = 0;
-    unsafe {
-        let dimlen = dims.len().try_into()?;
-        error::checked(utils::with_lock(|| {
-            nc_def_var(
-                ncid,
-                cname.as_ptr().cast(),
-                xtype,
-                dimlen,
-                dims.as_ptr(),
-                &mut varid,
-            )
-        }))?;
-    }
+    let dimlen = dims.len().try_into()?;
+    checked_with_lock(|| unsafe {
+        nc_def_var(
+            ncid,
+            cname.as_ptr().cast(),
+            xtype,
+            dimlen,
+            dims.as_ptr(),
+            &mut varid,
+        )
+    })?;
 
     Ok(VariableMut(
         Variable {

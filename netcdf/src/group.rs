@@ -9,7 +9,7 @@ use super::attribute::{Attribute, AttributeValue};
 use super::dimension::Dimension;
 use super::error;
 use super::types::{NcTypeDescriptor, NcVariableType};
-use super::utils::with_lock;
+use super::utils::{checked_with_lock, with_lock};
 use super::variable::{Variable, VariableMut};
 
 /// Main component of the netcdf format. Holds all variables,
@@ -43,12 +43,8 @@ impl<'f> Group<'f> {
     /// Name of the current group
     pub fn name(&self) -> String {
         let mut name = vec![0_u8; NC_MAX_NAME as usize + 1];
-        unsafe {
-            error::checked(with_lock(|| {
-                nc_inq_grpname(self.ncid, name.as_mut_ptr().cast())
-            }))
+        checked_with_lock(|| unsafe { nc_inq_grpname(self.ncid, name.as_mut_ptr().cast()) })
             .unwrap();
-        }
         let zeropos = name.iter().position(|&x| x == 0).unwrap_or(name.len());
         name.resize(zeropos, 0);
 
@@ -279,17 +275,9 @@ impl<'f> GroupMut<'f> {
 
 pub(crate) fn groups_at_ncid<'f>(ncid: nc_type) -> error::Result<impl Iterator<Item = Group<'f>>> {
     let mut num_grps = 0;
-    unsafe {
-        error::checked(with_lock(|| {
-            nc_inq_grps(ncid, &mut num_grps, std::ptr::null_mut())
-        }))?;
-    }
+    checked_with_lock(|| unsafe { nc_inq_grps(ncid, &mut num_grps, std::ptr::null_mut()) })?;
     let mut grps = vec![0; num_grps.try_into()?];
-    unsafe {
-        error::checked(with_lock(|| {
-            nc_inq_grps(ncid, std::ptr::null_mut(), grps.as_mut_ptr())
-        }))?;
-    }
+    checked_with_lock(|| unsafe { nc_inq_grps(ncid, std::ptr::null_mut(), grps.as_mut_ptr()) })?;
     Ok(grps.into_iter().map(|id| Group {
         ncid: id,
         _file: PhantomData,
@@ -310,17 +298,13 @@ pub(crate) fn add_group_at_path(mut ncid: nc_type, path: &str) -> error::Result<
 
 pub(crate) fn add_group(mut ncid: nc_type, name: &str) -> error::Result<nc_type> {
     let byte_name = super::utils::short_name_to_bytes(name)?;
-    unsafe {
-        error::checked(with_lock(|| {
-            nc_def_grp(ncid, byte_name.as_ptr().cast(), &mut ncid)
-        }))?;
-    }
+    checked_with_lock(|| unsafe { nc_def_grp(ncid, byte_name.as_ptr().cast(), &mut ncid) })?;
     Ok(ncid)
 }
 
 pub(crate) fn try_get_ncid(mut ncid: nc_type, name: &str) -> error::Result<Option<nc_type>> {
     let byte_name = super::utils::short_name_to_bytes(name)?;
-    let e = unsafe { with_lock(|| nc_inq_grp_ncid(ncid, byte_name.as_ptr().cast(), &mut ncid)) };
+    let e = with_lock(|| unsafe { nc_inq_grp_ncid(ncid, byte_name.as_ptr().cast(), &mut ncid) });
     if e == NC_ENOGRP {
         return Ok(None);
     }
