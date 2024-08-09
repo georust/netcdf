@@ -843,8 +843,10 @@ fn use_compression_chunking() {
     file.add_dimension("x", 10).unwrap();
 
     let var = &mut file.add_variable::<i32>("compressed", &["x"]).unwrap();
+    assert_eq!(var.chunking().unwrap(), None);
     var.set_compression(5, false).unwrap();
     var.set_chunking(&[5]).unwrap();
+    assert_eq!(var.chunking().unwrap(), Some(vec![5]));
 
     let v = vec![0i32; 10];
     var.put_values(&v, ..).unwrap();
@@ -852,8 +854,10 @@ fn use_compression_chunking() {
     let var = &mut file
         .add_variable::<i32>("compressed2", &["x", "x"])
         .unwrap();
+    assert_eq!(var.chunking().unwrap(), None);
     var.set_compression(9, true).unwrap();
     var.set_chunking(&[5, 5]).unwrap();
+    assert_eq!(var.chunking().unwrap(), Some(vec![5, 5]));
     var.put_values(&[1i32, 2, 3, 4, 5, 6, 7, 8, 9, 10], (..10, ..1))
         .unwrap();
 
@@ -866,7 +870,9 @@ fn use_compression_chunking() {
     file.add_dimension("y", 0).unwrap();
     let var = &mut file.add_variable::<u8>("chunked4", &["y", "x"]).unwrap();
 
+    assert_eq!(var.chunking().unwrap(), Some(vec![1, 10])); // unlimited dim enables chunking
     var.set_chunking(&[100, 2]).unwrap();
+    assert_eq!(var.chunking().unwrap(), Some(vec![100, 2]));
 }
 
 #[test]

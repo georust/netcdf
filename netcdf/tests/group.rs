@@ -66,13 +66,16 @@ fn find_variable() {
     assert!(group.variable("vvvvv").is_none());
 
     for mut var in group.variables_mut() {
+        assert_eq!(var.chunking().unwrap(), None);
         if !var.dimensions().is_empty() {
             var.set_compression(3, false).unwrap();
         }
         if var.name() == "z" {
             var.set_chunking(&[1]).unwrap();
+            assert_eq!(var.chunking().unwrap(), Some(vec![1]));
         } else {
             var.set_chunking(&[]).unwrap();
+            assert_eq!(var.chunking().unwrap(), None);
         }
     }
 }
