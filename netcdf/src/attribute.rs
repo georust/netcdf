@@ -363,7 +363,6 @@ impl<'a> Attribute<'a> {
             }
             NC_STRING => {
                 let mut buf: Vec<*mut c_char> = vec![std::ptr::null_mut(); attlen];
-                let result;
                 checked_with_lock(|| unsafe {
                     nc_get_att_string(
                         self.ncid,
@@ -372,7 +371,7 @@ impl<'a> Attribute<'a> {
                         buf.as_mut_ptr().cast(),
                     )
                 })?;
-                result = buf
+                let result = buf
                     .iter()
                     .map(|cstr_pointer| unsafe {
                         if cstr_pointer.is_null() {
