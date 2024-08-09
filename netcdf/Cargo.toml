@@ -30,7 +30,6 @@ netcdf-derive = { workspace = true, optional = true }
 bitflags = "2.4.2"
 libc = "0.2.155"
 mpi-sys = { workspace = true, optional = true }
-parking_lot = "0.12.3"
 
 [dev-dependencies]
 clap = { version = "4.5.1", features = ["derive"] }

@@ -1,7 +1,9 @@
+//! Set and get configuration variables
 use std::ffi::{c_char, CStr, CString};
 use std::ops::Deref;
 use std::ptr::NonNull;
 
+/// Set a key
 pub fn set(key: &str, value: &str) -> crate::error::Result<()> {
     let key = CString::new(key)?;
     let value = CString::new(value)?;
@@ -11,6 +13,7 @@ pub fn set(key: &str, value: &str) -> crate::error::Result<()> {
 }
 
 #[derive(Debug)]
+/// String with custom Drop implementations
 pub struct OwnedString {
     inner: NonNull<c_char>,
 }
@@ -30,6 +33,7 @@ impl Drop for OwnedString {
     }
 }
 
+/// Get a key
 pub fn get(key: &str) -> Option<OwnedString> {
     let key = if let Ok(key) = CString::new(key) {
         key
