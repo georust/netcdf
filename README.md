@@ -52,7 +52,7 @@ Some examples of usage can be found in the [tests/lib.rs](netcdf/tests/lib.rs) f
 
 The `netcdf` crate is thread-safe, although the `netcdf-c` library is not itself threadsafe. To render a safe interface, a global mutex is used to serialize access to the underlying library. Consider using a non threadsafe version of `hdf5` to avoid double locking (performance consideration).
 
-Use of `netcdf-sys` is not thread-safe. Users of this library must take care that calls do not interfere with simultaneous use of e.g. `netcdf`. Using the `hdf5-sys` library could also pose a problem, as this library is used throughout `netCDF-c` and internal state may be disrupted.
+Use of `netcdf-sys` is not thread-safe. Users of this library must take care that calls do not interfere with simultaneous use of e.g. `netcdf` or `hdf5-sys`. Use the lock provided by `netcdf-sys` to serialise access to the `hdf5` and `netCDF` libraries.
 
 ## License
 

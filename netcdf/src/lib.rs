@@ -257,7 +257,7 @@ pub(crate) mod utils {
     /// All functions should be wrapped in this locker. Disregarding this, expect
     /// segfaults, especially on non-threadsafe hdf5 builds
     pub(crate) fn with_lock<F: FnMut() -> nc_type>(mut f: F) -> nc_type {
-        let _l = netcdf_sys::libnetcdf_lock.lock().unwrap();
+        let _guard = netcdf_sys::libnetcdf_lock.lock();
         f()
     }
 

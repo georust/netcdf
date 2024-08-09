@@ -36,7 +36,7 @@ pub fn get(key: &str) -> Option<OwnedString> {
     } else {
         return None;
     };
-    let _lock = netcdf_sys::libnetcdf_lock.lock().unwrap();
+    let _lock = netcdf_sys::libnetcdf_lock.lock();
     let value = unsafe { netcdf_sys::nc_rc_get(key.as_ptr()) };
     NonNull::new(value).map(|inner| OwnedString { inner })
 }
