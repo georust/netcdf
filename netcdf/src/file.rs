@@ -13,7 +13,7 @@ use super::group::{Group, GroupMut};
 use super::types::{NcTypeDescriptor, NcVariableType};
 use super::variable::{Variable, VariableMut};
 use crate::group::{get_parent_ncid_and_stem, try_get_ncid, try_get_parent_ncid_and_stem};
-use crate::utils::with_lock;
+use crate::utils::checked_with_lock;
 
 #[derive(Debug)]
 #[repr(transparent)]
@@ -23,8 +23,9 @@ pub(crate) struct RawFile {
 
 impl RawFile {
     fn close(self) -> error::Result<()> {
-        let Self { ncid } = self;
-        error::checked(with_lock(|| unsafe { nc_close(ncid) }))
+        let ncid = self.ncid;
+        std::mem::forget(self);
+        checked_with_lock(|| unsafe { nc_close(ncid) })
     }
 }
 
@@ -32,7 +33,7 @@ impl Drop for RawFile {
     fn drop(&mut self) {
         // Can't really do much with an error here
         let ncid = self.ncid;
-        let _err = error::checked(with_lock(|| unsafe { nc_close(ncid) }));
+        let _err = checked_with_lock(|| unsafe { nc_close(ncid) });
     }
 }
 
@@ -78,11 +79,7 @@ impl RawFile {
     pub(crate) fn open_with(path: &path::Path, options: Options) -> error::Result<File> {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = 0;
-        unsafe {
-            error::checked(with_lock(|| {
-                nc_open(f.as_ptr().cast(), options.bits(), &mut ncid)
-            }))?;
-        }
+        checked_with_lock(|| unsafe { nc_open(f.as_ptr().cast(), options.bits(), &mut ncid) })?;
         Ok(File(Self { ncid }))
     }
 
@@ -96,17 +93,15 @@ impl RawFile {
     ) -> error::Result<File> {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = 0;
-        unsafe {
-            error::checked(with_lock(|| {
-                netcdf_sys::par::nc_open_par(
-                    f.as_ptr().cast(),
-                    options.bits(),
-                    communicator,
-                    info,
-                    &mut ncid,
-                )
-            }))?;
-        }
+        checked_with_lock(|| unsafe {
+            netcdf_sys::par::nc_open_par(
+                f.as_ptr().cast(),
+                options.bits(),
+                communicator,
+                info,
+                &mut ncid,
+            )
+        })?;
         Ok(File(Self { ncid }))
     }
 
@@ -120,11 +115,7 @@ impl RawFile {
     pub(crate) fn create_with(path: &path::Path, options: Options) -> error::Result<FileMut> {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = -1;
-        unsafe {
-            error::checked(with_lock(|| {
-                nc_create(f.as_ptr().cast(), options.bits(), &mut ncid)
-            }))?;
-        }
+        checked_with_lock(|| unsafe { nc_create(f.as_ptr().cast(), options.bits(), &mut ncid) })?;
 
         Ok(FileMut(File(Self { ncid })))
     }
@@ -139,17 +130,15 @@ impl RawFile {
     ) -> error::Result<FileMut> {
         let f = get_ffi_from_path(path);
         let mut ncid: nc_type = -1;
-        unsafe {
-            error::checked(with_lock(|| {
-                netcdf_sys::par::nc_create_par(
-                    f.as_ptr().cast(),
-                    options.bits(),
-                    communicator,
-                    info,
-                    &mut ncid,
-                )
-            }))?;
-        }
+        checked_with_lock(|| unsafe {
+            netcdf_sys::par::nc_create_par(
+                f.as_ptr().cast(),
+                options.bits(),
+                communicator,
+                info,
+                &mut ncid,
+            )
+        })?;
 
         Ok(FileMut(File(Self { ncid })))
     }
@@ -161,17 +150,15 @@ impl RawFile {
     ) -> error::Result<FileMem<'buffer>> {
         let cstr = std::ffi::CString::new(name.unwrap_or("/")).unwrap();
         let mut ncid = 0;
-        unsafe {
-            error::checked(with_lock(|| {
-                nc_open_mem(
-                    cstr.as_ptr(),
-                    NC_NOWRITE,
-                    mem.len(),
-                    mem.as_ptr().cast_mut().cast(),
-                    &mut ncid,
-                )
-            }))?;
-        }
+        checked_with_lock(|| unsafe {
+            nc_open_mem(
+                cstr.as_ptr(),
+                NC_NOWRITE,
+                mem.len(),
+                mem.as_ptr().cast_mut().cast(),
+                &mut ncid,
+            )
+        })?;
 
         Ok(FileMem(File(Self { ncid }), PhantomData))
     }
@@ -193,17 +180,13 @@ impl File {
     pub fn path(&self) -> error::Result<std::path::PathBuf> {
         let name: Vec<u8> = {
             let mut pathlen = 0;
-            unsafe {
-                error::checked(with_lock(|| {
-                    nc_inq_path(self.0.ncid, &mut pathlen, std::ptr::null_mut())
-                }))?;
-            }
+            checked_with_lock(|| unsafe {
+                nc_inq_path(self.0.ncid, &mut pathlen, std::ptr::null_mut())
+            })?;
             let mut name = vec![0_u8; pathlen + 1];
-            unsafe {
-                error::checked(with_lock(|| {
-                    nc_inq_path(self.0.ncid, std::ptr::null_mut(), name.as_mut_ptr().cast())
-                }))?;
-            }
+            checked_with_lock(|| unsafe {
+                nc_inq_path(self.0.ncid, std::ptr::null_mut(), name.as_mut_ptr().cast())
+            })?;
             name.truncate(pathlen);
             name
         };
@@ -223,7 +206,7 @@ impl File {
     /// Main entrypoint for interacting with the netcdf file.
     pub fn root(&self) -> Option<Group> {
         let mut format = 0;
-        unsafe { error::checked(with_lock(|| nc_inq_format(self.ncid(), &mut format))) }.unwrap();
+        checked_with_lock(|| unsafe { nc_inq_format(self.ncid(), &mut format) }).unwrap();
 
         match format {
             NC_FORMAT_NETCDF4 | NC_FORMAT_NETCDF4_CLASSIC => Some(Group {
@@ -486,7 +469,7 @@ impl FileMut {
     /// it is recommended to instead open the file in both the reader and
     /// writer process with the [`Options::SHARE`] flag.
     pub fn sync(&self) -> error::Result<()> {
-        error::checked(with_lock(|| unsafe { netcdf_sys::nc_sync(self.ncid()) }))
+        checked_with_lock(|| unsafe { netcdf_sys::nc_sync(self.ncid()) })
     }
 
     /// Close the file
@@ -500,12 +483,12 @@ impl FileMut {
 
     /// Open the file for new definitions
     pub fn redef(&mut self) -> error::Result<()> {
-        error::checked(with_lock(|| unsafe { netcdf_sys::nc_redef(self.ncid()) }))
+        checked_with_lock(|| unsafe { netcdf_sys::nc_redef(self.ncid()) })
     }
 
     /// Close the file for new definitions
     pub fn enddef(&mut self) -> error::Result<()> {
-        error::checked(with_lock(|| unsafe { netcdf_sys::nc_enddef(self.ncid()) }))
+        checked_with_lock(|| unsafe { netcdf_sys::nc_enddef(self.ncid()) })
     }
 }
 

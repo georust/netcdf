@@ -33,12 +33,12 @@ pub use filter::*;
 #[cfg(feature = "mpi")]
 pub mod par;
 
-use std::sync::Mutex;
-
 /// Global netCDF lock for using all functions in the netCDF library
 ///
 /// Per the NetCDF FAQ: "THE C-BASED LIBRARIES ARE NOT THREAD-SAFE"
-pub static libnetcdf_lock: Mutex<()> = Mutex::new(());
+/// This lock is the same as the one in `hdf5`, so the two libraries
+/// can be used at the same time
+pub use hdf5_sys::LOCK as libnetcdf_lock;
 
 #[cfg(test)]
 mod tests {
@@ -57,7 +57,7 @@ mod tests {
 
         let mut ncid: nc_type = -999_999;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = libnetcdf_lock.lock();
             let err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
             assert_eq!(err, NC_NOERR);
             let err = nc_close(ncid);
@@ -78,7 +78,7 @@ mod tests {
         let mut varid: nc_type = -999_999;
         let mut nvars: nc_type = -999_999;
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = libnetcdf_lock.lock();
             let err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
             assert_eq!(err, NC_NOERR);
             let err = nc_inq_nvars(ncid, &mut nvars);
@@ -104,7 +104,7 @@ mod tests {
         let mut varid: nc_type = -999_999;
         let mut buf: Vec<nc_type> = vec![0; 6 * 12];
         unsafe {
-            let _g = libnetcdf_lock.lock().unwrap();
+            let _g = libnetcdf_lock.lock();
             let err = nc_open(f.as_ptr(), NC_NOWRITE, &mut ncid);
             assert_eq!(err, NC_NOERR);
 

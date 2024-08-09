@@ -1,6 +1,6 @@
 [package]
 name = "netcdf-sys"
-version = "0.7.0"
+version = "0.8.0"
 authors = [
     "Michael Hiley <mhiley@gmail.com>",
     "Magnus Ulimoen <magnusu@met.no>"
@@ -25,6 +25,7 @@ curl-sys = { version = "0.4.51", optional = true }
 hdf5-sys = { workspace = true }
 netcdf-src = { workspace = true, optional = true }
 mpi-sys = { workspace = true, optional = true }
+parking_lot = "0.12.3"
 
 [dev-dependencies]
 

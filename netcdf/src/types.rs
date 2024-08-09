@@ -1,10 +1,12 @@
 //! Types found in `netCDF` files
 use netcdf_sys::{
-    nc_type, NC_BYTE, NC_CHAR, NC_COMPOUND, NC_DOUBLE, NC_ENUM, NC_FLOAT, NC_INT, NC_INT64,
-    NC_MAX_NAME, NC_OPAQUE, NC_SHORT, NC_STRING, NC_UBYTE, NC_UINT, NC_UINT64, NC_USHORT, NC_VLEN,
+    nc_type, NC_BYTE, NC_CHAR, NC_COMPOUND, NC_DOUBLE, NC_EBADTYPE, NC_ENUM, NC_FLOAT, NC_INT,
+    NC_INT64, NC_MAX_NAME, NC_OPAQUE, NC_SHORT, NC_STRING, NC_UBYTE, NC_UINT, NC_UINT64, NC_USHORT,
+    NC_VLEN,
 };
 
-use crate::{error::Result, utils::checked_with_lock};
+use crate::error::{checked, Result};
+use crate::utils::{checked_with_lock, with_lock};
 
 /// This trait allows reading and writing basic and user defined types.
 ///
@@ -562,12 +564,12 @@ pub(crate) fn find_type(ncid: nc_type, typ: &NcVariableType) -> Result<Option<nc
 
     let mut typid = 0;
     let name = crate::utils::short_name_to_bytes(name)?;
-    let e = checked_with_lock(|| unsafe {
-        netcdf_sys::nc_inq_typeid(ncid, name.as_ptr().cast(), &mut typid)
-    });
-    if matches!(e, Err(crate::Error::Netcdf(netcdf_sys::NC_EBADTYPE))) {
+    let e =
+        with_lock(|| unsafe { netcdf_sys::nc_inq_typeid(ncid, name.as_ptr().cast(), &mut typid) });
+    if e == NC_EBADTYPE {
         return Ok(None);
     }
+    checked(e)?;
     let candidate = read_type(ncid, typid)?;
     if &candidate != typ {
         return Err("Found type with that name, but it was not the correct type definition".into());
