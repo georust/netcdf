@@ -1,4 +1,5 @@
 /// Get location of the test files
+#[allow(dead_code)]
 pub(crate) fn test_location() -> std::path::PathBuf {
     use std::path::Path;
 

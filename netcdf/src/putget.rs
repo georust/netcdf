@@ -184,6 +184,34 @@ pub(crate) fn get_vars<T>(
     get_vars_mono(var, tp, start, count, stride, values.cast())
 }
 
+/// Non-typechecked version of get_vars
+/// to support getting a bag of bytes
+pub fn get_raw_values_into(
+    variable: &crate::Variable,
+    buffer: &mut [u8],
+    extents: crate::Extents,
+) -> crate::error::Result<()> {
+    let dims = variable.dimensions();
+    let (start, count, stride) = extents.get_start_count_stride(dims)?;
+    let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
+    let varsize = variable.vartype().size();
+    if number_of_elements * varsize != buffer.len() {
+        return Err("Buffer is not of requisite size".into());
+    }
+    checked_with_lock(|| unsafe {
+        netcdf_sys::nc_get_vars(
+            variable.ncid,
+            variable.varid,
+            start.as_ptr(),
+            count.as_ptr(),
+            stride.as_ptr(),
+            buffer.as_mut_ptr().cast(),
+        )
+    })?;
+
+    Ok(())
+}
+
 #[allow(clippy::too_many_lines)]
 fn put_vars_mono(
     var: &mut crate::VariableMut,

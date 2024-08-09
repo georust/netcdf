@@ -537,6 +537,42 @@ impl<'g> Variable<'g> {
         let extents: Extents = extents.try_into().map_err(Into::into)?;
         self.values_to_mono(buffer, &extents)
     }
+
+    /// Fetches variable and returns the bytes.
+    /// It is up to the caller to decide what to do with these bytes,
+    /// including interpretation and freeing memory if
+    /// this is a vlen/string type
+    pub fn get_raw_values<E>(&self, extents: E) -> error::Result<Vec<u8>>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents: Extents = extents.try_into().map_err(Into::into)?;
+        let dims = self.dimensions();
+        let (_, count, _) = extents.get_start_count_stride(dims)?;
+        let number_of_elements = count.iter().copied().fold(1_usize, usize::saturating_mul);
+        let varsize = self.vartype().size();
+        let mut buffer = vec![0_u8; number_of_elements * varsize];
+
+        super::putget::get_raw_values_into(self, &mut buffer, extents)?;
+
+        Ok(buffer)
+    }
+
+    /// Fetches variable into provided buffer.
+    /// This functions returns bytes and it is up to the caller to
+    /// decide what to do with it, including freeing memory if
+    /// this is a vlen/string type
+    pub fn get_raw_values_into<E>(&self, buffer: &mut [u8], extents: E) -> error::Result<()>
+    where
+        E: TryInto<Extents>,
+        E::Error: Into<error::Error>,
+    {
+        let extents: Extents = extents.try_into().map_err(Into::into)?;
+        super::putget::get_raw_values_into(self, buffer, extents)?;
+
+        Ok(())
+    }
 }
 
 impl<'g> VariableMut<'g> {
