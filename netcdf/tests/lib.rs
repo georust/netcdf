@@ -1766,3 +1766,32 @@ fn close_file() {
     let f = netcdf::open(path).unwrap();
     f.close().unwrap();
 }
+
+#[test]
+fn read_raw_values() {
+    let path = test_location().join("sfc_pres_temp.nc");
+    let file = netcdf::open(path).unwrap();
+
+    let var = file.variable("pressure").unwrap();
+    let d_lat = 6;
+    let d_lon = 12;
+
+    let buffer = var.get_raw_values(..).unwrap();
+    assert_eq!(buffer.len(), d_lat * d_lon * std::mem::size_of::<f32>());
+    let buffer = var.get_raw_values((0, ..)).unwrap();
+    assert_eq!(buffer.len(), 1 * d_lon * std::mem::size_of::<f32>());
+    let buffer = var.get_raw_values((.., 0)).unwrap();
+    assert_eq!(buffer.len(), d_lat * 1 * std::mem::size_of::<f32>());
+
+    let mut buffer = vec![0; d_lat * d_lon * std::mem::size_of::<f32>()];
+    var.get_raw_values_into(&mut buffer, ..).unwrap();
+
+    var.get_raw_values_into(&mut buffer[..d_lon * 1 * 4], (0, ..))
+        .unwrap();
+
+    // Mismatched buffers
+    var.get_raw_values_into(&mut buffer[..d_lon * 1 * 4 - 1], (0, ..))
+        .unwrap_err();
+    var.get_raw_values_into(&mut buffer[..d_lon * 1 * 4 + 1], (0, ..))
+        .unwrap_err();
+}
