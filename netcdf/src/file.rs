@@ -13,7 +13,7 @@ use super::group::{Group, GroupMut};
 use super::types::{NcTypeDescriptor, NcVariableType};
 use super::variable::{Variable, VariableMut};
 use crate::group::{get_parent_ncid_and_stem, try_get_ncid, try_get_parent_ncid_and_stem};
-use crate::utils::{checked_with_lock, with_lock};
+use crate::utils::checked_with_lock;
 
 #[derive(Debug)]
 #[repr(transparent)]
@@ -23,7 +23,8 @@ pub(crate) struct RawFile {
 
 impl RawFile {
     fn close(self) -> error::Result<()> {
-        let Self { ncid } = self;
+        let ncid = self.ncid;
+        std::mem::forget(self);
         checked_with_lock(|| unsafe { nc_close(ncid) })
     }
 }
