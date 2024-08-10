@@ -217,19 +217,12 @@ impl<'g> Variable<'g> {
         if self.dimensions.is_empty() {
             return Ok(None);
         }
-        let mut storage = std::mem::MaybeUninit::<std::ffi::c_int>::uninit();
-        let mut chunk_size = Vec::with_capacity(self.dimensions.len());
+        let mut storage = 0;
+        let mut chunk_size = vec![0; self.dimensions.len()];
         checked_with_lock(|| unsafe {
-            nc_inq_var_chunking(
-                self.ncid,
-                self.varid,
-                storage.as_mut_ptr(),
-                chunk_size.spare_capacity_mut().as_mut_ptr().cast(),
-            )
+            nc_inq_var_chunking(self.ncid, self.varid, &mut storage, chunk_size.as_mut_ptr())
         })?;
-        let storage = unsafe { storage.assume_init() };
         if storage == NC_CHUNKED {
-            unsafe { chunk_size.set_len(self.dimensions.len()) };
             Ok(Some(chunk_size))
         } else {
             Ok(None)
