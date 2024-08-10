@@ -206,6 +206,28 @@ impl<'g> Variable<'g> {
     pub fn access_collective(&self) -> error::Result<()> {
         self.access_mode(crate::par::AccessMode::Collective)
     }
+
+    /// Get the chunking for the variable.
+    /// Returns None for a contiguous variable.
+    ///
+    /// # Errors
+    ///
+    /// Not a `netCDF-4` file.
+    pub fn chunking(&self) -> error::Result<Option<Vec<usize>>> {
+        if self.dimensions.is_empty() {
+            return Ok(None);
+        }
+        let mut storage = 0;
+        let mut chunk_size = vec![0; self.dimensions.len()];
+        checked_with_lock(|| unsafe {
+            nc_inq_var_chunking(self.ncid, self.varid, &mut storage, chunk_size.as_mut_ptr())
+        })?;
+        if storage == NC_CHUNKED {
+            Ok(Some(chunk_size))
+        } else {
+            Ok(None)
+        }
+    }
 }
 impl<'g> VariableMut<'g> {
     /// Sets compression on the variable. Must be set before filling in data.
