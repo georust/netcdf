@@ -24,7 +24,7 @@ mpi = ["dep:mpi-sys", "netcdf-sys/mpi"]
 ndarray = ["dep:ndarray"]
 
 [dependencies]
-ndarray = { version = "0.15", optional = true }
+ndarray = { version = ">=0.15,<=0.16", optional = true }
 netcdf-sys = { workspace = true }
 netcdf-derive = { workspace = true, optional = true }
 bitflags = "2.4.2"
