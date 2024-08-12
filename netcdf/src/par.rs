@@ -1,7 +1,4 @@
-use crate::{
-    error::{checked, Result},
-    utils::checked_with_lock,
-};
+use crate::{error::Result, utils::checked_with_lock};
 
 use netcdf_sys::nc_type;
 
