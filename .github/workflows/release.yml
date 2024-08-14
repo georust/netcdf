@@ -35,7 +35,7 @@ jobs:
       run: cargo publish --package netcdf-sys --token "${{ secrets.CRATES_IO_TOKEN }}"
     - name: Publish netcdf-derive
       if: "${{ startsWith(github.ref_name, 'netcdf-derive-v') }}"
-      run: cargo publish --package netcdf --token "${{ secrets.CRATES_IO_TOKEN }}"
+      run: cargo publish --package netcdf-derive --token "${{ secrets.CRATES_IO_TOKEN }}"
     - name: Publish netcdf
       if: "${{ startsWith(github.ref_name, 'netcdf-v') }}"
       run: cargo publish --package netcdf --token "${{ secrets.CRATES_IO_TOKEN }}"
