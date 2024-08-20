@@ -122,8 +122,12 @@ pub const NC_MPIPOSIX: c_int = {
 
 #[cfg(feature = "4.6.2")]
 pub const NC_PERSIST: c_int = 0x4000;
-
 pub const NC_INMEMORY: c_int = 0x8000;
+
+#[cfg(feature = "4.9.0")]
+pub const NC_NOATTCREORD: c_int = 0x20000;
+#[cfg(feature = "4.9.0")]
+pub const NC_NODIMSCALE_ATTACH: c_int = 0x40000;
 
 #[cfg(feature = "4.6.2")]
 pub const NC_MAX_MAGIC_NUMBER_LEN: usize = 8;
