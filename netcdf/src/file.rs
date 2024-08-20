@@ -71,6 +71,15 @@ bitflags::bitflags! {
         const NETCDF4 = NC_NETCDF4;
         /// Read from memory
         const INMEMORY = NC_INMEMORY;
+        /// Disable netcdf-4 (hdf5) attribute creation order tracking
+        #[cfg(feature = "4.9.0")]
+        const NOATTCREORD = NC_NOATTCREORD;
+        /// Disable netcdf-4 (hdf5) attaching dimscales to variables
+        #[cfg(feature = "4.9.0")]
+        const NODIMSCALE_ATTACH = NC_NODIMSCALE_ATTACH;
+
+        // Unknown flags from C library
+        const _ = !0;
     }
 }
 
