@@ -14,7 +14,7 @@ use super::variable::{Variable, VariableMut};
 
 /// Main component of the netcdf format. Holds all variables,
 /// attributes, and dimensions. A group can always see the parents items,
-/// but a parent can not access a childs items.
+/// but a parent can not access the childrens items.
 #[derive(Debug, Clone)]
 pub struct Group<'f> {
     pub(crate) ncid: nc_type,

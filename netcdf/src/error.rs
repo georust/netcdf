@@ -67,7 +67,13 @@ pub enum Error {
 impl Error {
     /// Was the error due to ambiguity of the
     /// indices or lengths?
+    #[deprecated(note = "This item has a typo, use is_ambiguous instead")]
     pub fn is_ambigous(&self) -> bool {
+        matches!(self, Self::Ambiguous)
+    }
+    /// Was the error due to ambiguity of the
+    /// indices or lengths?
+    pub fn is_ambiguous(&self) -> bool {
         matches!(self, Self::Ambiguous)
     }
 }

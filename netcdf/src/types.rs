@@ -870,7 +870,7 @@ pub(crate) fn read_type(ncid: nc_type, xtype: nc_type) -> Result<NcVariableType>
                 fields,
             }))
         }
-        _ => panic!("Unexcepted base type {base_xtype}"),
+        _ => panic!("Unexpected base type {base_xtype}"),
     }
 }
 

@@ -191,7 +191,7 @@ impl<'g> Variable<'g> {
     }
 
     /// Access the variable in independent mode
-    /// for parallell reading using MPI.
+    /// for parallel reading using MPI.
     /// File must have been opened using `open_par`
     ///
     /// This is the default access mode
@@ -200,7 +200,7 @@ impl<'g> Variable<'g> {
         self.access_mode(crate::par::AccessMode::Independent)
     }
     /// Access the variable in collective mode
-    /// for parallell reading using MPI.
+    /// for parallel reading using MPI.
     /// File must have been opened using `open_par`
     #[cfg(feature = "mpi")]
     pub fn access_collective(&self) -> error::Result<()> {
@@ -766,7 +766,7 @@ impl<'g> VariableMut<'g> {
             start.push(item.start);
             if arr_len != item.count {
                 if arr_len > item.count && item.is_growable && !item.is_upwards_limited {
-                    // Item is allowed to grow to accomodate the
+                    // Item is allowed to grow to accommodate the
                     // extra values in the array
                 } else {
                     return Err(format!(
