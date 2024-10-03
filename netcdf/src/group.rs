@@ -13,8 +13,8 @@ use super::utils::{checked_with_lock, with_lock};
 use super::variable::{Variable, VariableMut};
 
 /// Main component of the netcdf format. Holds all variables,
-/// attributes, and dimensions. A group can always see the parents items,
-/// but a parent can not access the childrens items.
+/// attributes, and dimensions. A group can always see the parent's items,
+/// but a parent can not access the children's items.
 #[derive(Debug, Clone)]
 pub struct Group<'f> {
     pub(crate) ncid: nc_type,
