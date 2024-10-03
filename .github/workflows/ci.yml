@@ -27,7 +27,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Check spelling
-        uses: crate-ci/typos@v1.25.0
+        uses: crate-ci/typos@f12cee1d8f3c79282a98ecb41d235aef17dfa8fd # v1.25.0
     name: rustfmt
     runs-on: ubuntu-latest
     steps:
