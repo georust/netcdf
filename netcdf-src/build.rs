@@ -19,6 +19,7 @@ fn main() {
         .define("NETCDF_ENABLE_DAP_REMOTE_TESTS", "OFF")
         .define("NETCDF_ENABLE_TESTS", "OFF")
         .define("NETCDF_ENABLE_EXTREME_NUMBERS", "OFF")
+        .define("NETCDF_ENABLE_FILTER_TESTING", "OFF")
         .define("NETCDF_ENABLE_PARALLEL_TESTS", "OFF")
         .define("NETCDF_ENABLE_FILTER_TESTING", "OFF")
         .define("ENABLE_BASH_SCRIPT_TESTING", "OFF")
