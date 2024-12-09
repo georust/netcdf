@@ -478,7 +478,7 @@ enum StartCountStrideIter<'a> {
     Extent(std::iter::Zip<std::slice::Iter<'a, Extent>, std::slice::Iter<'a, Dimension<'a>>>),
 }
 
-impl<'a> Iterator for StartCountStrideIter<'a> {
+impl Iterator for StartCountStrideIter<'_> {
     type Item = StartCountStrideIterItem;
     fn next(&mut self) -> Option<Self::Item> {
         match self {

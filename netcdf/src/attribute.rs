@@ -27,7 +27,7 @@ pub struct Attribute<'a> {
     pub(crate) _marker: PhantomData<&'a nc_type>,
 }
 
-impl<'a> std::fmt::Debug for Attribute<'a> {
+impl std::fmt::Debug for Attribute<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "name: {}", self.name())?;
         write!(f, "ncid: {}", self.ncid)?;
@@ -35,7 +35,7 @@ impl<'a> std::fmt::Debug for Attribute<'a> {
     }
 }
 
-impl<'a> Attribute<'a> {
+impl Attribute<'_> {
     /// Get the name of the attribute
     ///
     /// # Panics
@@ -398,7 +398,7 @@ pub(crate) struct AttributeIterator<'a> {
     _marker: PhantomData<&'a nc_type>,
 }
 
-impl<'a> AttributeIterator<'a> {
+impl AttributeIterator<'_> {
     pub(crate) fn new(ncid: nc_type, varid: Option<nc_type>) -> error::Result<Self> {
         let mut natts = 0;
         checked_with_lock(|| unsafe {
@@ -474,7 +474,7 @@ pub enum AttributeValue {
     Strs(Vec<String>),
 }
 
-impl<'a> Attribute<'a> {
+impl Attribute<'_> {
     #[allow(clippy::needless_pass_by_value)] // All values will be small
     #[allow(clippy::too_many_lines)]
     pub(crate) fn put(

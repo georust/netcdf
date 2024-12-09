@@ -177,8 +177,6 @@ impl<'f> GroupMut<'f> {
         crate::types::add_type(self.ncid, typ, false)
     }
 
-    /// Add an opaque datatype, with `size` bytes
-
     /// Add an attribute to the group
     pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where

@@ -27,7 +27,7 @@ pub struct DimensionIdentifier {
 }
 
 #[allow(clippy::len_without_is_empty)]
-impl<'g> Dimension<'g> {
+impl Dimension<'_> {
     /// Get current length of this dimension
     pub fn len(&self) -> usize {
         if let Some(x) = self.len {

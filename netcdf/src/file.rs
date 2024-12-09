@@ -518,7 +518,7 @@ impl FileMut {
 pub struct FileMem<'buffer>(File, std::marker::PhantomData<&'buffer [u8]>);
 
 #[cfg(feature = "has-mmap")]
-impl<'a> std::ops::Deref for FileMem<'a> {
+impl std::ops::Deref for FileMem<'_> {
     type Target = File;
     fn deref(&self) -> &Self::Target {
         &self.0
