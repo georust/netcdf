@@ -229,7 +229,7 @@ impl<'g> Variable<'g> {
         }
     }
 }
-impl<'g> VariableMut<'g> {
+impl VariableMut<'_> {
     /// Sets compression on the variable. Must be set before filling in data.
     ///
     /// `deflate_level` can take a value 0..=9, with 0 being no
@@ -289,7 +289,7 @@ impl<'g> VariableMut<'g> {
     }
 }
 
-impl<'g> VariableMut<'g> {
+impl VariableMut<'_> {
     /// Adds an attribute to the variable
     pub fn put_attribute<T>(&mut self, name: &str, val: T) -> error::Result<Attribute>
     where
@@ -299,7 +299,7 @@ impl<'g> VariableMut<'g> {
     }
 }
 
-impl<'g> Variable<'g> {
+impl Variable<'_> {
     fn get_values_mono<T: NcTypeDescriptor>(&self, extents: &Extents) -> error::Result<Vec<T>> {
         let dims = self.dimensions();
         let (start, count, stride) = extents.get_start_count_stride(dims)?;
@@ -597,7 +597,7 @@ impl<'g> Variable<'g> {
     }
 }
 
-impl<'g> VariableMut<'g> {
+impl VariableMut<'_> {
     fn put_values_mono<T: NcTypeDescriptor>(
         &mut self,
         values: &[T],
@@ -804,7 +804,7 @@ impl<'g> VariableMut<'g> {
     }
 }
 
-impl<'g> VariableMut<'g> {
+impl VariableMut<'_> {
     pub(crate) fn add_from_str(
         ncid: nc_type,
         xtype: &NcVariableType,
