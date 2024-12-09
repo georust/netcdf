@@ -50,9 +50,9 @@ jobs:
     - name: Check formatting
       run: cargo fmt -- --check
     - name: Documentation
-      run: cargo doc --workspace --features netcdf/derive
+      run: cargo doc --workspace --features netcdf/derive --exclude netcdf-src
     - name: Clippy
-      run: cargo clippy --features netcdf/derive --workspace -- -D warnings
+      run: cargo clippy --features netcdf/derive --workspace --exclude netcdf-src -- -D warnings
 
   test_apt:
     name: test apt
@@ -131,7 +131,7 @@ jobs:
           - {os: ubuntu-latest, rust: stable}
           - {os: windows-latest, rust: stable-msvc}
           - {os: windows-latest, rust: stable-gnu}
-          - {os: macos-12, rust: stable}
+          - {os: macos-13, rust: stable}
           - {os: macos-latest, rust: stable}
     defaults:
       run:
