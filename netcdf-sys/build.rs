@@ -294,6 +294,7 @@ fn main() {
         Version::new(4, 9, 0),
         Version::new(4, 9, 1),
         Version::new(4, 9, 2),
+        Version::new(4, 9, 3),
         // Keep this list up to date with netcdf/build.rs
     ];
 
