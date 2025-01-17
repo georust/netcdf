@@ -227,6 +227,7 @@ impl<'f> GroupMut<'f> {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
         VariableMut::add_from_str(ncid, &T::type_descriptor(), name, dims)
     }
+
     /// Adds a variable from a set of unique identifiers, recursing upwards
     /// from the current group if necessary.
     pub fn add_variable_from_identifiers<'g, T>(
@@ -268,6 +269,20 @@ impl<'f> GroupMut<'f> {
             return Err("Type is not defined".into());
         };
         super::variable::add_variable_from_identifiers(ncid, name, dims, xtype)
+    }
+
+    /// Create a Variable containing strings into the dataset, with no data written into it
+    ///
+    /// Dimensions are identified using the name of the dimension, and will recurse upwards
+    /// if not found in the current group.
+    pub fn add_string_variable(
+        &mut self,
+        name: &str,
+        dims: &[&str],
+    ) -> error::Result<VariableMut<'f>> {
+        let typ = crate::types::NcVariableType::String;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.id(), name)?;
+        VariableMut::add_from_str(ncid, &typ, name, dims)
     }
 }
 

@@ -483,3 +483,23 @@ fn no_subtype() {
     file.add_type::<Bar>().unwrap();
     file.add_type::<FooBar>().unwrap();
 }
+
+#[test]
+fn add_string_variable() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("stringy.nc");
+    {
+        let mut file = netcdf::create(path.clone()).unwrap();
+        file.add_string_variable("s", &[]).unwrap();
+
+        let mut group = file.add_group("g").unwrap();
+        group.add_string_variable("str", &[]).unwrap();
+    }
+    {
+        let file = netcdf::open(path).unwrap();
+        let var = file.variable("s").unwrap();
+        assert_eq!(var.vartype(), NcVariableType::String);
+        let var = file.variable("g/str").unwrap();
+        assert_eq!(var.vartype(), NcVariableType::String);
+    }
+}
