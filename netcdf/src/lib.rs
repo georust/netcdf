@@ -54,7 +54,7 @@
 //! # #[cfg(feature = "ndarray")]
 //! let mut data = ndarray::Array::<f32, _>::zeros((100, 100));
 //! # #[cfg(feature = "ndarray")]
-//! var.get_into((0, .., ..), data.view_mut())?;
+//! var.get_into(data.view_mut(), (0, .., ..))?;
 //! # Ok(()) }
 //! ```
 //!
@@ -92,7 +92,7 @@
 //! # #[cfg(feature = "ndarray")]
 //! let values = ndarray::Array::from_shape_fn((5, 10), |(j, i)| (j * 10 + i) as f32);
 //! # #[cfg(feature = "ndarray")]
-//! var.put((11.., ..), values.view())?;
+//! var.put(values.view(), (11.., ..))?;
 //! # Ok(()) }
 //! ```
 //!

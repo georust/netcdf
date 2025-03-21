@@ -439,8 +439,8 @@ impl Variable<'_> {
     /// Get values from a variable directly into an ndarray
     pub fn get_into<T: NcTypeDescriptor + Copy, E, D>(
         &self,
-        extents: E,
         mut out: ndarray::ArrayViewMut<T, D>,
+        extents: E,
     ) -> error::Result<()>
     where
         D: ndarray::Dimension,
@@ -726,8 +726,8 @@ impl VariableMut<'_> {
     #[allow(clippy::needless_pass_by_value)]
     pub fn put<T: NcTypeDescriptor, E, D>(
         &mut self,
-        extent: E,
         arr: ndarray::ArrayView<T, D>,
+        extent: E,
     ) -> error::Result<()>
     where
         E: TryInto<Extents>,

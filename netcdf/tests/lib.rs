@@ -1648,58 +1648,58 @@ fn ndarray_put() {
 
     macro_rules! put_values {
         ($var:expr, $values:expr, $extent:expr) => {
-            put_values!($var, $extent, $values, $extent)
+            put_values!($var, $values, $extent, $extent)
         };
-        ($var:expr, $extent:expr, $values:expr, $slice:expr) => {
-            $var.put($extent, $values.slice($slice).as_standard_layout().view())
+        ($var:expr, $values:expr, $extent:expr, $slice:expr) => {
+            $var.put($values.slice($slice).as_standard_layout().view(), $extent)
                 .unwrap()
         };
-        ($var:expr, $extent:expr, $values:expr, $slice:expr, Failure) => {
-            $var.put($extent, $values.slice($slice).as_standard_layout().view())
+        ($var:expr, $values:expr, $extent:expr, $slice:expr, Failure) => {
+            $var.put($values.slice($slice).as_standard_layout().view(), $extent)
                 .unwrap_err()
         };
     }
 
-    var.put(.., values.view()).unwrap();
+    var.put(values.view(), ..).unwrap();
     put_values!(var, values, s![3, .., .., ..]);
     put_values!(var, values, s![5, .., 2, 3]);
     put_values!(var, values, s![5, .., 2, 3..5]);
 
-    put_values!(var, .., values, s![.., .., .., ..]);
-    put_values!(var, (4, 6, .., ..), values, s![4, 6, .., ..]);
+    put_values!(var, values, .., s![.., .., .., ..]);
+    put_values!(var, values, (4, 6, .., ..), s![4, 6, .., ..]);
 
-    put_values!(var, (4, 6, 2, ..), values, s![4, 6, 2, ..]);
-    put_values!(var, (4, 6, .., 4), values, s![4, 6, .., 4]);
+    put_values!(var, values, (4, 6, 2, ..), s![4, 6, 2, ..]);
+    put_values!(var, values, (4, 6, .., 4), s![4, 6, .., 4]);
 
     put_values!(var, values, s![4..;3, 6, .., 4]);
-    put_values!(var, .., values, s![.., .., .., 1], Failure);
-    put_values!(var, (.., .., .., 1), values, s![.., .., .., ..], Failure);
+    put_values!(var, values, .., s![.., .., .., 1], Failure);
+    put_values!(var, values, (.., .., .., 1), s![.., .., .., ..], Failure);
 
     std::mem::drop(var);
     let mut var = f.add_variable::<u8>("grow", &["grow", "d2", "d3"]).unwrap();
 
     // let values = ndarray::Array::<u8, _>::zeros((10, 11, 12, 13));
-    put_values!(var, .., values, s![.., .., .., ..], Failure);
-    put_values!(var, .., values, s![..0, .., .., 0]);
-    put_values!(var, .., values, s![..1, .., .., 0]);
-    put_values!(var, .., values, s![.., .., .., 0]);
+    put_values!(var, values, .., s![.., .., .., ..], Failure);
+    put_values!(var, values, .., s![..0, .., .., 0]);
+    put_values!(var, values, .., s![..1, .., .., 0]);
+    put_values!(var, values, .., s![.., .., .., 0]);
     // Should fail since we don't know where to put the value (front? back?)
-    put_values!(var, .., values, s![..1, .., .., 0], Failure);
+    put_values!(var, values, .., s![..1, .., .., 0], Failure);
 
-    put_values!(var, (1, 4, 3), values, s![1, 1, 0, 0]);
+    put_values!(var, values, (1, 4, 3), s![1, 1, 0, 0]);
 
-    put_values!(var, (1, 3..4, 3), values, s![1, 1, 5..6, 0]);
-    put_values!(var, (0, 0, 0), values, s![0, 0, .., ..], Failure);
+    put_values!(var, values, (1, 3..4, 3), s![1, 1, 5..6, 0]);
+    put_values!(var, values, (0, 0, 0), s![0, 0, .., ..], Failure);
     // And weird implementation makes it such that we can append from a position which
     // is not at the end, maybe this should be an error?
-    put_values!(var, (6.., .., ..), values, s![.., .., .., 0]);
+    put_values!(var, values, (6.., .., ..), s![.., .., .., 0]);
     // Can put at the same spot
-    put_values!(var, (6.., .., ..), values, s![.., .., .., 0]);
+    put_values!(var, values, (6.., .., ..), s![.., .., .., 0]);
     // But not if in the middle
-    put_values!(var, (5.., .., ..), values, s![.., .., .., 0], Failure);
+    put_values!(var, values, (5.., .., ..), s![.., .., .., 0], Failure);
     // If the number of items is specified we can't put more items
-    put_values!(var, (5..6, .., ..), values, s![.., .., .., 0], Failure);
-    put_values!(var, (5..15, .., ..), values, s![.., .., .., 0]);
+    put_values!(var, values, (5..6, .., ..), s![.., .., .., 0], Failure);
+    put_values!(var, values, (5..15, .., ..), s![.., .., .., 0]);
 }
 
 #[test]
@@ -1721,29 +1721,29 @@ fn ndarray_get_into() {
 
     let mut var = f.add_variable::<u64>("var", &["d1", "d2", "d3"]).unwrap();
 
-    var.put(.., values.view()).unwrap();
+    var.put(values.view(), ..).unwrap();
 
     let mut outarray = ndarray::Array::<u64, _>::zeros((4, 5, 6));
 
-    var.get_into(.., outarray.view_mut()).unwrap();
+    var.get_into(outarray.view_mut(), ..).unwrap();
     assert_eq!(values, outarray);
     outarray.fill(0);
 
-    var.get_into((1, .., ..), outarray.slice_mut(s![0, .., ..]))
+    var.get_into(outarray.slice_mut(s![0, .., ..]), (1, .., ..))
         .unwrap();
     assert_eq!(values.slice(s![1, .., ..]), outarray.slice(s![0, .., ..]));
     outarray.fill(0);
 
-    var.get_into((3, 1, ..), outarray.slice_mut(s![0, 0, ..]))
+    var.get_into(outarray.slice_mut(s![0, 0, ..]), (3, 1, ..))
         .unwrap();
     assert_eq!(values.slice(s![3, 1, ..]), outarray.slice(s![0, 0, ..]));
     outarray.fill(0);
 
-    var.get_into((.., .., 1), outarray.slice_mut(s![.., .., 1]))
+    var.get_into(outarray.slice_mut(s![.., .., 1]), (.., .., 1))
         .unwrap_err();
 
     let mut outarray = ndarray::Array::<u64, _>::zeros((3, 4, 5, 6));
-    var.get_into((.., .., ..), outarray.slice_mut(s![0, .., .., ..]))
+    var.get_into(outarray.slice_mut(s![0, .., .., ..]), (.., .., ..))
         .unwrap();
     assert_eq!(values, outarray.slice(s![0, .., .., ..]));
 }

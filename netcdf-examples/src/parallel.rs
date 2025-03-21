@@ -33,7 +33,7 @@ fn create(
     let mut var = file.variable_mut("output").unwrap();
 
     let values = ndarray::Array1::from_shape_fn(10, |t| target_function(rank, t));
-    var.put((.., rank as usize), values.view())?;
+    var.put(values.view(), (.., rank as usize))?;
 
     Ok(())
 }
