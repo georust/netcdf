@@ -472,6 +472,20 @@ impl FileMut {
         super::variable::add_variable_from_identifiers(ncid, name, dims, xtype)
     }
 
+    /// Create a Variable containing strings into the dataset, with no data written into it
+    ///
+    /// Dimensions are identified using the name of the dimension, and will recurse upwards
+    /// if not found in the current group.
+    pub fn add_string_variable<'f>(
+        &mut self,
+        name: &str,
+        dims: &[&str],
+    ) -> error::Result<VariableMut<'f>> {
+        let typ = crate::types::NcVariableType::String;
+        let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
+        VariableMut::add_from_str(ncid, &typ, name, dims)
+    }
+
     /// Flush pending buffers to disk to minimise data loss in case of termination.
     ///
     /// Note: When writing and reading from the same file from multiple processes
