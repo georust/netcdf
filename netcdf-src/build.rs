@@ -34,6 +34,7 @@ fn main() {
         .define("NETCDF_ENABLE_PARALLEL4", "OFF") // TODO: Enable mpi support
         //
         .define("NETCDF_ENABLE_NCZARR", "ON")
+        .define("NETCDF_ENABLE_NCZARR_ZIP", "OFF") // TODO: requires forwarding flags for libz
         .define("NETCDF_ENABLE_S3", "OFF") // TODO: requires a bunch of deps
         //
         .define("NETCDF_ENABLE_DAP", "OFF") // TODO: feature flag, requires curl
