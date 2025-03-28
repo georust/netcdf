@@ -143,6 +143,10 @@ jobs:
       - name: Install Rust (${{matrix.rust}})
         uses: dtolnay/rust-toolchain@stable
         with: {toolchain: '${{matrix.rust}}'}
+      - name: Set target version for macos-13
+        run: |
+          echo "MACOSX_DEPLOYMENT_TARGET=13.7" >> $GITHUB_ENV
+        if : ${{ matrix.os == 'macos-13' }}
       - name: Build and test
         run: cargo test -vv --features netcdf/derive,static --workspace --exclude netcdf-derive
 
