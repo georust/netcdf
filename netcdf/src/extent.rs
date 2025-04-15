@@ -115,7 +115,7 @@ impl From<StepBy<Range<usize>>> for Extent {
             },
             (Some(first), Some(second)) => {
                 let stride = isize::try_from(second - first).unwrap_or(isize::MAX);
-                let last = range.last().unwrap_or(second);
+                let last = range.next_back().unwrap_or(second);
 
                 Self::SliceEnd {
                     start: first,
