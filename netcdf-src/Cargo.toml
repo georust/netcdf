@@ -12,7 +12,7 @@ categories = ["filesystem"]
 keywords = ["netcdf"]
 readme = "README.md"
 exclude = [
-    "source/unit_test/**",
+    # "source/unit_test/**", https://github.com/Unidata/netcdf-c/pull/3133
     "source/NUG/**",
     "source/dap4_test/**",
     "source/examples/**",
