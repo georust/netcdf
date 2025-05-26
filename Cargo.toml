@@ -14,5 +14,5 @@ netcdf = { path = "netcdf", version = "0.11.0" }
 netcdf-sys = { path = "netcdf-sys", version = "0.8.1" }
 netcdf-src = { path = "netcdf-src", version = "0.4.0" }
 netcdf-derive = { path = "netcdf-derive", version = "0.1.0" }
-hdf5-sys = { package = "hdf5-metno-sys", version = "0.9.1" }
+hdf5-sys = { package = "hdf5-metno-sys", version = "0.10.1" }
 mpi-sys = { version = "0.2.1" }
