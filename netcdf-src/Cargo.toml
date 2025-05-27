@@ -12,19 +12,27 @@ categories = ["filesystem"]
 keywords = ["netcdf"]
 readme = "README.md"
 exclude = [
-    # "source/unit_test/**", https://github.com/Unidata/netcdf-c/pull/3133
+    "source/docs/doxygen-awesome-css/**",
+    "source/docs/images/**",
+    "source/docs/old/**",
     "source/NUG/**",
     "source/dap4_test/**",
     "source/examples/**",
     "source/nc_test/**",
+    # "source/unit_test/**", https://github.com/Unidata/netcdf-c/pull/3133
+    # "source/nc_test4/**", https://github.com/Unidata/netcdf-c/pull/3133
+    "source/nc_test4/**.nc",
     "source/h5_test/**",
     "source/nc_perf/**",
+    "source/nczarr_test/**",
+    "source/hdf5_test/**",
     "source/ncdump/**",
     "source/hdf4_test/**",
     "source/ncgen/**",
     "source/ncgen3/**",
     "source/nctest/**",
     "source/ncdap_test/**",
+    "source/nc_perf/**",
 ]
 rust-version = "1.77.0"
 
