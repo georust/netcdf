@@ -172,9 +172,6 @@ fn from_utf8_to_trimmed_string(bytes: &[u8]) -> String {
 }
 
 impl NcInfo {
-    fn guess() -> Self {
-        todo!()
-    }
     fn from_path(path: &Path) -> Self {
         Self {
             version: None,
@@ -258,7 +255,9 @@ fn main() {
         info = if let Some(nc_dir) = nc_dir.as_ref() {
             NcInfo::gather_from_ncconfig(Some(nc_dir)).unwrap_or_else(|| NcInfo::from_path(nc_dir))
         } else {
-            NcInfo::gather_from_ncconfig(None).unwrap_or_else(NcInfo::guess)
+            NcInfo::gather_from_ncconfig(None).unwrap_or_else(||
+                panic!("A system version of libnetcdf could not be found. Consider installing to some default location, use NETCDF_DIR, or prefer the static version of libnetcdf by setting the `static` feature on `netcdf-sys`")
+            )
         };
 
         println!("cargo::rustc-link-search={}", info.libdir.display());

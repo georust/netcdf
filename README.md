@@ -31,13 +31,12 @@ All variable data is read into a contiguous buffer, or into an [ndarray](https:/
 
 ## Building
 
-This crate depends on `libnetcdf`, but a static build from source is also supported, which can be enabled using the `static` feature.
+This crate depends on the library [`netcdf-c`](https://www.unidata.ucar.edu/netcdf/) which must be installed on the machine, along with libraries such as `hdf5`. An alternative to the system libraries is the use of the `static` feature of this crate (`cargo add netcdf --features static`), which compiles `libnetcdf` from source. The `static` feature requires `cmake`, a `c++` compiler and more to be installed on the build machine.
 
-The crate is built on several platforms using github actions, and is currently known to build form from source on all major platforms (linux, macos, windows (gnu+msvc)), and through the package installers `conda` and `apt`.
+The crate is built on several platforms using github actions, and is currently known to build form from source on all major platforms (linux, macos, windows (gnu+msvc)), and through the package installers `conda` and `apt`. Please see the github workflows for tips on how to install `netcdf`.
 
-If during compilation there is an error in building the `hdf5` crate, consider using the `static` feature which will include a compatible version of both `netcdf` and `hdf5`. This is likely to be an issue [upstream](https://github.com/aldanor/hdf5-rust/issues/262).
 
-### Building without `libnetcdf` or building statically
+### Building `libnetcdf` statically
 1. `git clone https://github.com/georust/netcdf`
 2. `git submodule update --init --recursive`
 3. `cargo build --features static`
