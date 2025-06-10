@@ -249,14 +249,11 @@ fn main() {
             .or_else(|| std::env::var_os("NetCDF_DIR"))
             .map(PathBuf::from);
 
-        #[cfg(windows)]
-        let nc_dir = nc_dir.map(|d| d.join("Library"));
-
         info = if let Some(nc_dir) = nc_dir.as_ref() {
             NcInfo::gather_from_ncconfig(Some(nc_dir)).unwrap_or_else(|| NcInfo::from_path(nc_dir))
         } else {
             NcInfo::gather_from_ncconfig(None).unwrap_or_else(||
-                panic!("A system version of libnetcdf could not be found. Consider installing to some default location, use NETCDF_DIR, or prefer the static version of libnetcdf by setting the `static` feature on `netcdf-sys`")
+                panic!("A system version of libnetcdf could not be found. Consider installing to some default location, use the environment variable NETCDF_DIR (remember to restart the shell), or prefer building the static version of libnetcdf by enabling the `static` feature on `netcdf-sys` or `netcdf`")
             )
         };
 

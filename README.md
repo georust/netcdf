@@ -31,7 +31,9 @@ All variable data is read into a contiguous buffer, or into an [ndarray](https:/
 
 ## Building
 
-This crate depends on the library [`netcdf-c`](https://www.unidata.ucar.edu/netcdf/) which must be installed on the machine, along with libraries such as `hdf5`. An alternative to the system libraries is the use of the `static` feature of this crate (`cargo add netcdf --features static`), which compiles `libnetcdf` from source. The `static` feature requires `cmake`, a `c++` compiler and more to be installed on the build machine.
+This crate depends on the C library [`netcdf-c`](https://www.unidata.ucar.edu/netcdf/) which must be installed on the machine, along with libraries such as `hdf5` which `netcdf-c` depends on. For some platforms you might have to set the environment variable `NETCDF_DIR` which needs to point at the installation of `netcdf-c` you wish to use.
+
+An alternative to using the system libraries is to enable `static` feature of this crate (`cargo add netcdf --features static`), which compiles `libnetcdf` from source. The `static` feature requires `cmake`, a `c++` compiler and more to be installed on the build machine.
 
 The crate is built on several platforms using github actions, and is currently known to build form from source on all major platforms (linux, macos, windows (gnu+msvc)), and through the package installers `conda` and `apt`. Please see the github workflows for tips on how to install `netcdf`.
 
