@@ -19,7 +19,7 @@ use crate::utils::{checked_with_lock, with_lock};
 ///
 /// This type is used for retrieving data from a variable.
 /// Metadata on the `netCDF`-level can be retrieved using e.g.
-/// [`fill_value`](Self::fill_value), [`endinanness`](Self::endianness).
+/// [`fill_value`](Self::fill_value), [`endianness`](Self::endianness).
 /// Use [`attributes`](Self::attribute) to get additional metadata assigned
 /// by the data producer. This crate will not apply any of the transformations
 /// given by such attributes (e.g. `add_offset` and `scale_factor` are NOT considered).

@@ -172,16 +172,18 @@ fn from_utf8_to_trimmed_string(bytes: &[u8]) -> String {
 }
 
 impl NcInfo {
-    fn guess() -> Self {
-        todo!()
-    }
-    fn from_path(path: &Path) -> Self {
-        Self {
+    fn from_path(path: &Path) -> Option<Self> {
+        let includedir = path.join("include");
+        if !includedir.exists() {
+            return None;
+        }
+
+        Some(Self {
             version: None,
             includedir: path.join("include"),
             libdir: path.join("lib"),
             libname: "netcdf".to_owned(),
-        }
+        })
     }
     fn gather_from_ncconfig(search_path: Option<&Path>) -> Option<Self> {
         let path = if let Some(search_path) = search_path {
@@ -232,6 +234,40 @@ fn _check_consistent_version_linked() {
     todo!()
 }
 
+fn determine_ncinfo() -> NcInfo {
+    let nc_dir = std::env::var_os("NETCDF_DIR")
+        .or_else(|| std::env::var_os("NetCDF_DIR"))
+        .map(PathBuf::from);
+
+    if let Some(nc_dir) = nc_dir.as_ref() {
+        #[allow(unused_mut)]
+        if let Some(info) = NcInfo::gather_from_ncconfig(Some(nc_dir)) {
+            return info;
+        }
+        if let Some(info) = NcInfo::from_path(nc_dir) {
+            return info;
+        }
+        #[cfg(windows)]
+        {
+            // Conda requires Library prefix
+            let nc_dir = nc_dir.join("Library");
+            if let Some(info) = NcInfo::gather_from_ncconfig(Some(&nc_dir)) {
+                return info;
+            }
+            if let Some(info) = NcInfo::from_path(&nc_dir) {
+                return info;
+            }
+        }
+    }
+
+    if let Some(info) = NcInfo::gather_from_ncconfig(None) {
+        return info;
+    }
+
+    panic!("A system version of libnetcdf could not be found. Consider installing to some default location, use the environment variable NETCDF_DIR (remember to restart the shell), or prefer building the static version of libnetcdf by enabling the `static` feature on `netcdf-sys` or `netcdf`"
+            );
+}
+
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
 
@@ -240,26 +276,19 @@ fn main() {
         let netcdf_lib = std::env::var("DEP_NETCDFSRC_LIB").unwrap();
         let netcdf_path = PathBuf::from(std::env::var_os("DEP_NETCDFSRC_SEARCH").unwrap());
 
-        info = NcInfo::gather_from_ncconfig(Some(&netcdf_path.join("..")))
-            .unwrap_or_else(|| NcInfo::from_path(&netcdf_path.join("..")));
+        let mut linfo = NcInfo::gather_from_ncconfig(Some(&netcdf_path.join("..")));
+        if linfo.is_none() {
+            linfo = NcInfo::from_path(&netcdf_path.join(".."))
+        }
+
+        info = linfo.expect("The library path should be determined by this point");
 
         println!("cargo::rustc-link-search=native={}", netcdf_path.display());
         println!("cargo::rustc-link-lib=static={netcdf_lib}");
     } else {
         println!("cargo::rerun-if-env-changed=NETCDF_DIR");
 
-        let nc_dir = std::env::var_os("NETCDF_DIR")
-            .or_else(|| std::env::var_os("NetCDF_DIR"))
-            .map(PathBuf::from);
-
-        #[cfg(windows)]
-        let nc_dir = nc_dir.map(|d| d.join("Library"));
-
-        info = if let Some(nc_dir) = nc_dir.as_ref() {
-            NcInfo::gather_from_ncconfig(Some(nc_dir)).unwrap_or_else(|| NcInfo::from_path(nc_dir))
-        } else {
-            NcInfo::gather_from_ncconfig(None).unwrap_or_else(NcInfo::guess)
-        };
+        info = determine_ncinfo();
 
         println!("cargo::rustc-link-search={}", info.libdir.display());
         println!("cargo::rustc-link-lib={}", &info.libname);

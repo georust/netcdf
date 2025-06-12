@@ -5,4 +5,5 @@ extend-exclude = ["netcdf-src/source", "netcdf-sys"]
 extend-ignore-identifiers-re = [
   "Dout",
   "is_ambigous", # Remove when deprecated item is removed
+  "typ",
 ]

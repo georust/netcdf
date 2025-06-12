@@ -14,7 +14,14 @@
 //!
 //! For more information see:
 //! * [The official introduction to `netCDF`](https://docs.unidata.ucar.edu/nug/current/netcdf_introduction.html)
-//! * [The `netCDF-c` repository](https://github.com/Unidata/netcdf-c)
+//! * [The `NetCDF-c` repository](https://github.com/Unidata/netcdf-c)
+//!
+//! # Installing netcdf-c
+//!
+//! This crate depends on [Unidata NetCDF-c](https://github.com/Unidata/netcdf-c) and dependencies
+//! of this library (such as hdf5).
+//! An alternative to the system libraries is to use the bundled sources of netcdf by using the `static` feature of this crate. This will require build utilities such as `cmake`, `c++` compiler and more.
+//!
 //!
 //! # Examples
 //!
