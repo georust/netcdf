@@ -79,7 +79,7 @@ impl<'f> Group<'f> {
         Attribute::find_from_name(ncid, None, name).unwrap()
     }
     /// Get all attributes in the group
-    pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
+    pub fn attributes(&self) -> impl Iterator<Item = Attribute<'_>> {
         // Need to lock when reading the first attribute (per group)
         crate::attribute::AttributeIterator::new(self.ncid, None)
             .unwrap()

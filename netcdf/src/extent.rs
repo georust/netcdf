@@ -1,5 +1,6 @@
 //! Extents used for putting and getting data
 //! from a variable
+#![allow(clippy::infallible_try_from)]
 
 use std::convert::Infallible;
 use std::convert::TryFrom;
