@@ -213,7 +213,7 @@ impl File {
     }
 
     /// Main entrypoint for interacting with the netcdf file.
-    pub fn root(&self) -> Option<Group> {
+    pub fn root(&self) -> Option<Group<'_>> {
         let mut format = 0;
         checked_with_lock(|| unsafe { nc_inq_format(self.ncid(), &mut format) }).unwrap();
 
@@ -237,7 +237,7 @@ impl File {
         Variable::find_from_name(ncid, name).unwrap()
     }
     /// Iterate over all variables in a group
-    pub fn variables(&self) -> impl Iterator<Item = Variable> {
+    pub fn variables(&self) -> impl Iterator<Item = Variable<'_>> {
         super::variable::variables_at_ncid(self.ncid())
             .unwrap()
             .map(Result::unwrap)
@@ -248,7 +248,7 @@ impl File {
         Attribute::find_from_name(ncid, None, name).unwrap()
     }
     /// Get all attributes in the root group
-    pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
+    pub fn attributes(&self) -> impl Iterator<Item = Attribute<'_>> {
         crate::attribute::AttributeIterator::new(self.0.ncid, None)
             .unwrap()
             .map(Result::unwrap)
@@ -261,7 +261,7 @@ impl File {
         super::dimension::dimension_from_name(ncid, name).unwrap()
     }
     /// Iterator over all dimensions in the root group
-    pub fn dimensions(&self) -> impl Iterator<Item = Dimension> {
+    pub fn dimensions(&self) -> impl Iterator<Item = Dimension<'_>> {
         super::dimension::dimensions_from_location(self.ncid())
             .unwrap()
             .map(Result::unwrap)
@@ -294,7 +294,7 @@ impl File {
     /// # Errors
     ///
     /// Not a `netCDF-4` file
-    pub fn groups(&self) -> error::Result<impl Iterator<Item = Group>> {
+    pub fn groups(&self) -> error::Result<impl Iterator<Item = Group<'_>>> {
         super::group::groups_at_ncid(self.ncid())
     }
 
@@ -333,7 +333,7 @@ impl FileMut {
     /// Mutable access to the root group
     ///
     /// Return None if this can't be a root group
-    pub fn root_mut(&mut self) -> Option<GroupMut> {
+    pub fn root_mut(&mut self) -> Option<GroupMut<'_>> {
         self.root().map(|root| GroupMut(root, PhantomData))
     }
     /// Get a mutable variable from the group
@@ -352,7 +352,7 @@ impl FileMut {
     /// vars[1].put_value(1_u8, [5, 2])?;
     /// # Ok(()) }
     /// ```
-    pub fn variables_mut(&mut self) -> impl Iterator<Item = VariableMut> {
+    pub fn variables_mut(&mut self) -> impl Iterator<Item = VariableMut<'_>> {
         self.variables().map(|var| VariableMut(var, PhantomData))
     }
 
@@ -370,7 +370,7 @@ impl FileMut {
     /// # Errors
     ///
     /// File does not support groups
-    pub fn groups_mut(&mut self) -> error::Result<impl Iterator<Item = GroupMut>> {
+    pub fn groups_mut(&mut self) -> error::Result<impl Iterator<Item = GroupMut<'_>>> {
         self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
 
@@ -389,7 +389,7 @@ impl FileMut {
         super::dimension::add_dimension_at(ncid, name, len)
     }
     /// Adds a dimension with unbounded size
-    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<Dimension> {
+    pub fn add_unlimited_dimension(&mut self, name: &str) -> error::Result<Dimension<'_>> {
         self.add_dimension(name, 0)
     }
 

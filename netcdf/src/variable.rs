@@ -127,7 +127,7 @@ impl<'g> Variable<'g> {
             .expect("Could not retrieve attribute")
     }
     /// Iterator over all the attributes of this variable
-    pub fn attributes(&self) -> impl Iterator<Item = Attribute> {
+    pub fn attributes(&self) -> impl Iterator<Item = Attribute<'_>> {
         // Need to lock when reading the first attribute (per variable)
         crate::attribute::AttributeIterator::new(self.ncid, Some(self.varid))
             .expect("Could not get attributes")
@@ -149,7 +149,7 @@ impl<'g> Variable<'g> {
         self.attribute(name).as_ref().map(Attribute::value)
     }
     /// Dimensions for a variable
-    pub fn dimensions(&self) -> &[Dimension] {
+    pub fn dimensions(&self) -> &[Dimension<'_>] {
         &self.dimensions
     }
     /// Get the type of this variable
@@ -291,7 +291,7 @@ impl VariableMut<'_> {
 
 impl VariableMut<'_> {
     /// Adds an attribute to the variable
-    pub fn put_attribute<T>(&mut self, name: &str, val: T) -> error::Result<Attribute>
+    pub fn put_attribute<T>(&mut self, name: &str, val: T) -> error::Result<Attribute<'_>>
     where
         T: Into<AttributeValue>,
     {
