@@ -5,11 +5,11 @@ fn target_function(rank: i32, t: usize) -> i32 {
 }
 
 fn mpi_null_info() -> mpi_sys::MPI_Info {
-    let mut info = std::ptr::null_mut();
-    let e = unsafe { mpi_sys::MPI_Info_create(&mut info) };
+    let mut info = std::mem::MaybeUninit::uninit();
+    let e = unsafe { mpi_sys::MPI_Info_create(info.as_mut_ptr()) };
     assert_eq!(e, mpi_sys::MPI_SUCCESS.try_into().unwrap());
 
-    info
+    unsafe { info.assume_init() }
 }
 
 fn create(
