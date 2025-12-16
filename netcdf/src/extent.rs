@@ -243,7 +243,7 @@ impl Extent {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 /// A selector for putting and getting data along a dataset
 ///
 /// This type can be constructed in many ways
@@ -276,15 +276,10 @@ impl Extent {
 /// ```
 pub enum Extents {
     /// The full variable
+    #[default]
     All,
     /// A selection along each dimension
     Extent(Vec<Extent>),
-}
-
-impl Default for Extents {
-    fn default() -> Self {
-        Self::All
-    }
 }
 
 impl From<std::ops::RangeFull> for Extents {
