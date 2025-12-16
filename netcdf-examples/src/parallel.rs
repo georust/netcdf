@@ -4,9 +4,9 @@ fn target_function(rank: i32, t: usize) -> i32 {
     100 * (t as i32) + rank
 }
 
-fn mpi_null_info() -> mpi_sys::MPI_Info {
+fn mpi_null_info() -> *mut mpi_sys::MPI_Info {
     let mut info = std::ptr::null_mut();
-    let e = unsafe { mpi_sys::MPI_Info_create(&mut info) };
+    let e = unsafe { mpi_sys::MPI_Info_create(info) };
     assert_eq!(e, mpi_sys::MPI_SUCCESS.try_into().unwrap());
 
     info
