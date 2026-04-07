@@ -23,6 +23,7 @@ include = [
     "source/**/*.in",
     "source/libsrc/*.m4",
     "source/docs/netcdf.m4",
+    "source/libncxml/*",
     "!source/docs/doxygen-awesome-css/**",
     "!source/docs/images/**",
     "!source/docs/old/**",
