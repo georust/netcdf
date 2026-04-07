@@ -1,6 +1,6 @@
 //! Dummy crate for building `netCDF` from source
 //!
-//! The current pinned version is 4.9.3 + strlcpy patch
+//! The current pinned version is 4.10.0
 
 #[cfg(feature = "dap")]
 extern crate link_cplusplus;
