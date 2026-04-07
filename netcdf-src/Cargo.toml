@@ -53,6 +53,7 @@ mpi = []
 
 [dependencies]
 hdf5-sys = { workspace = true, features = ["hl", "deprecated", "zlib", "static"] }
+hdf5-metno-src = { version = "=0.10.1" }
 libz-sys = { version = "1.0.25" }
 link-cplusplus = { version = "1.0.9", optional = true }
 
