@@ -110,7 +110,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with: {toolchain: '${{matrix.rust}}'}
       - name: Install conda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with: {auto-update-conda: false, activate-environment: testenv}
       - name: Install netCDF
         run: conda install -y -c ${{matrix.channel}} libnetcdf=4.8.1
