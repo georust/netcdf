@@ -26,7 +26,7 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
 
     - name: Install tarpaulin
-      uses: baptiste0928/cargo-install@30f432979e99f3ea66a8fa2eede53c07063995d8  # v2.1.0
+      uses: baptiste0928/cargo-install@f204293d9709061b7bc1756fec3ec4e2cd57dec0  # v3.4.0
       with:
         crate: cargo-tarpaulin
         version: "0.27.3"
