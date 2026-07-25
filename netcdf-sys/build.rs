@@ -291,7 +291,7 @@ fn main() {
         info = determine_ncinfo();
 
         println!("cargo::rustc-link-search={}", info.libdir.display());
-        println!("cargo::rustc-link-lib={}", &info.libname);
+        println!("cargo::rustc-link-lib={}", info.libname);
     }
 
     let metaheader = NcMetaHeader::gather_from_includeheader(
