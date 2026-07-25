@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Check spelling
         uses: crate-ci/typos@bee27e3a4fd1ea2111cf90ab89cd076c870fce14 # v1.48.0
 
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with: {submodules: true}
     - name: Install netCDF
       run: sudo apt-get update && sudo apt-get install libnetcdf-dev
@@ -72,7 +72,7 @@ jobs:
           rust: nightly
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with: {submodules: false}
 
     - name: Install netcdf
@@ -104,7 +104,7 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with: {submodules: false}
       - name: Install Rust (${{matrix.rust}})
         uses: dtolnay/rust-toolchain@stable
@@ -138,7 +138,7 @@ jobs:
           shell: bash -l {0}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with: {submodules: true}
       - name: Install Rust (${{matrix.rust}})
         uses: dtolnay/rust-toolchain@stable
@@ -155,7 +155,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with: {submodules: true}
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -173,7 +173,7 @@ jobs:
       NETCDF_DIR: /usr/lib/x86_64-linux-gnu/netcdf/mpi/
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with: {submodules: false}
 
     - name: Install netcdf
