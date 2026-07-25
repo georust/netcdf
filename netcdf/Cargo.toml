@@ -39,5 +39,5 @@ tempfile = "3.1.0"
 semver = "1.0.23"
 
 [package.metadata.docs.rs]
-features = ["static"]
+features = ["static", "derive"]
 rustdoc-args = ["--cfg", "docsrs"]
