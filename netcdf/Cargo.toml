@@ -22,6 +22,7 @@ static = ["netcdf-sys/static"]
 derive = ["dep:netcdf-derive"]
 mpi = ["dep:mpi-sys", "netcdf-sys/mpi"]
 ndarray = ["dep:ndarray"]
+has-mmap = []
 
 [dependencies]
 ndarray = { version = ">=0.15, <=0.17", optional = true }
