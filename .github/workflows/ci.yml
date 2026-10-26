@@ -195,3 +195,45 @@ jobs:
 
     - name: Run example in parallel
       run: mpirun -np 10 --oversubscribe -- target/debug/netcdf-examples
+
+  spack:
+    name: spack
+    runs-on: ${{matrix.os}}-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu}
+          - {os: macos}
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with: {submodules: false}
+      - name: Set up Spack
+        uses: spack/setup-spack@v3
+        with:
+          buildcache: true
+      - name: Add dependencies
+        shell: spack-bash {0}
+        run: |
+          spack env create ci-env
+          spack env activate ci-env
+          spack add hdf5~mpi
+          spack add netcdf-c~mpi
+          spack concretize -f
+          spack install
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "stable"
+      - name: Build and test
+        shell: spack-bash {0}
+        run: |
+          spack env activate ci-env
+          export HDF5_DIR="$(spack location -i hdf5)"
+          export NETCDF_DIR="$(spack location -i netcdf-c)"
+          cargo test -vv --workspace --exclude netcdf-src --exclude netcdf-derive --features netcdf/derive
+
