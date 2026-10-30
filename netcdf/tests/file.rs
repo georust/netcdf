@@ -53,7 +53,7 @@ fn fetch_from_path() {
         let mut subgroup = group.add_group("subgrp").unwrap();
         subgroup.add_dimension("dim", 1).unwrap();
         subgroup.add_variable::<f64>("var", &["dim"]).unwrap();
-        subgroup.add_attribute("attr", "test").unwrap();
+        subgroup.put_attribute("attr", "test").unwrap();
     }
     let file = netcdf::open(path).unwrap();
     assert_eq!(

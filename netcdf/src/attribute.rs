@@ -11,8 +11,8 @@ use super::error;
 use super::utils::{checked_with_lock, with_lock};
 
 /// Extra properties of a variable or a group can be represented
-/// with attributes. Primarily added with `add_attribute` on
-/// the variable and group
+/// with attributes. Primarily added with `put_attribute` on
+/// variables, files, and groups
 #[derive(Clone)]
 pub struct Attribute<'a> {
     pub(crate) name: [u8; NC_MAX_NAME as usize + 1],

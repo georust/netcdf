@@ -91,8 +91,8 @@ fn add_and_get_from_path() {
         assert!(file.add_dimension("a/c/dim", 1).is_err());
         file.add_variable::<f64>("a/b/var", &["dim"]).unwrap();
         assert!(file.add_variable::<f64>("a/c/var", &["dim"]).is_err());
-        file.add_attribute("a/b/attr", "test").unwrap();
-        assert!(file.add_attribute("a/c/test", "test").is_err());
+        file.put_attribute("a/b/attr", "test").unwrap();
+        assert!(file.put_attribute("a/c/test", "test").is_err());
     }
     let file = netcdf::open(path).unwrap();
     let root = file.root().unwrap();

@@ -290,7 +290,7 @@ impl VariableMut<'_> {
 }
 
 impl VariableMut<'_> {
-    /// Adds an attribute to the variable
+    /// Puts an attribute on the variable
     pub fn put_attribute<T>(&mut self, name: &str, val: T) -> error::Result<Attribute<'_>>
     where
         T: Into<AttributeValue>,

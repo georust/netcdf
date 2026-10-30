@@ -355,8 +355,8 @@ fn def_dims_vars_attrs() {
         assert_eq!(var.dimensions()[0].len(), 10);
 
         // test global attrs
-        file.add_attribute("testattr1", 3).unwrap();
-        file.add_attribute("testattr2", "Global string attr".to_string())
+        file.put_attribute("testattr1", 3).unwrap();
+        file.put_attribute("testattr2", "Global string attr".to_string())
             .unwrap();
 
         // test var attrs

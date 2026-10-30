@@ -44,13 +44,13 @@ fn attribute_put() {
     let p = d.path().join("attribute_put.nc");
     let mut f = netcdf::create(p).unwrap();
 
-    f.add_attribute("a", "1").unwrap();
+    f.put_attribute("a", "1").unwrap();
     assert_eq!(f.attribute("a").unwrap().value().unwrap(), "1".into());
-    f.add_attribute("b", "2").unwrap();
+    f.put_attribute("b", "2").unwrap();
     assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
-    f.add_attribute("a", 2u32).unwrap();
+    f.put_attribute("a", 2u32).unwrap();
     assert_eq!(f.attribute("a").unwrap().value().unwrap(), 2u32.into());
-    f.add_attribute("b", "2").unwrap();
+    f.put_attribute("b", "2").unwrap();
     assert_eq!(f.attribute("b").unwrap().value().unwrap(), "2".into());
 }
 #[test]
@@ -110,22 +110,22 @@ fn all_attr_types() {
         let f = d.path().join("all_attr_types.nc");
         let mut file = netcdf::create(f).unwrap();
 
-        file.add_attribute("attr_byte", 3 as i8).unwrap();
-        file.add_attribute("attr_ubyte", 3 as u8).unwrap();
-        file.add_attribute("attr_short", 3 as i16).unwrap();
-        file.add_attribute("attr_ushort", 3 as u16).unwrap();
-        file.add_attribute("attr_int", 3 as i32).unwrap();
-        file.add_attribute("attr_uint", 3 as u32).unwrap();
-        file.add_attribute("attr_int64", 3 as i64).unwrap();
-        file.add_attribute("attr_uint64", 3 as u64).unwrap();
-        file.add_attribute("attr_float", 3.2 as f32).unwrap();
-        file.add_attribute("attr_double", 3.2 as f64).unwrap();
-        file.add_attribute("attr_text", "Hello world!").unwrap();
-        file.add_attribute("attr_str", strs.clone()).unwrap();
-        file.add_attribute("attr_str_slice", strs.as_slice())
+        file.put_attribute("attr_byte", 3 as i8).unwrap();
+        file.put_attribute("attr_ubyte", 3 as u8).unwrap();
+        file.put_attribute("attr_short", 3 as i16).unwrap();
+        file.put_attribute("attr_ushort", 3 as u16).unwrap();
+        file.put_attribute("attr_int", 3 as i32).unwrap();
+        file.put_attribute("attr_uint", 3 as u32).unwrap();
+        file.put_attribute("attr_int64", 3 as i64).unwrap();
+        file.put_attribute("attr_uint64", 3 as u64).unwrap();
+        file.put_attribute("attr_float", 3.2 as f32).unwrap();
+        file.put_attribute("attr_double", 3.2 as f64).unwrap();
+        file.put_attribute("attr_text", "Hello world!").unwrap();
+        file.put_attribute("attr_str", strs.clone()).unwrap();
+        file.put_attribute("attr_str_slice", strs.as_slice())
             .unwrap();
 
-        file.add_attribute("attr_text_utf8", u8string).unwrap();
+        file.put_attribute("attr_text_utf8", u8string).unwrap();
     }
 
     {
@@ -197,17 +197,17 @@ fn multi_attributes() {
     let path = d.path().join("multi_attributes");
     {
         let mut file = netcdf::create(&path).unwrap();
-        file.add_attribute("u8s", vec![1_u8, 2, 3, 4]).unwrap();
-        file.add_attribute("i8s", vec![1_i8, 2, 3, 4]).unwrap();
-        file.add_attribute("u16s", vec![1_u16, 2, 3, 4]).unwrap();
-        file.add_attribute("i16s", vec![1_i16, 2, 3, 4]).unwrap();
-        file.add_attribute("u32s", vec![1_u32, 2, 3, 4]).unwrap();
-        file.add_attribute("i32s", vec![1_i32, 2, 3, 4]).unwrap();
-        file.add_attribute("u64s", vec![1_u64, 2, 3, 4]).unwrap();
-        file.add_attribute("i64s", vec![1_i64, 2, 3, 4]).unwrap();
-        file.add_attribute("f32s", vec![1.0_f32, 2.0, 3.0, 4.0])
+        file.put_attribute("u8s", vec![1_u8, 2, 3, 4]).unwrap();
+        file.put_attribute("i8s", vec![1_i8, 2, 3, 4]).unwrap();
+        file.put_attribute("u16s", vec![1_u16, 2, 3, 4]).unwrap();
+        file.put_attribute("i16s", vec![1_i16, 2, 3, 4]).unwrap();
+        file.put_attribute("u32s", vec![1_u32, 2, 3, 4]).unwrap();
+        file.put_attribute("i32s", vec![1_i32, 2, 3, 4]).unwrap();
+        file.put_attribute("u64s", vec![1_u64, 2, 3, 4]).unwrap();
+        file.put_attribute("i64s", vec![1_i64, 2, 3, 4]).unwrap();
+        file.put_attribute("f32s", vec![1.0_f32, 2.0, 3.0, 4.0])
             .unwrap();
-        file.add_attribute("f64s", vec![1.0_f64, 2.0, 3.0, 4.0])
+        file.put_attribute("f64s", vec![1.0_f64, 2.0, 3.0, 4.0])
             .unwrap();
     }
     let file = netcdf::open(path).unwrap();

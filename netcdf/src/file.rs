@@ -374,13 +374,22 @@ impl FileMut {
         self.groups().map(|g| g.map(|g| GroupMut(g, PhantomData)))
     }
 
-    /// Add an attribute to the root group
-    pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
+    /// Put an attribute on the root group
+    pub fn put_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
     where
         T: Into<AttributeValue>,
     {
         let (ncid, name) = super::group::get_parent_ncid_and_stem(self.ncid(), name)?;
         Attribute::put(ncid, NC_GLOBAL, name, val.into())
+    }
+
+    /// Add an attribute to the root group
+    #[deprecated(note = "renamed to `put_attribute` for consistency with `VariableMut`")]
+    pub fn add_attribute<'a, T>(&'a mut self, name: &str, val: T) -> error::Result<Attribute<'a>>
+    where
+        T: Into<AttributeValue>,
+    {
+        self.put_attribute(name, val)
     }
 
     /// Adds a dimension with the given name and size. A size of zero gives an unlimited dimension
