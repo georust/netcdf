@@ -31,7 +31,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
       - name: Check spelling
-        uses: crate-ci/typos@512fc24f32f44ab01972217aaaf3dc86ec234d53 # v1.50.2
+        uses: crate-ci/typos@4c8b7f51ca60df14e3c5ca82770dfbbe6c3dae85 # v1.52.0
 
   format-and-clippy:
     name: rustfmt
